@@ -51,16 +51,20 @@ serve(async (req) => {
       throw new Error('No audio data provided');
     }
 
+    console.log('Received audio data, processing...');
+    
     // Process audio in chunks
     const binaryAudio = processBase64Chunks(audio);
+    console.log('Audio data processed, size:', binaryAudio.length, 'bytes');
     
     // Prepare form data
     const formData = new FormData();
-    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
-    formData.append('file', blob, 'audio.webm');
+    // Use mp3 format which is more widely supported
+    const blob = new Blob([binaryAudio], { type: 'audio/mp3' });
+    formData.append('file', blob, 'audio.mp3');
     formData.append('model', 'whisper-1');
-
-    // Log API key presence (without revealing it)
+    
+    console.log('Sending request to OpenAI API...');
     console.log('OPENAI_API_KEY present:', !!Deno.env.get('OPENAI_API_KEY'));
 
     // Send to OpenAI

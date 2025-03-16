@@ -24,7 +24,17 @@ const DoctorAssessment = () => {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      // Specify audio format as mp3 if possible, or use a more compatible format
+      const options = { mimeType: 'audio/mp3;codecs=mp3' };
+      
+      let mediaRecorder;
+      try {
+        mediaRecorder = new MediaRecorder(stream, options);
+      } catch (e) {
+        console.log('MediaRecorder with specified options failed, trying default options');
+        mediaRecorder = new MediaRecorder(stream);
+      }
+      
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       
@@ -35,17 +45,19 @@ const DoctorAssessment = () => {
       };
       
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
         setAudioBlob(audioBlob);
         
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
         audio.oncanplaythrough = () => {
           console.log(`Audio duration: ${audio.duration} seconds`);
+          console.log(`Audio type: ${audioBlob.type}`);
+          console.log(`Audio size: ${audioBlob.size} bytes`);
         };
       };
       
-      mediaRecorder.start();
+      mediaRecorder.start(100); // Collect data every 100ms for smoother processing
       setIsRecording(true);
       
       toast({
@@ -94,8 +106,10 @@ const DoctorAssessment = () => {
       
       reader.onloadend = async () => {
         const base64data = reader.result as string;
-        // Remove the data URL prefix (e.g., data:audio/webm;base64,)
+        // Remove the data URL prefix (e.g., data:audio/mp3;base64,)
         const base64Audio = base64data.split(',')[1];
+        
+        console.log('Sending audio for transcription, size:', base64Audio?.length || 0);
         
         // Call Supabase Edge Function
         const { data, error } = await supabase.functions.invoke('transcribe-audio', {
@@ -103,6 +117,7 @@ const DoctorAssessment = () => {
         });
         
         if (error) {
+          console.error('Transcription error:', error);
           throw new Error(error.message);
         }
         
