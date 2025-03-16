@@ -64,3 +64,21 @@
 .dark-input::placeholder {
   color: rgba(243, 244, 246, 0.5);
 }
+
+/* Gold text styling */
+.gold-text {
+  color: #FDCF9A;
+  text-shadow: 0 0 10px rgba(253, 207, 154, 0.3);
+}
+
+/* Form section styling */
+.form-section {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(253, 207, 154, 0.1);
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 450px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}

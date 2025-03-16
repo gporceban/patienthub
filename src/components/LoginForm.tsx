@@ -41,16 +41,23 @@ const LoginForm: React.FC = () => {
       return;
     }
 
+    if (!password) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao fazer login",
+        description: "Por favor, insira sua senha.",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       console.log(`Attempting login with email: ${email}`);
       
-      // For demo purposes, using a simplified login approach
-      // In production, would need proper authentication and verification
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password: password || 'default-password', // In this design, password might be optional
+        password,
       });
 
       if (error) {
@@ -113,7 +120,7 @@ const LoginForm: React.FC = () => {
         </p>
         <button 
           onClick={() => redirectBasedOnUserType(profile.user_type)}
-          className="form-button"
+          className="button-gold-gradient px-6 py-2 rounded-lg font-semibold transition-all"
         >
           Ir para Dashboard
         </button>
@@ -127,12 +134,8 @@ const LoginForm: React.FC = () => {
         Área exclusiva para pacientes do Dr. Porceban
       </h2>
       <p className="mb-6 text-sm text-gray-400 text-center">
-        O acesso se dará através do link recebido no email de pós consulta. Veja como proceder:
+        Entre com seu email e senha para acessar sua área do paciente
       </p>
-      <ul className="mb-6 text-xs text-gray-400 text-left list-decimal pl-5 space-y-1">
-        <li>Insira o email no qual obteve as orientações pós consulta (email cadastrado)</li>
-        <li>É necessário que este página tenha sido acessada com o link enviado pelo email</li>
-      </ul>
       
       <div className="space-y-4 w-full">
         <Input
@@ -140,10 +143,17 @@ const LoginForm: React.FC = () => {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="form-input"
+          className="dark-input"
+        />
+        <Input
+          type="password"
+          placeholder="Senha"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="dark-input"
         />
         <button 
-          className="form-button"
+          className="button-gold-gradient w-full px-6 py-2 rounded-lg font-semibold transition-all"
           onClick={handleLogin}
           disabled={isLoading}
         >
@@ -153,7 +163,7 @@ const LoginForm: React.FC = () => {
       
       <div className="mt-4 text-center">
         <button className="text-amber-300/90 hover:text-amber-200 text-sm">
-          Recuperar Link
+          Esqueci minha senha
         </button>
       </div>
     </div>
