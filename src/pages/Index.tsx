@@ -15,19 +15,19 @@ const Index = () => {
           <Logo size="large" />
           <h1 className="mt-6 text-3xl md:text-4xl font-bold">
             <span className="text-white">Cuidado Ortopédico</span>{' '}
-            <span className="gold-text">Unificado</span>
+            <span className="gold-text">Especializado</span>
           </h1>
           <p className="mt-3 text-gray-400 max-w-md mx-auto">
-            Plataforma completa para gerenciamento de saúde ortopédica, conectando médicos e pacientes.
+            Plataforma completa para gerenciamento de saúde ortopédica, desenvolvida para o cuidado personalizado de seus pacientes.
           </p>
         </div>
         
-        <Card className="card-gradient w-full max-w-md p-6">
+        <Card className="card-gradient w-full max-w-md p-6 border-gold-400/20">
           <LoginForm />
         </Card>
         
         <div className="mt-8 text-center text-sm text-gray-500">
-          <p>© 2023 OrthoCareMosaic. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} Patient Hub by Dr. Porceban. Todos os direitos reservados.</p>
           <div className="mt-2 space-x-4">
             <a href="#" className="text-gold-400 hover:underline">Termos de Uso</a>
             <a href="#" className="text-gold-400 hover:underline">Política de Privacidade</a>
