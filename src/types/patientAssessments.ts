@@ -23,7 +23,18 @@ export const fromPatientAssessments = (supabase: any) => {
     select: () => {
       return supabase.from('patient_assessments').select('*') as any;
     },
-    insert: (values: Omit<PatientAssessment, 'id' | 'created_at' | 'updated_at'> & { id?: string }) => {
+    insert: (values: { 
+      patient_email: string; 
+      patient_name: string; 
+      prontuario_id: string; 
+      doctor_id?: string | null;
+      transcription?: string | null;
+      clinical_note?: string | null;
+      prescription?: string | null;
+      summary?: string | null;
+      structured_data?: any | null;
+      id?: string;
+    }) => {
       return supabase.from('patient_assessments').insert(values) as any;
     },
     update: (values: Partial<Omit<PatientAssessment, 'id' | 'created_at' | 'updated_at'>>, id: string) => {
