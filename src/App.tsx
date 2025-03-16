@@ -9,6 +9,7 @@ import { supabase } from "./integrations/supabase/client";
 import Index from "./pages/Index";
 import PatientDashboard from "./pages/PatientDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
+import DoctorAssessment from "./pages/DoctorAssessment";
 import NotFound from "./pages/NotFound";
 import StarBackground from "./components/StarBackground";
 
@@ -113,6 +114,16 @@ const App = () => {
                 element={
                   profile?.user_type === 'medico' ? (
                     <DoctorDashboard />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                } 
+              />
+              <Route 
+                path="/medico/avaliacao" 
+                element={
+                  profile?.user_type === 'medico' ? (
+                    <DoctorAssessment />
                   ) : (
                     <Navigate to="/" replace />
                   )

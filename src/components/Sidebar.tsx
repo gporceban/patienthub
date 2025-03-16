@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, FileText, Home, MessageSquare, BookOpen, Users, Activity } from 'lucide-react';
+import { Calendar, FileText, Home, MessageSquare, BookOpen, Users, Activity, Stethoscope } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -45,6 +45,11 @@ const Sidebar: React.FC<SidebarProps> = ({ userType }) => {
       icon: <Home size={20} />, 
       label: 'Dashboard', 
       path: `${basePath}` 
+    },
+    { 
+      icon: <Stethoscope size={20} />, 
+      label: 'Avaliação', 
+      path: `${basePath}/avaliacao` 
     },
     { 
       icon: <Calendar size={20} />, 
