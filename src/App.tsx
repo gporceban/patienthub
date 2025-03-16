@@ -26,10 +26,12 @@ export const AuthContext = createContext<{
   user: any;
   profile: any;
   loading: boolean;
+  refreshProfile: () => Promise<void>;
 }>({
   user: null,
   profile: null,
   loading: true,
+  refreshProfile: async () => {},
 });
 
 const App = () => {
@@ -62,6 +64,16 @@ const App = () => {
     } catch (error) {
       console.error("Exception in fetchUserProfile:", error);
       return null;
+    }
+  };
+
+  // Function to refresh profile - can be called after profile updates
+  const refreshProfile = async () => {
+    if (user) {
+      const profileData = await fetchUserProfile(user.id);
+      if (profileData) {
+        setProfile(profileData);
+      }
     }
   };
 
@@ -139,7 +151,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider value={{ user, profile, loading }}>
+      <AuthContext.Provider value={{ user, profile, loading, refreshProfile }}>
         <TooltipProvider>
           <StarBackground />
           <Toaster />

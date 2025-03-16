@@ -25,18 +25,24 @@ const LoginForm: React.FC = () => {
 
   const redirectBasedOnUserType = (userType: string) => {
     console.log(`Redirecting user to /${userType} page`);
-    if (userType === 'paciente') {
-      navigate('/paciente', { replace: true });
-    } else if (userType === 'medico') {
-      navigate('/medico', { replace: true });
-    } else {
-      console.error("Unknown user type:", userType);
-      toast({
-        variant: "destructive",
-        title: "Erro de perfil",
-        description: "Tipo de usuário desconhecido. Por favor, contate o suporte.",
-      });
-    }
+    
+    // Force a slight delay to ensure state updates complete
+    setTimeout(() => {
+      if (userType === 'paciente') {
+        console.log("Navigating to /paciente with replace=true");
+        navigate('/paciente', { replace: true });
+      } else if (userType === 'medico') {
+        console.log("Navigating to /medico with replace=true");
+        navigate('/medico', { replace: true });
+      } else {
+        console.error("Unknown user type:", userType);
+        toast({
+          variant: "destructive",
+          title: "Erro de perfil",
+          description: "Tipo de usuário desconhecido. Por favor, contate o suporte.",
+        });
+      }
+    }, 100);
   };
 
   const handleLogin = async () => {
@@ -159,6 +165,11 @@ const LoginForm: React.FC = () => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="dark-input"
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              handleLogin();
+            }
+          }}
         />
         <button 
           className="button-gold-gradient w-full px-6 py-2 rounded-lg font-semibold transition-all"
