@@ -98,7 +98,7 @@ const LoginForm: React.FC = () => {
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
-          .maybeSingle();
+          .single();
 
         if (profileError) {
           console.error("Error fetching profile:", profileError);
@@ -116,7 +116,10 @@ const LoginForm: React.FC = () => {
           return;
         }
 
-        console.log(`Login successful as ${profileData.user_type}, redirecting...`);
+        // Safely access user_type after confirming profileData exists
+        const userType = profileData.user_type;
+        
+        console.log(`Login successful as ${userType}, redirecting...`);
         toast({
           title: "Login realizado com sucesso",
           description: `Bem-vindo ao OrthoCareMosaic.`,
@@ -126,7 +129,7 @@ const LoginForm: React.FC = () => {
         await refreshProfile();
         
         // Then redirect based on the user type from the profile we just fetched
-        redirectBasedOnUserType(profileData.user_type);
+        redirectBasedOnUserType(userType);
       }
     } catch (error: any) {
       console.error('Login error:', error);

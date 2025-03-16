@@ -26,13 +26,6 @@ export const supabase = createClient<Database>(
         'x-app-name': 'ortho-care-mosaic',
       },
     },
-    // Add custom fetch implementation with CORS mode
-    fetch: (url, options) => {
-      return fetch(url, {
-        ...options,
-        mode: 'cors',
-      });
-    },
   }
 );
 

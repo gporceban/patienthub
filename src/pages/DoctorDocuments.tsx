@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useContext } from 'react';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
@@ -62,37 +63,40 @@ const DoctorDocuments = () => {
           const docs: Document[] = [];
           
           data.forEach(assessment => {
-            if (assessment && assessment.clinical_note) {
-              docs.push({
-                id: `${assessment.id}-note`,
-                name: "Nota Clínica",
-                type: "Nota Clínica",
-                patient_name: assessment.patient_name || "Desconhecido",
-                patient_id: assessment.prontuario_id || "Sem ID",
-                created_at: assessment.created_at || new Date().toISOString(),
-              });
-            }
-            
-            if (assessment && assessment.prescription) {
-              docs.push({
-                id: `${assessment.id}-prescription`,
-                name: "Receita",
-                type: "Receita",
-                patient_name: assessment.patient_name || "Desconhecido",
-                patient_id: assessment.prontuario_id || "Sem ID",
-                created_at: assessment.created_at || new Date().toISOString(),
-              });
-            }
-            
-            if (assessment && assessment.summary) {
-              docs.push({
-                id: `${assessment.id}-summary`,
-                name: "Resumo",
-                type: "Resumo",
-                patient_name: assessment.patient_name || "Desconhecido",
-                patient_id: assessment.prontuario_id || "Sem ID",
-                created_at: assessment.created_at || new Date().toISOString(),
-              });
+            // Safely check for presence of properties
+            if (assessment && assessment.id) {
+              if (assessment.clinical_note) {
+                docs.push({
+                  id: `${assessment.id}-note`,
+                  name: "Nota Clínica",
+                  type: "Nota Clínica",
+                  patient_name: assessment.patient_name || "Desconhecido",
+                  patient_id: assessment.prontuario_id || "Sem ID",
+                  created_at: assessment.created_at || new Date().toISOString(),
+                });
+              }
+              
+              if (assessment.prescription) {
+                docs.push({
+                  id: `${assessment.id}-prescription`,
+                  name: "Receita",
+                  type: "Receita",
+                  patient_name: assessment.patient_name || "Desconhecido",
+                  patient_id: assessment.prontuario_id || "Sem ID",
+                  created_at: assessment.created_at || new Date().toISOString(),
+                });
+              }
+              
+              if (assessment.summary) {
+                docs.push({
+                  id: `${assessment.id}-summary`,
+                  name: "Resumo",
+                  type: "Resumo",
+                  patient_name: assessment.patient_name || "Desconhecido",
+                  patient_id: assessment.prontuario_id || "Sem ID",
+                  created_at: assessment.created_at || new Date().toISOString(),
+                });
+              }
             }
           });
           

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import Layout from '@/components/Layout';
 import DashboardCard from '@/components/DashboardCard';
@@ -77,20 +76,29 @@ const DoctorDashboard = () => {
         if (appointmentsData && appointmentsData.length > 0) {
           const appointmentsWithNames = await Promise.all(
             appointmentsData.map(async (appointment) => {
+              // Safely check if appointment exists and has patient_id
               if (!appointment || !appointment.patient_id) {
                 return { ...appointment, patient_name: 'Desconhecido' };
               }
               
-              const { data: profileData } = await supabase
-                .from('profiles')
-                .select('full_name')
-                .eq('id', appointment.patient_id)
-                .maybeSingle();
-                
-              return {
-                ...appointment,
-                patient_name: profileData?.full_name || 'Paciente'
-              };
+              try {
+                const { data: profileData } = await supabase
+                  .from('profiles')
+                  .select('full_name')
+                  .eq('id', appointment.patient_id)
+                  .single();
+                  
+                return {
+                  ...appointment,
+                  patient_name: profileData?.full_name || 'Paciente'
+                };
+              } catch (error) {
+                console.error("Error fetching patient name:", error);
+                return {
+                  ...appointment,
+                  patient_name: 'Paciente'
+                };
+              }
             })
           );
           
@@ -103,7 +111,9 @@ const DoctorDashboard = () => {
           
           // Get unique patient count
           const uniquePatients = new Set(
-            appointmentsWithNames.filter(app => app?.patient_id).map(app => app?.patient_id)
+            appointmentsWithNames
+              .filter(app => app && app.patient_id)
+              .map(app => app.patient_id)
           ).size;
           
           setStats({
@@ -293,10 +303,10 @@ const DoctorDashboard = () => {
   };
   
   return (
-    <Layout userType="medico" userName={doctorName}>
+    <Layout userType="medico" userName={profile?.full_name || "Dr. Paulo Oliveira"}>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white mb-2">
-          Bem-vindo, <span className="text-gold-400">{doctorName}</span>
+          Bem-vindo, <span className="text-gold-400">{profile?.full_name || "Dr. Paulo Oliveira"}</span>
         </h1>
         <p className="text-gray-400">
           Gerencie seus pacientes e consultas
@@ -509,4 +519,3 @@ const DoctorDashboard = () => {
 };
 
 export default DoctorDashboard;
-
