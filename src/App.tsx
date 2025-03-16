@@ -26,11 +26,13 @@ export const AuthContext = createContext<{
   user: any;
   profile: any;
   loading: boolean;
+  error: string | null;
   refreshProfile: () => Promise<void>;
 }>({
   user: null,
   profile: null,
   loading: true,
+  error: null,
   refreshProfile: async () => {},
 });
 
@@ -38,31 +40,50 @@ const App = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch profile helper function to avoid code duplication
   const fetchUserProfile = async (userId: string) => {
     try {
       console.log("Fetching profile for user:", userId);
-      const { data: profileData, error: profileError } = await supabase
+      
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Profile fetch timeout")), 10000);
+      });
+      
+      const fetchPromise = supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId as any)
+        .eq('id', userId)
         .maybeSingle();
+      
+      // Race between fetch and timeout
+      const { data: profileData, error: profileError } = await Promise.race([
+        fetchPromise,
+        timeoutPromise.then(() => {
+          throw new Error("Profile fetch timeout");
+        })
+      ]) as any;
       
       if (profileError) {
         console.error("Error fetching profile:", profileError);
+        setError(`Error fetching profile: ${profileError.message}`);
         return null;
       }
       
       if (profileData) {
         console.log("Profile loaded successfully:", profileData);
+        setError(null);
         return profileData;
       } else {
         console.warn("No profile found for user:", userId);
+        setError("No profile found for your user ID. Please contact support.");
         return null;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Exception in fetchUserProfile:", error);
+      setError(`Error fetching profile: ${error.message}`);
       return null;
     }
   };
@@ -70,10 +91,12 @@ const App = () => {
   // Function to refresh profile - can be called after profile updates
   const refreshProfile = async () => {
     if (user) {
+      setLoading(true);
       const profileData = await fetchUserProfile(user.id);
       if (profileData) {
         setProfile(profileData);
       }
+      setLoading(false);
     }
   };
 
@@ -96,8 +119,9 @@ const App = () => {
         } else {
           console.log("No active session found");
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error getting initial session:", error);
+        setError(`Error getting initial session: ${error.message}`);
       } finally {
         setLoading(false);
       }
@@ -114,6 +138,7 @@ const App = () => {
           console.log("User signed out, clearing state");
           setUser(null);
           setProfile(null);
+          setError(null);
           queryClient.clear(); // Clear any cached queries
         } else if (session?.user) {
           console.log("User session updated:", session.user.id);
@@ -139,10 +164,22 @@ const App = () => {
   const LoadingOrRedirect = () => {
     if (loading) {
       return (
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-screen flex items-center justify-center flex-col">
           <div className="card-gradient rounded-lg p-8">
             <p className="text-xl text-gold-400">Carregando...</p>
           </div>
+          {error && (
+            <div className="mt-4 p-4 bg-red-900/50 text-red-200 rounded max-w-md">
+              <p className="font-medium">Erro:</p>
+              <p>{error}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="mt-2 px-4 py-2 bg-red-800 text-white rounded hover:bg-red-700"
+              >
+                Recarregar Página
+              </button>
+            </div>
+          )}
         </div>
       );
     }
@@ -151,7 +188,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider value={{ user, profile, loading, refreshProfile }}>
+      <AuthContext.Provider value={{ user, profile, loading, error, refreshProfile }}>
         <TooltipProvider>
           <StarBackground />
           <Toaster />

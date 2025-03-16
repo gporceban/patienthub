@@ -14,10 +14,10 @@ const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const navigate = useNavigate();
-  const { user, profile, loading, refreshProfile } = useContext(AuthContext);
+  const { user, profile, loading, error, refreshProfile } = useContext(AuthContext);
 
   useEffect(() => {
-    console.log("LoginForm rendered. Auth state:", { user: !!user, profile, loading });
+    console.log("LoginForm rendered. Auth state:", { user: !!user, profile, loading, error });
     
     // Only redirect if we have both user and profile with user_type
     if (!loading && user && profile?.user_type) {
@@ -98,7 +98,7 @@ const LoginForm: React.FC = () => {
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
         if (profileError) {
           console.error("Error fetching profile:", profileError);
@@ -169,6 +169,26 @@ const LoginForm: React.FC = () => {
       setIsClearing(false);
     }
   };
+
+  // If there's an auth error, show it
+  if (error) {
+    return (
+      <div className="text-center">
+        <p className="text-red-400 text-lg font-semibold mb-4">
+          Erro de autenticação
+        </p>
+        <p className="text-red-300 mb-4">{error}</p>
+        <div className="flex flex-col space-y-3">
+          <button 
+            onClick={handleClearSession}
+            className="button-gold-gradient px-6 py-2 rounded-lg font-semibold transition-all"
+          >
+            Limpar Sessão e Tentar Novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // If already logged in, show a message or redirect
   if (!loading && user && profile) {
