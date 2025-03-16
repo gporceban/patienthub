@@ -7,20 +7,18 @@ interface LogoProps {
 
 const Logo: React.FC<LogoProps> = ({ size = 'medium' }) => {
   const sizeClasses = {
-    small: 'text-2xl md:text-3xl',
-    medium: 'text-3xl md:text-4xl',
-    large: 'text-4xl md:text-5xl',
+    small: 'h-8 md:h-10',
+    medium: 'h-12 md:h-16',
+    large: 'h-16 md:h-20',
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative">
-        <img 
-          src="/lovable-uploads/928027f7-2ed3-4bc7-bdd7-366cc08fbf87.png" 
-          alt="Patient Hub logo"
-          className={`h-${size === 'small' ? '8' : size === 'medium' ? '10' : '12'} w-auto`}
-        />
-      </div>
+    <div className="flex items-center justify-center">
+      <img 
+        src="/lovable-uploads/b29d5752-94e4-453d-8259-9bbe370370fd.png" 
+        alt="Patient Hub by Dr. Porceban"
+        className={`${sizeClasses[size]} w-auto`}
+      />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 
 const StarBackground: React.FC = () => {
   const starsRef = useRef<HTMLDivElement>(null);
+  const horizonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!starsRef.current) return;
@@ -10,7 +11,7 @@ const StarBackground: React.FC = () => {
     const starContainer = starsRef.current;
     starContainer.innerHTML = '';
     
-    const numberOfStars = 100;
+    const numberOfStars = 150;
     
     for (let i = 0; i < numberOfStars; i++) {
       const star = document.createElement('div');
@@ -33,7 +34,12 @@ const StarBackground: React.FC = () => {
     }
   }, []);
   
-  return <div ref={starsRef} className="stars"></div>;
+  return (
+    <>
+      <div ref={starsRef} className="stars"></div>
+      <div ref={horizonRef} className="planet-horizon"></div>
+    </>
+  );
 };
 
 export default StarBackground;

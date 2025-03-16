@@ -3,9 +3,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from 'react-router-dom';
-import { Lock, User, UserCog } from 'lucide-react';
+import { User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/App';
 
@@ -32,12 +31,12 @@ const LoginForm: React.FC = () => {
     }
   };
 
-  const handleLogin = async (role: 'paciente' | 'medico') => {
-    if (!email || !password) {
+  const handleLogin = async () => {
+    if (!email) {
       toast({
         variant: "destructive",
         title: "Erro ao fazer login",
-        description: "Por favor, preencha todos os campos.",
+        description: "Por favor, insira seu email.",
       });
       return;
     }
@@ -45,11 +44,13 @@ const LoginForm: React.FC = () => {
     setIsLoading(true);
 
     try {
-      console.log(`Attempting login as ${role} with email: ${email}`);
+      console.log(`Attempting login with email: ${email}`);
       
+      // For demo purposes, using a simplified login approach
+      // In production, would need proper authentication and verification
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password: password || 'default-password', // In this design, password might be optional
       });
 
       if (error) {
@@ -82,25 +83,14 @@ const LoginForm: React.FC = () => {
           return;
         }
 
-        // Check if user type matches the selected role
-        if (profileData && profileData.user_type !== role) {
-          console.error(`User type mismatch: expected ${role}, got ${profileData.user_type}`);
-          toast({
-            variant: "destructive",
-            title: "Tipo de usuário incorreto",
-            description: `Você tentou entrar como ${role}, mas sua conta está registrada como ${profileData.user_type}.`,
-          });
-          await supabase.auth.signOut();
-        } else if (profileData) {
-          console.log(`Login successful as ${role}, redirecting...`);
-          toast({
-            title: "Login realizado com sucesso",
-            description: `Você entrou como ${role}.`,
-          });
-          
-          // Redirect based on role
-          redirectBasedOnUserType(role);
-        }
+        console.log(`Login successful as ${profileData.user_type}, redirecting...`);
+        toast({
+          title: "Login realizado com sucesso",
+          description: `Bem-vindo ao Patient Hub.`,
+        });
+        
+        // Redirect based on role
+        redirectBasedOnUserType(profileData.user_type);
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -114,66 +104,16 @@ const LoginForm: React.FC = () => {
     }
   };
 
-  const handleSignUp = async (role: 'paciente' | 'medico') => {
-    if (!email || !password) {
-      toast({
-        variant: "destructive",
-        title: "Erro ao criar conta",
-        description: "Por favor, preencha todos os campos.",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      console.log(`Attempting to sign up as ${role} with email: ${email}`);
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            user_type: role,
-            full_name: '',
-          }
-        }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (data?.user) {
-        console.log("Signup successful:", data.user);
-        
-        toast({
-          title: "Conta criada com sucesso",
-          description: "Por favor, verifique seu e-mail para confirmar sua conta.",
-        });
-      }
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao criar conta",
-        description: error.message || "Ocorreu um erro durante o cadastro.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // If already logged in, show a message or redirect
   if (!loading && user && profile) {
     return (
       <div className="text-center">
-        <p className="text-gold-400 text-lg font-semibold mb-4">
+        <p className="text-amber-300/90 text-lg font-semibold mb-4">
           Você já está conectado como {profile.user_type === 'paciente' ? 'Paciente' : 'Médico'}
         </p>
         <Button 
           onClick={() => redirectBasedOnUserType(profile.user_type)}
-          className="bg-gradient-to-r from-darkblue-600 to-darkblue-800 hover:from-darkblue-700 hover:to-darkblue-900 text-white"
+          className="w-full bg-gradient-to-r from-amber-500/80 to-amber-600/80 hover:from-amber-500 hover:to-amber-600 text-white"
         >
           Ir para Dashboard
         </Button>
@@ -182,107 +122,25 @@ const LoginForm: React.FC = () => {
   }
 
   return (
-    <div className="w-full max-w-md">
-      <Tabs defaultValue="paciente" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-8">
-          <TabsTrigger value="paciente" className="flex items-center gap-2">
-            <User size={16} />
-            <span>Paciente</span>
-          </TabsTrigger>
-          <TabsTrigger value="medico" className="flex items-center gap-2">
-            <UserCog size={16} />
-            <span>Médico</span>
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="paciente">
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-center mb-6">
-              Área do <span className="gold-text">Paciente</span>
-            </h2>
-            <div className="space-y-2">
-              <Input
-                type="email"
-                placeholder="E-mail"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-darkblue-900/50 border-darkblue-700 focus:border-gold-400"
-              />
-              <Input
-                type="password"
-                placeholder="Senha"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-darkblue-900/50 border-darkblue-700 focus:border-gold-400"
-              />
-              <Button 
-                className="w-full bg-gradient-to-r from-darkblue-600 to-darkblue-800 hover:from-darkblue-700 hover:to-darkblue-900 text-white border border-darkblue-500"
-                onClick={() => handleLogin('paciente')}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Processando...' : 'Entrar como Paciente'}
-              </Button>
-              <div className="text-sm text-center mt-2 text-muted-foreground">
-                Não tem uma conta?{' '}
-                <button 
-                  onClick={() => handleSignUp('paciente')} 
-                  className="text-gold-400 hover:underline"
-                  disabled={isLoading}
-                >
-                  Cadastre-se
-                </button>
-              </div>
-              <div className="text-sm text-center mt-4 text-muted-foreground">
-                <a href="#" className="text-gold-400 hover:underline">Esqueceu sua senha?</a>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="medico">
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-center mb-6">
-              Área do <span className="gold-text">Médico</span>
-            </h2>
-            <div className="space-y-2">
-              <Input
-                type="email"
-                placeholder="E-mail"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-darkblue-900/50 border-darkblue-700 focus:border-gold-400"
-              />
-              <Input
-                type="password"
-                placeholder="Senha"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-darkblue-900/50 border-darkblue-700 focus:border-gold-400"
-              />
-              <Button 
-                className="w-full bg-gradient-to-r from-darkblue-600 to-darkblue-800 hover:from-darkblue-700 hover:to-darkblue-900 text-white border border-darkblue-500"
-                onClick={() => handleLogin('medico')}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Processando...' : 'Entrar como Médico'}
-              </Button>
-              <div className="text-sm text-center mt-2 text-muted-foreground">
-                Não tem uma conta?{' '}
-                <button 
-                  onClick={() => handleSignUp('medico')} 
-                  className="text-gold-400 hover:underline"
-                  disabled={isLoading}
-                >
-                  Cadastre-se
-                </button>
-              </div>
-              <div className="text-sm text-center mt-4 text-muted-foreground">
-                <a href="#" className="text-gold-400 hover:underline">Esqueceu sua senha?</a>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+    <div className="w-full">
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="bg-black/60 border-gray-700 focus:border-amber-400/50 placeholder-gray-500"
+          />
+          <Button 
+            className="w-full bg-gradient-to-r from-amber-500/80 to-amber-600/80 hover:from-amber-500 hover:to-amber-600 text-white"
+            onClick={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Processando...' : 'Entrar'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };
