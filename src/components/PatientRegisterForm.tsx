@@ -70,8 +70,26 @@ const PatientRegisterForm: React.FC = () => {
 
       console.log("Assessment check result:", existingAssessment);
 
+      // Fix: The query format was incorrect. Let's try a different approach
       if (!existingAssessment) {
-        throw new Error(`Não encontramos nenhum prontuário com ID ${prontuarioId} associado ao email ${email}. Verifique as informações ou entre em contato com seu médico.`);
+        // Try another query approach with proper parameter binding
+        const { data: secondAttempt, error: secondError } = await supabase
+          .from('patient_assessments')
+          .select('id')
+          .in('prontuario_id', [prontuarioId, formattedProntuarioId])
+          .eq('patient_email', email)
+          .maybeSingle();
+          
+        console.log("Second attempt result:", secondAttempt);
+        
+        if (secondError) {
+          console.error("Second database check error:", secondError);
+          throw secondError;
+        }
+        
+        if (!secondAttempt) {
+          throw new Error(`Não encontramos nenhum prontuário com ID ${prontuarioId} associado ao email ${email}. Verifique as informações ou entre em contato com seu médico.`);
+        }
       }
 
       // Register the user
