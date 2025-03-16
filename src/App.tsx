@@ -44,7 +44,7 @@ const App = () => {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('id', userId as any)
         .maybeSingle();
       
       if (profileError) {

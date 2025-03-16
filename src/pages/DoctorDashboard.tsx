@@ -68,10 +68,14 @@ const DoctorDashboard = () => {
         if (appointmentsData && appointmentsData.length > 0) {
           const appointmentsWithNames = await Promise.all(
             appointmentsData.map(async (appointment) => {
+              if (!appointment || !appointment.patient_id) {
+                return { ...appointment, patient_name: 'Unknown' };
+              }
+              
               const { data: profileData } = await supabase
                 .from('profiles')
                 .select('full_name')
-                .eq('id', appointment.patient_id)
+                .eq('id', appointment.patient_id as any)
                 .maybeSingle();
                 
               return {
@@ -81,16 +85,16 @@ const DoctorDashboard = () => {
             })
           );
           
-          setAppointments(appointmentsWithNames);
+          setAppointments(appointmentsWithNames as Appointment[]);
           
           // Calculate statistics
           const todayAppointments = appointmentsWithNames.filter(
-            app => app.date_time.startsWith(today)
+            app => app?.date_time?.startsWith(today)
           ).length;
           
           // Get unique patient count
           const uniquePatients = new Set(
-            appointmentsWithNames.map(app => app.patient_id)
+            appointmentsWithNames.filter(app => app?.patient_id).map(app => app?.patient_id)
           ).size;
           
           setStats({
@@ -188,19 +192,19 @@ const DoctorDashboard = () => {
         <DashboardCard
           title="Pacientes Ativos"
           value={stats.active_patients.toString()}
-          icon={<Users size={24} />}
+          icon={Users}
         />
         
         <DashboardCard
           title="Consultas Hoje"
           value={stats.today.toString()}
-          icon={<Calendar size={24} />}
+          icon={Calendar}
         />
         
         <DashboardCard
           title="Total de Atendimentos"
           value={stats.total.toString()}
-          icon={<FileText size={24} />}
+          icon={FileText}
         />
       </div>
       

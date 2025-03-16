@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useContext } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +63,7 @@ const LoginForm: React.FC = () => {
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', data.user.id)
+          .eq('id', data.user.id as any)
           .maybeSingle();
 
         if (profileError) {
@@ -82,7 +83,7 @@ const LoginForm: React.FC = () => {
         }
 
         // Check if user type matches the selected role
-        if (profileData.user_type !== role) {
+        if (profileData && profileData.user_type !== role) {
           console.error(`User type mismatch: expected ${role}, got ${profileData.user_type}`);
           toast({
             variant: "destructive",
@@ -90,7 +91,7 @@ const LoginForm: React.FC = () => {
             description: `Você tentou entrar como ${role}, mas sua conta está registrada como ${profileData.user_type}.`,
           });
           await supabase.auth.signOut();
-        } else {
+        } else if (profileData) {
           console.log(`Login successful as ${role}, redirecting...`);
           toast({
             title: "Login realizado com sucesso",

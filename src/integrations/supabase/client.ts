@@ -21,13 +21,6 @@ export const supabase = createClient<Database>(
       detectSessionInUrl: true,
       flowType: 'implicit',
       debug: true,
-      cookieOptions: {
-        name: 'ortho-care-auth-token',
-        lifetime: 604800, // 7 days
-        domain: window.location.hostname,
-        path: '/',
-        sameSite: 'lax',
-      },
     },
     global: {
       headers: {

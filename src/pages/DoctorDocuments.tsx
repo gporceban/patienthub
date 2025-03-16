@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
@@ -18,16 +17,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-// Mock document types for initial implementation
-const DOCUMENT_TYPES = [
-  "Nota Clínica",
-  "Receita",
-  "Atestado",
-  "Exame",
-  "Relatório",
-  "Outro"
-];
 
 // Document interface
 interface Document {
@@ -50,7 +39,6 @@ const DoctorDocuments = () => {
   const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   
-  // Mock fetch documents - to be replaced with real data later
   useEffect(() => {
     const fetchDocuments = async () => {
       if (!user) return;
@@ -74,36 +62,36 @@ const DoctorDocuments = () => {
           const docs: Document[] = [];
           
           data.forEach(assessment => {
-            if (assessment.clinical_note) {
+            if (assessment && assessment.clinical_note) {
               docs.push({
                 id: `${assessment.id}-note`,
                 name: "Nota Clínica",
                 type: "Nota Clínica",
-                patient_name: assessment.patient_name,
-                patient_id: assessment.prontuario_id,
-                created_at: assessment.created_at,
+                patient_name: assessment.patient_name || "Desconhecido",
+                patient_id: assessment.prontuario_id || "Sem ID",
+                created_at: assessment.created_at || new Date().toISOString(),
               });
             }
             
-            if (assessment.prescription) {
+            if (assessment && assessment.prescription) {
               docs.push({
                 id: `${assessment.id}-prescription`,
                 name: "Receita",
                 type: "Receita",
-                patient_name: assessment.patient_name,
-                patient_id: assessment.prontuario_id,
-                created_at: assessment.created_at,
+                patient_name: assessment.patient_name || "Desconhecido",
+                patient_id: assessment.prontuario_id || "Sem ID",
+                created_at: assessment.created_at || new Date().toISOString(),
               });
             }
             
-            if (assessment.summary) {
+            if (assessment && assessment.summary) {
               docs.push({
                 id: `${assessment.id}-summary`,
                 name: "Resumo",
                 type: "Resumo",
-                patient_name: assessment.patient_name,
-                patient_id: assessment.prontuario_id,
-                created_at: assessment.created_at,
+                patient_name: assessment.patient_name || "Desconhecido",
+                patient_id: assessment.prontuario_id || "Sem ID",
+                created_at: assessment.created_at || new Date().toISOString(),
               });
             }
           });
