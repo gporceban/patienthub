@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +46,7 @@ const LoginForm: React.FC = () => {
         // Fetch the user profile to confirm user type
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('user_type')
+          .select('*')
           .eq('id', data.user.id)
           .single();
 
@@ -56,7 +55,7 @@ const LoginForm: React.FC = () => {
         }
 
         // Check if user type matches the selected role
-        if (profileData.user_type !== role) {
+        if (profileData && profileData.user_type !== role) {
           toast({
             variant: "destructive",
             title: "Tipo de usuário incorreto",

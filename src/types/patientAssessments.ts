@@ -35,10 +35,10 @@ export const fromPatientAssessments = (supabase: any) => {
       structured_data?: any | null;
       id?: string;
     }) => {
-      return supabase.from('patient_assessments').insert(values) as any;
+      return supabase.from('patient_assessments').insert(values as any) as any;
     },
     update: (values: Partial<Omit<PatientAssessment, 'id' | 'created_at' | 'updated_at'>>, id: string) => {
-      return supabase.from('patient_assessments').update(values).eq('id', id) as any;
+      return supabase.from('patient_assessments').update(values as any).eq('id', id) as any;
     }
   };
 };

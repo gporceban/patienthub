@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -31,14 +30,12 @@ const DoctorProfile = () => {
     biography: '',
   });
 
-  // Redirect if not logged in or not a doctor
   useEffect(() => {
     if (!user || profile?.user_type !== 'medico') {
       navigate('/');
     }
   }, [user, profile, navigate]);
 
-  // Fetch doctor profile data
   useEffect(() => {
     const fetchDoctorProfile = async () => {
       if (!user) return;
@@ -51,11 +48,8 @@ const DoctorProfile = () => {
           .single();
         
         if (error) {
-          // If the doctor profile doesn't exist yet, we'll handle this case
           console.log('Error fetching doctor profile:', error);
           if (error.code === 'PGRST116') {
-            // This is the error code when no rows are returned by .single()
-            // We'll just set the doctorProfile to null
             setDoctorProfile(null);
           } else {
             toast({
@@ -64,9 +58,8 @@ const DoctorProfile = () => {
               description: error.message,
             });
           }
-        } else {
-          setDoctorProfile(data);
-          // Initialize form with doctor data
+        } else if (data) {
+          setDoctorProfile(data as DoctorProfile);
           setFormData({
             license_number: data.license_number || '',
             specialty: data.specialty || '',
@@ -102,19 +95,17 @@ const DoctorProfile = () => {
     
     try {
       if (doctorProfile) {
-        // Update existing profile
         const { error } = await supabase
           .from('doctors')
           .update({
             license_number: formData.license_number,
             specialty: formData.specialty,
             biography: formData.biography,
-          })
+          } as any)
           .eq('id', user.id);
           
         if (error) throw error;
       } else {
-        // Create new profile
         const { error } = await supabase
           .from('doctors')
           .insert({
@@ -122,11 +113,10 @@ const DoctorProfile = () => {
             license_number: formData.license_number,
             specialty: formData.specialty,
             biography: formData.biography,
-          });
+          } as any);
           
         if (error) throw error;
         
-        // Update local state with new profile
         setDoctorProfile({
           id: user.id,
           license_number: formData.license_number,

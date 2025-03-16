@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -7,7 +6,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
 import {
   Table,
@@ -61,9 +59,11 @@ const DoctorPatients = () => {
             title: "Erro ao carregar pacientes",
             description: error.message,
           });
-        } else {
-          setPatientAssessments(data || []);
-          setFilteredAssessments(data || []);
+        } else if (data) {
+          // Cast data to the correct type
+          const typedData = data as unknown as PatientAssessment[];
+          setPatientAssessments(typedData);
+          setFilteredAssessments(typedData);
         }
       } catch (error: any) {
         console.error('Error fetching patient assessments:', error);

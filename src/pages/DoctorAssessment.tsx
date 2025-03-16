@@ -63,9 +63,9 @@ const DoctorAssessment = () => {
         .limit(5);
       
       if (email) {
-        query.eq('patient_email', email);
+        query.ilike('patient_email', email);
       } else if (prontuarioId) {
-        query.eq('prontuario_id', prontuarioId);
+        query.ilike('prontuario_id', prontuarioId);
       }
       
       const { data, error } = await query;
@@ -114,19 +114,21 @@ const DoctorAssessment = () => {
         throw error;
       }
       
-      setAssessmentId(assessmentData.id);
-      setPatientInfo(data);
-      
-      // Fetch patient history
-      await fetchPatientHistory(data.email, data.prontuarioId);
-      
-      setStep('recording');
-      
-      toast({
-        title: "Informações do paciente salvas",
-        description: "Agora você pode iniciar a gravação da avaliação."
-      });
-    } catch (error) {
+      if (assessmentData) {
+        setAssessmentId(assessmentData.id);
+        setPatientInfo(data);
+        
+        // Fetch patient history
+        await fetchPatientHistory(data.email, data.prontuarioId);
+        
+        setStep('recording');
+        
+        toast({
+          title: "Informações do paciente salvas",
+          description: "Agora você pode iniciar a gravação da avaliação."
+        });
+      }
+    } catch (error: any) {
       console.error('Error saving patient info:', error);
       toast({
         variant: "destructive",
@@ -756,4 +758,3 @@ const DoctorAssessment = () => {
 };
 
 export default DoctorAssessment;
-

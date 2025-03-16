@@ -15,11 +15,8 @@ export const supabase = createClient<Database>(
   {
     auth: {
       persistSession: true,
-      storage: {
-        // This enables the use of cookies for session storage
-        type: 'localStorage',
-        // You can also use 'localStorage' which is the default
-      },
+      // Fixed storage configuration to use a valid SupportedStorage type
+      storage: localStorage
     },
   }
 );
