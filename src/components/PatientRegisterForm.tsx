@@ -50,17 +50,26 @@ const PatientRegisterForm: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // Format the prontuario_id by removing any hyphens for consistency
+      const formattedProntuarioId = prontuarioId.replace(/-/g, '');
+      
+      console.log(`Checking prontuario with normalized ID: ${formattedProntuarioId} and email: ${email}`);
+      
       // First check if a patient record with this email and prontuario_id exists
+      // Use both the formatted and original prontuarioId to handle different input formats
       const { data: existingAssessment, error: checkError } = await supabase
         .from('patient_assessments')
         .select('id')
+        .or(`prontuario_id.eq.${formattedProntuarioId},prontuario_id.eq.${prontuarioId}`)
         .eq('patient_email', email)
-        .eq('prontuario_id', prontuarioId)
         .maybeSingle();
 
       if (checkError) {
+        console.error("Database check error:", checkError);
         throw checkError;
       }
+
+      console.log("Assessment check result:", existingAssessment);
 
       if (!existingAssessment) {
         throw new Error(`Não encontramos nenhum prontuário com ID ${prontuarioId} associado ao email ${email}. Verifique as informações ou entre em contato com seu médico.`);
