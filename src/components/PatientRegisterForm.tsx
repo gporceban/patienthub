@@ -55,8 +55,7 @@ const PatientRegisterForm: React.FC = () => {
       
       console.log(`Checking prontuario with normalized ID: ${formattedProntuarioId} and email: ${email}`);
       
-      // First check if a patient record with this email and prontuario_id exists
-      // Use both the formatted and original prontuarioId to handle different input formats
+      // First check if a patient record with this email and prontuario_id exists in patient_assessments table
       const { data: existingAssessment, error: checkError } = await supabase
         .from('patient_assessments')
         .select('id')
