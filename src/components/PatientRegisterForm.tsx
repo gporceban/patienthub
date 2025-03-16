@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from 'react-router-dom';
 import { Loader2, User, Mail, Lock, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { AuthContext } from '@/contexts/AuthContext';
 
 const PatientRegisterForm: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -17,6 +18,14 @@ const PatientRegisterForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const auth = useContext(AuthContext);
+
+  // Check if we're already logged in
+  useEffect(() => {
+    if (auth.user && auth.profile?.user_type === 'paciente') {
+      navigate('/paciente');
+    }
+  }, [auth.user, auth.profile, navigate]);
 
   const handleRegister = async () => {
     // Validations
@@ -114,8 +123,12 @@ const PatientRegisterForm: React.FC = () => {
         description: "Você será redirecionado para a área do paciente.",
       });
 
-      // Give a small delay for the user to see the success message
+      // Manually update auth context to avoid waiting for the auth state to update
+      await auth.refreshProfile();
+      
+      // Give a small delay for the user to see the success message and auth context to update
       setTimeout(() => {
+        setIsLoading(false); // Make sure to set loading to false before redirecting
         navigate('/paciente');
       }, 1500);
     } catch (error: any) {
@@ -125,8 +138,7 @@ const PatientRegisterForm: React.FC = () => {
         title: "Erro no cadastro",
         description: error.message || "Ocorreu um erro durante o cadastro. Verifique suas informações.",
       });
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Make sure to set loading to false when there's an error
     }
   };
 
@@ -151,6 +163,7 @@ const PatientRegisterForm: React.FC = () => {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               className="dark-input pl-10"
+              disabled={isLoading}
             />
           </div>
         </div>
@@ -166,6 +179,7 @@ const PatientRegisterForm: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="dark-input pl-10"
+              disabled={isLoading}
             />
           </div>
         </div>
@@ -181,6 +195,7 @@ const PatientRegisterForm: React.FC = () => {
               value={prontuarioId}
               onChange={(e) => setProntuarioId(e.target.value)}
               className="dark-input pl-10"
+              disabled={isLoading}
             />
           </div>
           <p className="text-xs text-gray-500">Fornecido pelo seu médico</p>
@@ -197,6 +212,7 @@ const PatientRegisterForm: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="dark-input pl-10"
+              disabled={isLoading}
             />
           </div>
         </div>
@@ -212,6 +228,7 @@ const PatientRegisterForm: React.FC = () => {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="dark-input pl-10"
+              disabled={isLoading}
             />
           </div>
         </div>
