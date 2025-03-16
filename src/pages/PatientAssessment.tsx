@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { AuthContext } from '@/contexts/AuthContext';
@@ -8,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Calendar, FileText, User, FileMedical, FileDigit, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, User, FileHeart, FileDigit, Loader2 } from 'lucide-react';
 
 interface Assessment {
   id: string;
@@ -48,7 +47,6 @@ const PatientAssessment = () => {
         setIsLoading(true);
         setError(null);
         
-        // Fetch the assessment
         const { data: assessmentData, error: assessmentError } = await supabase
           .from('patient_assessments')
           .select('*')
@@ -66,7 +64,6 @@ const PatientAssessment = () => {
         
         setAssessment(assessmentData as Assessment);
         
-        // If there's a doctor_id, fetch the doctor's information
         if (assessmentData.doctor_id) {
           const { data: doctorData, error: doctorError } = await supabase
             .from('profiles')
@@ -177,7 +174,7 @@ const PatientAssessment = () => {
         <div className="lg:col-span-2">
           <Card className="card-gradient p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <FileMedical className="mr-2 text-gold-400" />
+              <FileHeart className="mr-2 text-gold-400" />
               Nota Clínica
             </h2>
             {assessment.clinical_note ? (
