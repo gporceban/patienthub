@@ -24,10 +24,18 @@ const LoginForm: React.FC = () => {
   }, [user, profile, loading]);
 
   const redirectBasedOnUserType = (userType: string) => {
+    console.log(`Redirecting user to /${userType} page`);
     if (userType === 'paciente') {
       navigate('/paciente', { replace: true });
     } else if (userType === 'medico') {
       navigate('/medico', { replace: true });
+    } else {
+      console.error("Unknown user type:", userType);
+      toast({
+        variant: "destructive",
+        title: "Erro de perfil",
+        description: "Tipo de usuário desconhecido. Por favor, contate o suporte.",
+      });
     }
   };
 
@@ -71,7 +79,7 @@ const LoginForm: React.FC = () => {
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', data.user.id as any)
+          .eq('id', data.user.id)
           .maybeSingle();
 
         if (profileError) {
@@ -93,10 +101,10 @@ const LoginForm: React.FC = () => {
         console.log(`Login successful as ${profileData.user_type}, redirecting...`);
         toast({
           title: "Login realizado com sucesso",
-          description: `Bem-vindo ao Patient Hub.`,
+          description: `Bem-vindo ao OrthoCareMosaic.`,
         });
         
-        // Redirect based on role
+        // Redirect based on role immediately after login
         redirectBasedOnUserType(profileData.user_type);
       }
     } catch (error: any) {
