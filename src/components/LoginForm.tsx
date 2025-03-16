@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useContext } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
@@ -6,19 +7,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from 'react-router-dom';
 import { Lock, User, UserCog } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { AuthContext } from '@/App';
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { user, profile } = useContext(AuthContext);
 
-  // Reset loading state when component unmounts or on navigation
+  // Check if user is already logged in and redirect accordingly
   useEffect(() => {
-    return () => {
-      setIsLoading(false);
-    };
-  }, []);
+    if (user && profile) {
+      redirectBasedOnUserType(profile.user_type);
+    }
+  }, [user, profile]);
+
+  const redirectBasedOnUserType = (userType: string) => {
+    if (userType === 'paciente') {
+      navigate('/paciente');
+    } else if (userType === 'medico') {
+      navigate('/medico');
+    }
+  };
 
   const handleLogin = async (role: 'paciente' | 'medico') => {
     if (!email || !password) {
@@ -55,27 +66,21 @@ const LoginForm: React.FC = () => {
         }
 
         // Check if user type matches the selected role
-        if (profileData && profileData.user_type !== role) {
+        if (profileData.user_type !== role) {
           toast({
             variant: "destructive",
             title: "Tipo de usuário incorreto",
             description: `Você tentou entrar como ${role}, mas sua conta está registrada como ${profileData.user_type}.`,
           });
           await supabase.auth.signOut();
-          setIsLoading(false);
-          return;
-        }
-
-        toast({
-          title: "Login realizado com sucesso",
-          description: `Você entrou como ${role}.`,
-        });
-        
-        // Redirect based on role
-        if (role === 'paciente') {
-          navigate('/paciente');
         } else {
-          navigate('/medico');
+          toast({
+            title: "Login realizado com sucesso",
+            description: `Você entrou como ${role}.`,
+          });
+          
+          // Redirect based on role
+          redirectBasedOnUserType(role);
         }
       }
     } catch (error: any) {
@@ -135,6 +140,23 @@ const LoginForm: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // If already logged in, show a message or redirect
+  if (user && profile) {
+    return (
+      <div className="text-center">
+        <p className="text-gold-400 text-lg font-semibold mb-4">
+          Você já está conectado como {profile.user_type === 'paciente' ? 'Paciente' : 'Médico'}
+        </p>
+        <Button 
+          onClick={() => redirectBasedOnUserType(profile.user_type)}
+          className="bg-gradient-to-r from-darkblue-600 to-darkblue-800 hover:from-darkblue-700 hover:to-darkblue-900 text-white"
+        >
+          Ir para Dashboard
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md">

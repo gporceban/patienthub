@@ -45,14 +45,17 @@ const App = () => {
           setUser(data.session.user);
           
           // Fetch user profile
-          const { data: profileData } = await supabase
+          const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', data.session.user.id)
-            .maybeSingle();
+            .single();
           
-          if (profileData) {
+          if (!profileError && profileData) {
             setProfile(profileData);
+            console.log("Profile loaded:", profileData);
+          } else {
+            console.error("Error fetching profile:", profileError);
           }
         }
       } catch (error) {
@@ -67,18 +70,26 @@ const App = () => {
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("Auth state changed:", event, session?.user?.id);
         setUser(session?.user || null);
         
         if (session?.user) {
           // Fetch user profile when auth state changes
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle();
-          
-          if (profileData) {
-            setProfile(profileData);
+          try {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            
+            if (!profileError && profileData) {
+              setProfile(profileData);
+              console.log("Profile updated:", profileData);
+            } else {
+              console.error("Error fetching updated profile:", profileError);
+            }
+          } catch (error) {
+            console.error("Error in auth state change handler:", error);
           }
         } else {
           setProfile(null);
@@ -106,70 +117,98 @@ const App = () => {
               <Route 
                 path="/paciente" 
                 element={
-                  profile?.user_type === 'paciente' ? (
-                    <PatientDashboard />
+                  !loading && user ? (
+                    profile?.user_type === 'paciente' ? (
+                      <PatientDashboard />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
                   ) : (
-                    <Navigate to="/" replace />
+                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
                   )
                 } 
               />
               <Route 
                 path="/paciente/avaliacoes" 
                 element={
-                  profile?.user_type === 'paciente' ? (
-                    <PatientAssessmentsList />
+                  !loading && user ? (
+                    profile?.user_type === 'paciente' ? (
+                      <PatientAssessmentsList />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
                   ) : (
-                    <Navigate to="/" replace />
+                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
                   )
                 } 
               />
               <Route 
                 path="/paciente/avaliacoes/:id" 
                 element={
-                  profile?.user_type === 'paciente' ? (
-                    <PatientAssessment />
+                  !loading && user ? (
+                    profile?.user_type === 'paciente' ? (
+                      <PatientAssessment />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
                   ) : (
-                    <Navigate to="/" replace />
+                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
                   )
                 } 
               />
               <Route 
                 path="/medico" 
                 element={
-                  profile?.user_type === 'medico' ? (
-                    <DoctorDashboard />
+                  !loading && user ? (
+                    profile?.user_type === 'medico' ? (
+                      <DoctorDashboard />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
                   ) : (
-                    <Navigate to="/" replace />
+                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
                   )
                 } 
               />
               <Route 
                 path="/medico/perfil" 
                 element={
-                  profile?.user_type === 'medico' ? (
-                    <DoctorProfile />
+                  !loading && user ? (
+                    profile?.user_type === 'medico' ? (
+                      <DoctorProfile />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
                   ) : (
-                    <Navigate to="/" replace />
+                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
                   )
                 } 
               />
               <Route 
                 path="/medico/pacientes" 
                 element={
-                  profile?.user_type === 'medico' ? (
-                    <DoctorPatients />
+                  !loading && user ? (
+                    profile?.user_type === 'medico' ? (
+                      <DoctorPatients />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
                   ) : (
-                    <Navigate to="/" replace />
+                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
                   )
                 } 
               />
               <Route 
                 path="/medico/avaliacao" 
                 element={
-                  profile?.user_type === 'medico' ? (
-                    <DoctorAssessment />
+                  !loading && user ? (
+                    profile?.user_type === 'medico' ? (
+                      <DoctorAssessment />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
                   ) : (
-                    <Navigate to="/" replace />
+                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
                   )
                 } 
               />
