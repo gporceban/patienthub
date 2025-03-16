@@ -12,6 +12,8 @@ import DoctorDashboard from "./pages/DoctorDashboard";
 import DoctorAssessment from "./pages/DoctorAssessment";
 import PatientAssessment from "./pages/PatientAssessment";
 import PatientAssessmentsList from "./pages/PatientAssessmentsList";
+import DoctorProfile from "./pages/DoctorProfile";
+import DoctorPatients from "./pages/DoctorPatients";
 import NotFound from "./pages/NotFound";
 import StarBackground from "./components/StarBackground";
 
@@ -136,6 +138,26 @@ const App = () => {
                 element={
                   profile?.user_type === 'medico' ? (
                     <DoctorDashboard />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                } 
+              />
+              <Route 
+                path="/medico/perfil" 
+                element={
+                  profile?.user_type === 'medico' ? (
+                    <DoctorProfile />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                } 
+              />
+              <Route 
+                path="/medico/pacientes" 
+                element={
+                  profile?.user_type === 'medico' ? (
+                    <DoctorPatients />
                   ) : (
                     <Navigate to="/" replace />
                   )
