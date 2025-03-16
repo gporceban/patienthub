@@ -5,6 +5,7 @@
   padding: 0;
   text-align: center;
   min-height: 100vh;
+  background-color: #000103;
 }
 
 .logo {
@@ -14,7 +15,7 @@
   transition: filter 300ms;
 }
 .logo:hover {
-  filter: drop-shadow(0 0 2em rgba(251, 191, 36, 0.6));
+  filter: drop-shadow(0 0 2em rgba(253, 207, 154, 0.6));
 }
 
 @keyframes logo-spin {
@@ -38,4 +39,28 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* Custom gradient for button backgrounds */
+.button-gold-gradient {
+  background: linear-gradient(to right, #FDCF9A, #d4af37);
+  color: #0a0a0a;
+  transition: all 0.3s ease;
+}
+
+.button-gold-gradient:hover {
+  filter: brightness(110%);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(253, 207, 154, 0.2);
+}
+
+/* Custom styles for form elements */
+.dark-input {
+  background-color: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(253, 207, 154, 0.1);
+  color: #f9f9f9;
+}
+
+.dark-input::placeholder {
+  color: rgba(243, 244, 246, 0.5);
 }

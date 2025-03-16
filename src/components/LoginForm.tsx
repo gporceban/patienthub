@@ -111,35 +111,50 @@ const LoginForm: React.FC = () => {
         <p className="text-amber-300/90 text-lg font-semibold mb-4">
           Você já está conectado como {profile.user_type === 'paciente' ? 'Paciente' : 'Médico'}
         </p>
-        <Button 
+        <button 
           onClick={() => redirectBasedOnUserType(profile.user_type)}
-          className="w-full bg-gradient-to-r from-amber-500/80 to-amber-600/80 hover:from-amber-500 hover:to-amber-600 text-white"
+          className="form-button"
         >
           Ir para Dashboard
-        </Button>
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="w-full">
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="bg-black/60 border-gray-700 focus:border-amber-400/50 placeholder-gray-500"
-          />
-          <Button 
-            className="w-full bg-gradient-to-r from-amber-500/80 to-amber-600/80 hover:from-amber-500 hover:to-amber-600 text-white"
-            onClick={handleLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Processando...' : 'Entrar'}
-          </Button>
-        </div>
+    <div className="w-full form-section">
+      <h2 className="text-lg gold-text font-medium mb-4 text-center">
+        Área exclusiva para pacientes do Dr. Porceban
+      </h2>
+      <p className="mb-6 text-sm text-gray-400 text-center">
+        O acesso se dará através do link recebido no email de pós consulta. Veja como proceder:
+      </p>
+      <ul className="mb-6 text-xs text-gray-400 text-left list-decimal pl-5 space-y-1">
+        <li>Insira o email no qual obteve as orientações pós consulta (email cadastrado)</li>
+        <li>É necessário que este página tenha sido acessada com o link enviado pelo email</li>
+      </ul>
+      
+      <div className="space-y-4 w-full">
+        <Input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="form-input"
+        />
+        <button 
+          className="form-button"
+          onClick={handleLogin}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Processando...' : 'Entrar'}
+        </button>
+      </div>
+      
+      <div className="mt-4 text-center">
+        <button className="text-amber-300/90 hover:text-amber-200 text-sm">
+          Recuperar Link
+        </button>
       </div>
     </div>
   );
