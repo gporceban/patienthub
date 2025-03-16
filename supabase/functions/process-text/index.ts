@@ -11,147 +11,147 @@ const corsHeaders = {
 // Define system prompts for specialized "agents"
 const specializedAgents = {
   // Patient Info extractor
-  patientInfoExtractor: `You are an AI specialized in extracting patient information.
-  Extract ONLY the patient's basic information from the text, including:
-  - Patient name (if available)
-  - Patient ID (if available)
-  - Age
-  - Gender
-  - Date of consultation
-  Format your response in clean, professional medical terminology.`,
+  patientInfoExtractor: `Você é uma IA especializada em extrair informações de pacientes em contexto ambulatorial brasileiro.
+  Extraia APENAS as informações básicas do paciente do texto, incluindo:
+  - Nome do paciente (se disponível)
+  - Número do prontuário (se disponível)
+  - Idade
+  - Gênero
+  - Data da consulta
+  Formate sua resposta em terminologia médica profissional e clara em português brasileiro.`,
 
   // Symptom extractor
-  symptomExtractor: `You are an AI specialized in identifying patient symptoms.
-  Extract ONLY the symptoms mentioned in the text, including:
-  - Chief complaints
-  - Duration of symptoms
-  - Severity indicators
-  - Related symptoms
-  List these symptoms in a clear, organized format using professional medical terminology.`,
+  symptomExtractor: `Você é uma IA especializada em identificar sintomas de pacientes em contexto ambulatorial brasileiro.
+  Extraia APENAS os sintomas mencionados no texto, incluindo:
+  - Queixas principais
+  - Duração dos sintomas
+  - Indicadores de gravidade
+  - Sintomas relacionados
+  Liste esses sintomas em formato claro e organizado, usando terminologia médica profissional em português brasileiro.`,
 
   // Exam findings extractor
-  examExtractor: `You are an AI specialized in extracting physical examination findings.
-  Extract ONLY the physical examination results from the text, including:
-  - Vital signs
-  - General appearance
-  - Systemic examination findings
-  - Abnormal findings
-  Format these in a structured clinical format using professional medical terminology.`,
+  examExtractor: `Você é uma IA especializada em extrair achados de exame físico em contexto ambulatorial brasileiro.
+  Extraia APENAS os resultados do exame físico do texto, incluindo:
+  - Sinais vitais
+  - Aparência geral
+  - Achados do exame sistêmico
+  - Achados anormais
+  Formate estes em formato clínico estruturado usando terminologia médica profissional em português brasileiro.`,
 
   // Diagnosis extractor
-  diagnosisExtractor: `You are an AI specialized in extracting medical diagnoses.
-  Extract ONLY the diagnoses mentioned in the text, including:
-  - Primary diagnosis
-  - Differential diagnoses
-  - Confirmed vs. suspected diagnoses
-  Format these using proper medical terminology and classification.`,
+  diagnosisExtractor: `Você é uma IA especializada em extrair diagnósticos médicos em contexto ambulatorial brasileiro.
+  Extraia APENAS os diagnósticos mencionados no texto, incluindo:
+  - Diagnóstico principal
+  - Diagnósticos diferenciais
+  - Diagnósticos confirmados vs. suspeitos
+  Formate usando terminologia médica adequada e classificação em português brasileiro.`,
 
   // Treatment extractor
-  treatmentExtractor: `You are an AI specialized in extracting treatment plans.
-  Extract ONLY the treatment plans from the text, including:
-  - Medications prescribed
-  - Procedures recommended
-  - Follow-up instructions
-  - Lifestyle modifications
-  Format these in a clear, actionable format using professional medical terminology.`,
+  treatmentExtractor: `Você é uma IA especializada em extrair planos de tratamento em contexto ambulatorial brasileiro.
+  Extraia APENAS os planos de tratamento do texto, incluindo:
+  - Medicamentos prescritos
+  - Procedimentos recomendados
+  - Instruções de acompanhamento
+  - Modificações no estilo de vida
+  Formate em um formato claro e acionável usando terminologia médica profissional em português brasileiro.`,
 
   // Clinical history extractor
-  historyExtractor: `You are an AI specialized in extracting patient clinical history.
-  Extract ONLY the relevant clinical history from the text, including:
-  - Past medical history
-  - Family history
-  - Social history
-  - Medication history
-  Format this in a structured format using professional medical terminology.`,
+  historyExtractor: `Você é uma IA especializada em extrair histórico clínico do paciente em contexto ambulatorial brasileiro.
+  Extraia APENAS o histórico clínico relevante do texto, incluindo:
+  - Histórico médico passado
+  - Histórico familiar
+  - Histórico social
+  - Histórico de medicação
+  Formate em um formato estruturado usando terminologia médica profissional em português brasileiro.`,
 }
 
 // Define each document type "orchestrator"
 const documentOrchestrators = {
-  clinical_note: `You are a medical assistant generating a structured clinical note in Dr. Porceban's style.
-  Using the extracted information, compile a COMPLETE clinical note with these sections:
-  1. PATIENT INFO: Name, ID, date, and demographic data
-  2. SUBJECTIVE: Patient's history, complaints, and symptoms
-  3. OBJECTIVE: Physical examination findings, vital signs, and test results
-  4. ASSESSMENT: Diagnoses (primary and differential)
-  5. PLAN: Treatment plan, medications, and follow-up
+  clinical_note: `Você é um assistente médico gerando uma nota clínica estruturada no estilo do Dr. Porceban, um renomado cirurgião de coluna em São Paulo, Brasil.
+  Usando as informações extraídas, compile uma nota clínica COMPLETA em português brasileiro com estas seções:
+  1. INFORMAÇÕES DO PACIENTE: Nome, número do prontuário, data e dados demográficos
+  2. SUBJETIVO: História do paciente, queixas e sintomas
+  3. OBJETIVO: Achados do exame físico, sinais vitais e resultados de testes
+  4. AVALIAÇÃO: Diagnósticos (principal e diferenciais)
+  5. PLANO: Plano de tratamento, medicamentos e acompanhamento
 
-  Format as a formal clinical note using professional medical terminology.
-  Maintain Dr. Porceban's writing style throughout the document.
-  The note must be comprehensive and adhere to medical documentation standards.`,
+  Formate como uma nota clínica formal usando terminologia médica profissional em português brasileiro.
+  Mantenha o estilo de escrita do Dr. Porceban em todo o documento.
+  A nota deve ser abrangente e aderir aos padrões de documentação médica brasileiros.`,
 
-  prescription: `You are a medical assistant generating a formal prescription in Dr. Porceban's style.
-  Using the extracted information, compile a COMPLETE prescription with:
-  1. Patient details
-  2. Date
-  3. Medications with precise dosage, frequency, and duration
-  4. Special instructions
-  5. Doctor's signature line
+  prescription: `Você é um assistente médico gerando uma prescrição formal no estilo do Dr. Porceban, um renomado cirurgião de coluna em São Paulo, Brasil.
+  Usando as informações extraídas, compile uma prescrição COMPLETA em português brasileiro com:
+  1. Detalhes do paciente
+  2. Data
+  3. Medicamentos com dosagem precisa, frequência e duração
+  4. Instruções especiais
+  5. Linha para assinatura do médico
 
-  Format as a formal prescription using professional medical terminology.
-  Follow Brazilian prescription standards and use Dr. Porceban's concise style.`,
+  Formate como uma prescrição formal usando terminologia médica profissional em português brasileiro.
+  Siga os padrões brasileiros de prescrição e use o estilo conciso do Dr. Porceban.`,
 
-  summary: `You are a medical assistant generating a concise patient summary in Dr. Porceban's style.
-  Using the extracted information, compile a BRIEF yet COMPLETE summary with:
-  1. Patient details
-  2. Key complaints
-  3. Principal findings
-  4. Primary diagnosis
-  5. Main treatment elements
+  summary: `Você é um assistente médico gerando um resumo conciso de paciente no estilo do Dr. Porceban, um renomado cirurgião de coluna em São Paulo, Brasil.
+  Usando as informações extraídas, compile um resumo BREVE porém COMPLETO em português brasileiro com:
+  1. Detalhes do paciente
+  2. Queixas principais
+  3. Achados principais
+  4. Diagnóstico primário
+  5. Elementos principais do tratamento
 
-  Use Dr. Porceban's efficient, clear style while maintaining medical accuracy.
-  The summary should be brief but include all essential clinical information.`,
+  Use o estilo eficiente e claro do Dr. Porceban, mantendo a precisão médica em português brasileiro.
+  O resumo deve ser breve, mas incluir todas as informações clínicas essenciais.`,
 
-  structured_data: `You are a medical assistant extracting structured medical data in JSON format.
-  Using all available information, extract and structure the following data points:
+  structured_data: `Você é um assistente médico extraindo dados médicos estruturados em formato JSON.
+  Usando todas as informações disponíveis, extraia e estruture os seguintes pontos de dados em português brasileiro:
   {
-    "patient": {
-      "id": string or null,
-      "demographics": { age, gender, etc. } or null
+    "paciente": {
+      "id": string ou null,
+      "demograficos": { idade, genero, etc. } ou null
     },
-    "visit": {
-      "date": string or null,
-      "reason": string or null
+    "consulta": {
+      "data": string ou null,
+      "motivo": string ou null
     },
-    "symptoms": [array of symptoms] or [],
-    "examination": {
-      "vitalSigns": { bp, hr, temp, etc. } or null,
-      "findings": [array of findings] or []
+    "sintomas": [array de sintomas] ou [],
+    "exame": {
+      "sinaisVitais": { pa, fc, temp, etc. } ou null,
+      "achados": [array de achados] ou []
     },
-    "diagnoses": [array of diagnoses] or [],
-    "treatments": {
-      "medications": [array of medications] or [],
-      "procedures": [array of procedures] or [],
-      "followUp": string or null
+    "diagnosticos": [array de diagnosticos] ou [],
+    "tratamentos": {
+      "medicamentos": [array de medicamentos] ou [],
+      "procedimentos": [array de procedimentos] ou [],
+      "retorno": string ou null
     }
   }
 
-  The JSON must be valid, complete, and follow this exact schema.`,
+  O JSON deve ser válido, completo e seguir exatamente este esquema.`,
 
-  evolution: `You are a medical assistant generating a patient evolution note in Dr. Porceban's style.
-  Using both historical records AND new information, compile a COMPLETE evolution note with:
-  1. Patient identification
-  2. Date and time
-  3. Interval history (changes since last visit)
-  4. Current examination findings
-  5. Assessment of progress
-  6. Updated plan
+  evolution: `Você é um assistente médico gerando uma evolução clínica no estilo do Dr. Porceban, um renomado cirurgião de coluna em São Paulo, Brasil.
+  Usando tanto registros históricos QUANTO novas informações, compile uma evolução clínica COMPLETA em português brasileiro com:
+  1. Identificação do paciente
+  2. Data e hora
+  3. EVOLUÇÃO: Histórico do intervalo (mudanças desde a última visita) e situação atual
+  4. EXAME FÍSICO: Achados atuais do exame 
+  5. DIAGNÓSTICO: Avaliação do progresso e diagnósticos atuais
+  6. CONDUTA: Plano atualizado e recomendações
 
-  Explicitly compare current status with previous visits.
-  Follow Dr. Porceban's concise yet thorough style for evolution notes.
-  Maintain continuity with previous documentation.`,
+  Compare explicitamente o estado atual com visitas anteriores.
+  Siga o estilo conciso porém completo do Dr. Porceban para evoluções clínicas.
+  Mantenha continuidade com a documentação anterior.`,
 
-  medical_report: `You are a medical assistant generating a formal medical report in Dr. Porceban's style.
-  Using the extracted information, compile a COMPREHENSIVE medical report with:
-  1. Patient demographics
-  2. Detailed history
-  3. Comprehensive examination findings
-  4. Diagnostic studies
-  5. Assessment and clinical reasoning
-  6. Detailed recommendations
+  medical_report: `Você é um assistente médico gerando um relatório médico formal no estilo do Dr. Porceban, um renomado cirurgião de coluna em São Paulo, Brasil.
+  Usando as informações extraídas, compile um relatório médico ABRANGENTE em português brasileiro com:
+  1. Demografia do paciente
+  2. Histórico detalhado
+  3. Achados abrangentes do exame
+  4. Estudos diagnósticos
+  5. Avaliação e raciocínio clínico
+  6. Recomendações detalhadas
 
-  Format as a formal medical report suitable for official purposes.
-  Follow Dr. Porceban's structured, thorough style for official documentation.
-  Ensure the report is complete, precise, and professionally formatted.`
+  Formate como um relatório médico formal adequado para fins oficiais em português brasileiro.
+  Siga o estilo estruturado e completo do Dr. Porceban para documentação oficial.
+  Garanta que o relatório seja completo, preciso e formatado profissionalmente.`
 }
 
 // Main function to coordinate the "agents" workflow
@@ -174,9 +174,9 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
              `Prescrição: ${record.prescription || 'Não disponível'}\n\n`;
     }).join('---\n');
     
-    contextPrompt = `HISTÓRICO DO PACIENTE:\n${historyText}\n\nNOVA CONSULTA:\n${text}`;
+    contextPrompt = `HISTÓRICO DO PACIENTE:\n${historyText}\n\nNOVA CONSULTA AMBULATORIAL:\n${text}`;
   } else {
-    contextPrompt = text;
+    contextPrompt = `CONSULTA AMBULATORIAL:\n${text}`;
   }
 
   // Step 2: Run specialized extractions as needed for the document type
@@ -280,16 +280,26 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
   // Step 5: Run the final orchestrator to generate the complete document
   console.log(`Running orchestrator for ${mode}`);
   
+  // Add context about Dr. Porceban for more personalized results
+  const doctorContext = `
+CONTEXTO DO MÉDICO:
+Dr. Porceban é um cirurgião de coluna renomado em São Paulo, Brasil. Ele tem um estilo de escrita conciso 
+mas completo, e segue rigorosamente os padrões brasileiros de documentação médica. Ele atende em ambiente 
+ambulatorial e está especialmente interessado em doenças da coluna vertebral.
+`;
+
   // Prepare the final prompt for the orchestrator
   const orchestratorPrompt = `
-CONSULTATION TRANSCRIPT:
+${doctorContext}
+
+TRANSCRIÇÃO DA CONSULTA AMBULATORIAL:
 ${text}
 
-EXTRACTED INFORMATION:
+INFORMAÇÕES EXTRAÍDAS:
 ${compiledExtractions}
 
 ${patientHistory && patientHistory.length > 0 ? `
-PATIENT HISTORY:
+HISTÓRICO DO PACIENTE:
 ${patientHistory.map((record: any) => {
   return `Data: ${new Date(record.created_at).toLocaleDateString('pt-BR')}\n` +
          `Resumo: ${record.summary || 'Não disponível'}\n` +
