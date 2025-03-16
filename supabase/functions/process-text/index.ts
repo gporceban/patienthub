@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.9'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -211,7 +211,7 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
     try {
       console.log(`Running extractor: ${extractor}`);
       
-      const response = await fetch('https://api.openai.com/v1/responses', {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openaiApiKey}`,
@@ -219,14 +219,17 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
         },
         body: JSON.stringify({
           model: 'gpt-4o',
-          input: contextPrompt,
-          instructions: specializedAgents[extractor as keyof typeof specializedAgents],
-          temperature: 0.3, // Lower temperature for more deterministic extraction
-          text: {
-            format: {
-              type: 'text'
+          messages: [
+            { 
+              role: 'system', 
+              content: specializedAgents[extractor as keyof typeof specializedAgents] 
+            },
+            { 
+              role: 'user', 
+              content: contextPrompt 
             }
-          }
+          ],
+          temperature: 0.3, // Lower temperature for more deterministic extraction
         }),
       });
       
@@ -241,18 +244,7 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
       }
       
       const result = await response.json();
-      let extractedContent = '';
-      
-      // Find the text content in the response structure
-      if (result.output && result.output.length > 0) {
-        const messageOutput = result.output.find((item: any) => item.type === 'message');
-        if (messageOutput && messageOutput.content && messageOutput.content.length > 0) {
-          const textContent = messageOutput.content.find((content: any) => content.type === 'output_text');
-          if (textContent) {
-            extractedContent = textContent.text;
-          }
-        }
-      }
+      const extractedContent = result.choices[0].message.content;
       
       return {
         extractor,
@@ -307,7 +299,7 @@ ${patientHistory.map((record: any) => {
 `;
 
   // Run the orchestrator to generate the final document
-  const orchestratorResponse = await fetch('https://api.openai.com/v1/responses', {
+  const orchestratorResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${openaiApiKey}`,
@@ -315,14 +307,17 @@ ${patientHistory.map((record: any) => {
     },
     body: JSON.stringify({
       model: 'gpt-4o',
-      input: orchestratorPrompt,
-      instructions: documentOrchestrators[mode as keyof typeof documentOrchestrators],
-      temperature: 0.7,
-      text: {
-        format: {
-          type: mode === 'structured_data' ? 'json' : 'text'
+      messages: [
+        { 
+          role: 'system', 
+          content: documentOrchestrators[mode as keyof typeof documentOrchestrators]
+        },
+        { 
+          role: 'user', 
+          content: orchestratorPrompt 
         }
-      }
+      ],
+      temperature: 0.7,
     }),
   });
   
@@ -333,18 +328,7 @@ ${patientHistory.map((record: any) => {
   }
   
   const orchestratorResult = await orchestratorResponse.json();
-  let finalDocument = '';
-  
-  // Extract the final document from the response
-  if (orchestratorResult.output && orchestratorResult.output.length > 0) {
-    const messageOutput = orchestratorResult.output.find((item: any) => item.type === 'message');
-    if (messageOutput && messageOutput.content && messageOutput.content.length > 0) {
-      const textContent = messageOutput.content.find((content: any) => content.type === 'output_text');
-      if (textContent) {
-        finalDocument = textContent.text;
-      }
-    }
-  }
+  const finalDocument = orchestratorResult.choices[0].message.content;
   
   // Process structured data if needed
   let structuredData = null;
