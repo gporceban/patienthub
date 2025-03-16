@@ -18,7 +18,6 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
       storage: window.localStorage, // Explicitly use localStorage instead of the default
       storageKey: 'ortho-care-auth-token', // Change the key to avoid conflicts with previous sessions
-      detectSessionInUrl: true,
       flowType: 'implicit',
       debug: true,
     },
@@ -26,6 +25,13 @@ export const supabase = createClient<Database>(
       headers: {
         'x-app-name': 'ortho-care-mosaic',
       },
+    },
+    // Add custom fetch implementation with CORS mode
+    fetch: (url, options) => {
+      return fetch(url, {
+        ...options,
+        mode: 'cors',
+      });
     },
   }
 );
