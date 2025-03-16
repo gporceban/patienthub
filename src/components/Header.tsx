@@ -1,20 +1,25 @@
 
-import React from 'react';
+import React, { useContext } from 'react';
 import Logo from './Logo';
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { AuthContext } from '@/App';
 
 interface HeaderProps {
   userType?: 'paciente' | 'medico';
   userName?: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ userType, userName = 'Usuário' }) => {
+const Header: React.FC<HeaderProps> = ({ userType, userName }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { profile } = useContext(AuthContext);
+  
+  // Use profile name if available, otherwise use provided userName or default
+  const displayName = profile?.full_name || userName || 'Usuário';
 
   const handleLogout = async () => {
     try {
@@ -47,7 +52,7 @@ const Header: React.FC<HeaderProps> = ({ userType, userName = 'Usuário' }) => {
         <div className="flex items-center gap-4">
           <div className="text-right mr-2">
             <p className="text-sm text-muted-foreground">Olá,</p>
-            <p className="font-medium">{userName}</p>
+            <p className="font-medium">{displayName}</p>
           </div>
           
           <Button 

@@ -23,14 +23,14 @@ const Sidebar: React.FC<SidebarProps> = ({ userType }) => {
   const sidebarItems = userType === 'paciente' 
     ? [
         { href: '/paciente', icon: <Home size={20} />, label: 'Início' },
-        { href: '/paciente/consultas', icon: <CalendarClock size={20} />, label: 'Consultas' },
+        { href: '/paciente/consultas', icon: <CalendarClock size={20} />, label: 'Agenda' },
         { href: '/paciente/avaliacoes', icon: <FileText size={20} />, label: 'Avaliações' },
         { href: '/paciente/perfil', icon: <User size={20} />, label: 'Perfil' },
       ]
     : [
         { href: '/medico', icon: <Home size={20} />, label: 'Início' },
         { href: '/medico/pacientes', icon: <Users size={20} />, label: 'Pacientes' },
-        { href: '/medico/consultas', icon: <CalendarClock size={20} />, label: 'Consultas' },
+        { href: '/medico/consultas', icon: <CalendarClock size={20} />, label: 'Agenda' },
         { href: '/medico/avaliacao', icon: <FileEdit size={20} />, label: 'Nova Avaliação' },
         { href: '/medico/documentos', icon: <FilePlus2 size={20} />, label: 'Documentos' },
         { href: '/medico/perfil', icon: <User size={20} />, label: 'Perfil' },

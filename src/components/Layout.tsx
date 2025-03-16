@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useContext } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import { useLocation } from 'react-router-dom';
+import { AuthContext } from '@/App';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -13,14 +14,15 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ 
   children, 
   userType,
-  userName = userType === 'paciente' ? 'Maria Silva' : 'Dr. Paulo Oliveira'
+  userName
 }) => {
   const location = useLocation();
+  const { profile } = useContext(AuthContext);
   const showSidebar = userType && location.pathname !== '/';
   
   return (
     <div className="min-h-screen">
-      <Header userType={userType} userName={userName} />
+      <Header userType={userType} userName={userName || profile?.full_name} />
       
       <div className="flex">
         {showSidebar && <Sidebar userType={userType} />}
