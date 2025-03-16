@@ -15,7 +15,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'medium' }) => {
   return (
     <div className="flex items-center justify-center">
       <img 
-        src="/lovable-uploads/b29d5752-94e4-453d-8259-9bbe370370fd.png" 
+        src="/lovable-uploads/058d1a3a-0618-461f-a21b-3430a79eee43.png" 
         alt="Patient Hub by Dr. Porceban"
         className={`${sizeClasses[size]} w-auto filter drop-shadow-lg`}
         style={{ 
