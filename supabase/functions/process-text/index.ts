@@ -39,20 +39,23 @@ serve(async (req) => {
       promptContent = `Informações do paciente: Nome: ${patientInfo.name}, Email: ${patientInfo.email}, ID do Prontuário: ${patientInfo.prontuarioId}\n\nTranscrição da consulta: ${text}`;
     }
 
-    // Send to OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Send to OpenAI API using the new responses endpoint
+    const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompts[mode] },
-          { role: 'user', content: promptContent }
-        ],
+        model: 'gpt-4o',
+        instructions: systemPrompts[mode],
+        input: promptContent,
         temperature: 0.7,
+        text: {
+          format: {
+            type: mode === 'structured_data' ? 'json' : 'text'
+          }
+        }
       }),
     });
 
@@ -63,44 +66,58 @@ serve(async (req) => {
     }
 
     const result = await response.json();
-    const processedText = result.choices[0].message.content;
+    console.log('API Response:', JSON.stringify(result, null, 2));
+
+    // Extract the output text from the response
+    let processedText = '';
+    let structuredData = null;
+
+    // Extract the content from the assistant message in the output
+    if (result.output && result.output.length > 0) {
+      // Find the message output
+      const messageOutput = result.output.find(item => item.type === 'message');
+      
+      if (messageOutput && messageOutput.content && messageOutput.content.length > 0) {
+        // Find the text content
+        const textContent = messageOutput.content.find(content => content.type === 'output_text');
+        
+        if (textContent) {
+          processedText = textContent.text;
+          
+          // If structured_data mode, try to parse the JSON
+          if (mode === 'structured_data') {
+            try {
+              if (processedText.includes('```json')) {
+                const jsonMatch = processedText.match(/```json\n([\s\S]*?)\n```/);
+                if (jsonMatch && jsonMatch[1]) {
+                  structuredData = JSON.parse(jsonMatch[1]);
+                }
+              } else if (processedText.includes('```')) {
+                const jsonMatch = processedText.match(/```\n([\s\S]*?)\n```/);
+                if (jsonMatch && jsonMatch[1]) {
+                  structuredData = JSON.parse(jsonMatch[1]);
+                }
+              } else {
+                // Try to parse directly
+                structuredData = JSON.parse(processedText);
+              }
+            } catch (jsonError) {
+              console.error('Error parsing JSON response:', jsonError);
+              console.log('Original response:', processedText);
+              // Continue with the original text response
+            }
+          }
+        }
+      }
+    }
 
     let formattedResponse = { text: processedText };
-
-    // If structured_data mode, try to parse JSON from the response
-    if (mode === 'structured_data') {
-      try {
-        // If the response is already a JSON object (no backticks), parse it
-        // If it contains markdown backticks for code formatting, extract and parse the JSON
-        let jsonData;
-        if (processedText.includes('```json')) {
-          const jsonMatch = processedText.match(/```json\n([\s\S]*?)\n```/);
-          if (jsonMatch && jsonMatch[1]) {
-            jsonData = JSON.parse(jsonMatch[1]);
-          } else {
-            throw new Error('Could not extract JSON from the response');
-          }
-        } else if (processedText.includes('```')) {
-          const jsonMatch = processedText.match(/```\n([\s\S]*?)\n```/);
-          if (jsonMatch && jsonMatch[1]) {
-            jsonData = JSON.parse(jsonMatch[1]);
-          } else {
-            throw new Error('Could not extract JSON from the response');
-          }
-        } else {
-          // Try to parse directly
-          jsonData = JSON.parse(processedText);
-        }
-        
-        formattedResponse = { 
-          text: processedText,
-          structuredData: jsonData 
-        };
-      } catch (jsonError) {
-        console.error('Error parsing JSON response:', jsonError);
-        console.log('Original response:', processedText);
-        // Continue with the original text response
-      }
+    
+    if (mode === 'structured_data' && structuredData) {
+      formattedResponse = { 
+        text: processedText,
+        structuredData: structuredData 
+      };
     }
 
     return new Response(
