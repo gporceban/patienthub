@@ -1,33 +1,44 @@
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useContext, useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useContext } from 'react';
+import { Input } from '@/components/ui/input';
 import { AuthContext } from '@/contexts/AuthContext';
-import { Calendar, FileText, ChevronRight, AlertCircle } from 'lucide-react';
-import { fromPatientAssessments, PatientAssessment } from '@/types/patientAssessments';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import { Link } from 'react-router-dom';
+import { FileText, Search, Calendar, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+
+interface PatientAssessment {
+  id: string;
+  patient_name: string;
+  prontuario_id: string;
+  created_at: string;
+  doctor_id: string | null;
+  summary: string | null;
+}
 
 const PatientAssessmentsList = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
   const { user, profile } = useContext(AuthContext);
+  const { toast } = useToast();
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const [assessments, setAssessments] = useState<PatientAssessment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+  const [filteredAssessments, setFilteredAssessments] = useState<PatientAssessment[]>([]);
+  
+  // Fetch patient assessments
   useEffect(() => {
-    const fetchAssessments = async () => {
-      if (!user || !profile) return;
-
+    const fetchPatientAssessments = async () => {
+      if (!profile) return;
+      
       try {
-        setLoading(true);
+        setIsLoading(true);
         
-        const { data, error } = await fromPatientAssessments(supabase)
-          .select()
+        const { data, error } = await supabase
+          .from('patient_assessments')
+          .select('*')
           .eq('patient_email', profile.email)
           .order('created_at', { ascending: false });
         
@@ -35,91 +46,137 @@ const PatientAssessmentsList = () => {
           throw error;
         }
         
-        setAssessments(data || []);
+        if (data) {
+          setAssessments(data as PatientAssessment[]);
+          setFilteredAssessments(data as PatientAssessment[]);
+        }
       } catch (error) {
-        console.error('Error fetching assessments:', error);
-        setError("Ocorreu um erro ao buscar suas avaliações médicas.");
+        console.error('Error fetching patient assessments:', error);
         toast({
           variant: "destructive",
           title: "Erro ao carregar avaliações",
-          description: "Não foi possível carregar suas avaliações médicas."
+          description: "Não foi possível carregar suas avaliações. Tente novamente mais tarde."
         });
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
-
-    fetchAssessments();
-  }, [user, profile, toast]);
-
-  const viewAssessment = (id: string) => {
-    navigate(`/paciente/avaliacoes/${id}`);
-  };
-
-  if (loading) {
-    return (
-      <Layout userType="paciente" userName={profile?.full_name || 'Paciente'}>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-pulse text-gold-400">Carregando suas avaliações...</div>
-        </div>
-      </Layout>
+    
+    fetchPatientAssessments();
+  }, [profile, toast]);
+  
+  // Filter assessments based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredAssessments(assessments);
+      return;
+    }
+    
+    const query = searchQuery.toLowerCase();
+    const filtered = assessments.filter(
+      assessment => {
+        const dateStr = formatDate(assessment.created_at);
+        return dateStr.includes(query) ||
+               (assessment.summary && assessment.summary.toLowerCase().includes(query)) ||
+               assessment.prontuario_id.toLowerCase().includes(query);
+      }
     );
-  }
-
+    
+    setFilteredAssessments(filtered);
+  }, [searchQuery, assessments]);
+  
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).format(date);
+  };
+  
   return (
-    <Layout userType="paciente" userName={profile?.full_name || 'Paciente'}>
+    <Layout userType="paciente">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">
-          Minhas Avaliações Médicas
-        </h1>
+        <h1 className="text-2xl font-bold mb-2">Minhas Avaliações</h1>
         <p className="text-gray-400">
-          Visualize todas as suas avaliações médicas realizadas
+          Consulte todas as suas avaliações médicas
         </p>
       </div>
       
-      {error ? (
-        <Card className="card-gradient p-6">
-          <div className="flex flex-col items-center text-center p-6">
-            <AlertCircle size={48} className="text-red-500 mb-4" />
-            <h2 className="text-xl font-bold mb-2">Erro ao Carregar Avaliações</h2>
-            <p className="text-gray-400">{error}</p>
-          </div>
-        </Card>
-      ) : assessments.length === 0 ? (
-        <Card className="card-gradient p-6">
-          <div className="flex flex-col items-center text-center p-6">
-            <FileText size={48} className="text-gold-400 mb-4" />
-            <h2 className="text-xl font-bold mb-2">Nenhuma Avaliação Encontrada</h2>
-            <p className="text-gray-400">Você ainda não possui avaliações médicas registradas.</p>
-          </div>
+      <div className="mb-6">
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+          <Input
+            type="search"
+            placeholder="Buscar por data ou tipo de avaliação..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 bg-darkblue-800/50 border-darkblue-700"
+          />
+        </div>
+      </div>
+      
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-gold-500" />
+        </div>
+      ) : filteredAssessments.length === 0 ? (
+        <Card className="card-gradient p-8 text-center">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-gold-400" />
+          {searchQuery ? (
+            <>
+              <h3 className="text-xl font-medium mb-2">Nenhum resultado encontrado</h3>
+              <p className="text-gray-400">Nenhuma avaliação corresponde à sua busca "{searchQuery}"</p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-xl font-medium mb-2">Nenhuma avaliação encontrada</h3>
+              <p className="text-gray-400">
+                Você ainda não possui nenhuma avaliação médica registrada.
+                Entre em contato com seu médico para mais informações.
+              </p>
+            </>
+          )}
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {assessments.map((assessment) => (
-            <Card key={assessment.id} className="card-gradient p-4 hover:bg-darkblue-800/50 transition-colors">
-              <div className="flex justify-between items-center">
-                <div className="flex items-start gap-4">
-                  <div className="p-2 bg-darkblue-700/50 rounded-full">
-                    <Calendar size={20} className="text-gold-400" />
+          {filteredAssessments.map((assessment) => (
+            <Card key={assessment.id} className="card-gradient p-4 hover:bg-darkblue-800/60 transition-colors">
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="bg-darkblue-700 rounded-full p-3">
+                    <FileText className="h-6 w-6 text-gold-500" />
                   </div>
+                  
                   <div>
-                    <h3 className="font-semibold text-white">
-                      Avaliação de {new Date(assessment.created_at).toLocaleDateString('pt-BR')}
-                    </h3>
-                    <p className="text-sm text-gray-400">
-                      Prontuário: {assessment.prontuario_id}
-                    </p>
+                    <h3 className="font-semibold">Avaliação de {formatDate(assessment.created_at)}</h3>
+                    <p className="text-sm text-gray-400">Prontuário: {assessment.prontuario_id}</p>
+                    {assessment.summary && (
+                      <p className="text-sm text-gray-400 mt-1 line-clamp-1">
+                        {assessment.summary}
+                      </p>
+                    )}
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gold-400 hover:text-gold-300 hover:bg-darkblue-700"
-                  onClick={() => viewAssessment(assessment.id)}
-                >
-                  <span className="mr-1">Ver</span>
-                  <ChevronRight size={16} />
-                </Button>
+                
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <Calendar size={14} />
+                    <span>{formatDate(assessment.created_at)}</span>
+                  </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    asChild
+                    className="ml-auto"
+                  >
+                    <Link to={`/paciente/avaliacoes/${assessment.id}`}>
+                      Ver Detalhes
+                      <ArrowRight size={14} className="ml-2" />
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </Card>
           ))}

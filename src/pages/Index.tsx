@@ -1,62 +1,47 @@
 
-import React, { useState, useEffect } from 'react';
-import Layout from '@/components/Layout';
+import React, { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Logo from '@/components/Logo';
 import LoginForm from '@/components/LoginForm';
-import StarBackground from '@/components/StarBackground';
 import { Card } from '@/components/ui/card';
+import PatientRegisterForm from '@/components/PatientRegisterForm';
 
 const Index = () => {
-  const [showContent, setShowContent] = useState(false);
-  
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowContent(true);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, []);
+  const [activeTab, setActiveTab] = useState("login");
   
   return (
-    <Layout>
-      <StarBackground />
-      <div className="hero-section">
-        <div className="title-container">
-          <Logo size="large" />
-          <h1 
-            className={`heading-text mt-8 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ transition: 'all 0.8s ease-out 0.3s' }}
-          >
-            Assuma o controle total de seu tratamento
-          </h1>
-          <p 
-            className={`text-gray-400 mt-4 mb-10 max-w-xl text-center ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ transition: 'all 0.8s ease-out 0.6s' }}
-          >
-            Nossa plataforma oferece uma experiência integrada para seu tratamento ortopédico, 
-            com acesso às recomendações médicas e acompanhamento personalizado.
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <Logo size="medium" />
+          <h1 className="mt-4 text-2xl font-bold">OrthoCareMosaic</h1>
+          <p className="mt-2 text-gray-400">
+            Plataforma de acompanhamento ortopédico do Dr. Guilherme Porceban
           </p>
         </div>
         
-        <div 
-          className={`${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-          style={{ transition: 'all 0.8s ease-out 0.9s' }}
-        >
-          <LoginForm />
-        </div>
+        <Card className="card-gradient p-6">
+          <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="login">Entrar</TabsTrigger>
+              <TabsTrigger value="register">Criar Conta</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="login">
+              <LoginForm />
+            </TabsContent>
+            
+            <TabsContent value="register">
+              <PatientRegisterForm />
+            </TabsContent>
+          </Tabs>
+        </Card>
         
-        <div 
-          className={`mt-12 text-center text-sm text-gray-500 ${showContent ? 'opacity-100' : 'opacity-0'}`}
-          style={{ transition: 'opacity 0.8s ease-out 1.2s' }}
-        >
-          <p>© {new Date().getFullYear()} Patient Hub by Dr. Porceban. Todos os direitos reservados.</p>
-          <div className="mt-2 space-x-4">
-            <a href="#" className="text-amber-400/70 hover:text-amber-300 hover:underline">Termos de Uso</a>
-            <a href="#" className="text-amber-400/70 hover:text-amber-300 hover:underline">Política de Privacidade</a>
-          </div>
-        </div>
+        <p className="text-center text-xs text-gray-500 mt-6">
+          © 2025 OrthoCareMosaic. Todos os direitos reservados.
+        </p>
       </div>
-    </Layout>
+    </div>
   );
 };
 

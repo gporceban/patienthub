@@ -1,184 +1,260 @@
 
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useContext, useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { AuthContext } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, FilePen, FilePlus2, AlertCircle } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useContext } from 'react';
-import { AuthContext } from '@/contexts/AuthContext';
-import { fromPatientAssessments, PatientAssessment as PatientAssessmentType } from '@/types/patientAssessments';
+import { ArrowLeft, Calendar, FileText, User, FileMedical, FileDigit, Loader2 } from 'lucide-react';
+
+interface Assessment {
+  id: string;
+  patient_name: string;
+  patient_email: string;
+  prontuario_id: string;
+  doctor_id: string | null;
+  created_at: string;
+  updated_at: string;
+  clinical_note: string | null;
+  prescription: string | null;
+  summary: string | null;
+  structured_data: any | null;
+}
+
+interface DoctorProfile {
+  id: string;
+  full_name: string;
+  email: string;
+}
 
 const PatientAssessment = () => {
   const { id } = useParams<{ id: string }>();
-  const { toast } = useToast();
   const { user, profile } = useContext(AuthContext);
-  const [assessment, setAssessment] = useState<PatientAssessmentType | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
+  const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  
   useEffect(() => {
     const fetchAssessment = async () => {
-      if (!id || !user) return;
-
+      if (!id || !profile) return;
+      
       try {
-        setLoading(true);
+        setIsLoading(true);
+        setError(null);
         
-        const { data, error } = await fromPatientAssessments(supabase)
-          .select()
+        // Fetch the assessment
+        const { data: assessmentData, error: assessmentError } = await supabase
+          .from('patient_assessments')
+          .select('*')
           .eq('id', id)
-          .maybeSingle();
+          .eq('patient_email', profile.email)
+          .single();
         
-        if (error) {
-          throw error;
+        if (assessmentError) {
+          throw new Error('Avaliação não encontrada ou você não tem permissão para visualizá-la');
         }
         
-        if (!data) {
-          setError("Avaliação não encontrada ou você não tem permissão para acessá-la.");
-          return;
+        if (!assessmentData) {
+          throw new Error('Avaliação não encontrada');
         }
         
-        // Check if the current user is authorized (either as the patient via email or the doctor)
-        if (profile?.user_type === 'paciente' && data.patient_email !== profile.email) {
-          setError("Você não tem permissão para acessar esta avaliação.");
-          return;
-        }
+        setAssessment(assessmentData as Assessment);
         
-        setAssessment(data);
+        // If there's a doctor_id, fetch the doctor's information
+        if (assessmentData.doctor_id) {
+          const { data: doctorData, error: doctorError } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .eq('id', assessmentData.doctor_id)
+            .single();
+          
+          if (!doctorError && doctorData) {
+            setDoctor(doctorData as DoctorProfile);
+          }
+        }
       } catch (error) {
         console.error('Error fetching assessment:', error);
-        setError("Ocorreu um erro ao buscar os dados da avaliação.");
+        setError(error instanceof Error ? error.message : 'Erro ao carregar avaliação');
         toast({
           variant: "destructive",
           title: "Erro ao carregar avaliação",
-          description: "Não foi possível carregar os dados da avaliação solicitada."
+          description: error instanceof Error ? error.message : 'Não foi possível carregar os detalhes da avaliação'
         });
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
-
+    
     fetchAssessment();
-  }, [id, user, profile, toast]);
-
-  if (loading) {
+  }, [id, profile, toast]);
+  
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+  
+  if (isLoading) {
     return (
-      <Layout userType={profile?.user_type || 'paciente'} userName={profile?.full_name || 'Paciente'}>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-pulse text-gold-400">Carregando dados da avaliação...</div>
+      <Layout userType="paciente">
+        <div className="flex flex-col items-center justify-center h-96">
+          <Loader2 className="h-12 w-12 text-gold-500 animate-spin mb-4" />
+          <p className="text-gray-400">Carregando avaliação...</p>
         </div>
       </Layout>
     );
   }
-
-  if (error || !assessment) {
+  
+  if (error) {
     return (
-      <Layout userType={profile?.user_type || 'paciente'} userName={profile?.full_name || 'Paciente'}>
-        <Card className="card-gradient p-6">
-          <div className="flex flex-col items-center text-center p-6">
-            <AlertCircle size={48} className="text-red-500 mb-4" />
-            <h2 className="text-xl font-bold mb-2">Erro ao Carregar Avaliação</h2>
-            <p className="text-gray-400">{error || "Não foi possível encontrar a avaliação solicitada."}</p>
-          </div>
-        </Card>
+      <Layout userType="paciente">
+        <div className="p-6 text-center">
+          <FileText className="h-16 w-16 text-gold-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Erro ao carregar avaliação</h2>
+          <p className="text-gray-400 mb-6">{error}</p>
+          <Button asChild variant="outline">
+            <Link to="/paciente/avaliacoes">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar para lista de avaliações
+            </Link>
+          </Button>
+        </div>
       </Layout>
     );
   }
-
+  
+  if (!assessment) {
+    return (
+      <Layout userType="paciente">
+        <div className="p-6 text-center">
+          <FileText className="h-16 w-16 text-gold-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Avaliação não encontrada</h2>
+          <p className="text-gray-400 mb-6">A avaliação solicitada não foi encontrada ou você não tem permissão para visualizá-la.</p>
+          <Button asChild variant="outline">
+            <Link to="/paciente/avaliacoes">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar para lista de avaliações
+            </Link>
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+  
   return (
-    <Layout userType={profile?.user_type || 'paciente'} userName={profile?.full_name || 'Paciente'}>
+    <Layout userType="paciente">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">
-          Avaliação Médica
-        </h1>
+        <Button
+          variant="outline"
+          size="sm"
+          asChild
+          className="mb-4"
+        >
+          <Link to="/paciente/avaliacoes">
+            <ArrowLeft size={16} className="mr-2" />
+            Voltar para lista
+          </Link>
+        </Button>
+        
+        <h1 className="text-2xl font-bold mb-2">Detalhes da Avaliação</h1>
         <p className="text-gray-400">
-          {`Avaliação realizada em ${new Date(assessment.created_at).toLocaleDateString('pt-BR')}`}
+          Avaliação realizada em {formatDate(assessment.created_at)}
         </p>
       </div>
       
-      <Card className="card-gradient p-6 mb-6">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4">
-          <h2 className="text-xl font-semibold">Informações do Paciente</h2>
-          <div className="text-sm text-gray-400">
-            ID do Prontuário: {assessment.prontuario_id}
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <p className="text-sm font-medium text-gray-400">Nome Completo</p>
-            <p className="text-base">{assessment.patient_name}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-400">Email</p>
-            <p className="text-base">{assessment.patient_email}</p>
-          </div>
-        </div>
-      </Card>
-      
-      <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-4">
-          <TabsTrigger value="summary" className="flex items-center gap-2">
-            <FilePlus2 size={16} />
-            <span>Resumo</span>
-          </TabsTrigger>
-          <TabsTrigger value="clinical_note" className="flex items-center gap-2">
-            <FileText size={16} />
-            <span>Nota Clínica</span>
-          </TabsTrigger>
-          <TabsTrigger value="prescription" className="flex items-center gap-2">
-            <FilePen size={16} />
-            <span>Receita</span>
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="summary">
-          <Card className="card-gradient p-6">
-            <h3 className="text-lg font-semibold mb-4">Resumo da Consulta</h3>
-            {assessment.summary ? (
-              <div className="whitespace-pre-wrap bg-darkblue-900/30 p-4 rounded-md">
-                {assessment.summary}
-              </div>
-            ) : (
-              <div className="text-center p-6 text-gray-400">
-                Nenhum resumo disponível para esta consulta.
-              </div>
-            )}
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="clinical_note">
-          <Card className="card-gradient p-6">
-            <h3 className="text-lg font-semibold mb-4">Nota Clínica</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card className="card-gradient p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <FileMedical className="mr-2 text-gold-400" />
+              Nota Clínica
+            </h2>
             {assessment.clinical_note ? (
-              <div className="whitespace-pre-wrap bg-darkblue-900/30 p-4 rounded-md">
+              <div className="bg-darkblue-800/50 rounded-lg p-4 whitespace-pre-wrap">
                 {assessment.clinical_note}
               </div>
             ) : (
-              <div className="text-center p-6 text-gray-400">
-                Nenhuma nota clínica disponível para esta consulta.
+              <div className="bg-darkblue-800/50 rounded-lg p-4 text-gray-400 italic">
+                Nenhuma nota clínica disponível.
               </div>
             )}
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="prescription">
+          
           <Card className="card-gradient p-6">
-            <h3 className="text-lg font-semibold mb-4">Receita Médica</h3>
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <FileDigit className="mr-2 text-gold-400" />
+              Prescrição
+            </h2>
             {assessment.prescription ? (
-              <div className="whitespace-pre-wrap bg-darkblue-900/30 p-4 rounded-md">
+              <div className="bg-darkblue-800/50 rounded-lg p-4 whitespace-pre-wrap">
                 {assessment.prescription}
               </div>
             ) : (
-              <div className="text-center p-6 text-gray-400">
-                Nenhuma receita disponível para esta consulta.
+              <div className="bg-darkblue-800/50 rounded-lg p-4 text-gray-400 italic">
+                Nenhuma prescrição disponível.
               </div>
             )}
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+        
+        <div>
+          <Card className="card-gradient p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-4">Informações</h2>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-400">Nome do Paciente</p>
+                <p className="font-medium">{assessment.patient_name}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-400">Email</p>
+                <p className="font-medium">{assessment.patient_email}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-400">ID do Prontuário</p>
+                <p className="font-medium">{assessment.prontuario_id}</p>
+              </div>
+              
+              <Separator className="bg-darkblue-700/50" />
+              
+              <div>
+                <p className="text-sm text-gray-400">Data da Avaliação</p>
+                <p className="font-medium">{formatDate(assessment.created_at)}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-400">Médico Responsável</p>
+                <p className="font-medium">{doctor ? doctor.full_name : 'Não informado'}</p>
+              </div>
+            </div>
+          </Card>
+          
+          <Card className="card-gradient p-6">
+            <h2 className="text-lg font-semibold mb-4">Resumo</h2>
+            {assessment.summary ? (
+              <div className="bg-darkblue-800/50 rounded-lg p-4 whitespace-pre-wrap">
+                {assessment.summary}
+              </div>
+            ) : (
+              <div className="bg-darkblue-800/50 rounded-lg p-4 text-gray-400 italic">
+                Nenhum resumo disponível.
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
     </Layout>
   );
 };
