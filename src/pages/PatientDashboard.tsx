@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import DashboardCard from '@/components/DashboardCard';
@@ -9,7 +8,7 @@ import {
   Bell, Calendar, Clock, FileText, Plus, CheckCircle, 
   ArrowRight, Award, Target, Zap, Shield, Flame
 } from 'lucide-react';
-import { AuthContext } from '@/App';
+import { AuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';

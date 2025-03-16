@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Link, Navigate } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster"
@@ -22,6 +23,31 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      setProfile(profileData);
+    } catch (err: any) {
+      setError(err);
+      console.error("Profile Error:", err);
+    }
+  };
+
+  // Refresh profile function to be exposed in the context
+  const refreshProfile = async () => {
+    if (!user) return;
+    await fetchProfile(user.id);
+  };
+
   useEffect(() => {
     const fetchSession = async () => {
       setIsLoading(true);
@@ -40,25 +66,6 @@ function App() {
         console.error("Session Error:", err);
       } finally {
         setIsLoading(false);
-      }
-    };
-
-    const fetchProfile = async (userId: string) => {
-      try {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        if (profileError) {
-          throw profileError;
-        }
-
-        setProfile(profileData);
-      } catch (err: any) {
-        setError(err);
-        console.error("Profile Error:", err);
       }
     };
 
@@ -105,7 +112,7 @@ function App() {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, isLoading, error, signOut }}>
+    <AuthContext.Provider value={{ user, profile, isLoading, error, signOut, refreshProfile }}>
       <div className="min-h-screen bg-darkblue-950 text-gray-100">
         <StarBackground />
         <Routes>

@@ -6,7 +6,17 @@ import { toast } from "@/components/ui/use-toast";
 import { useNavigate } from 'react-router-dom';
 import { User, RefreshCcw } from 'lucide-react';
 import { supabase, clearAuthState } from '@/integrations/supabase/client';
-import { AuthContext } from '@/App';
+import { AuthContext } from '@/contexts/AuthContext';
+
+interface ExtendedAuthContext {
+  user: any | null;
+  profile: any | null;
+  loading?: boolean;
+  error: Error | null;
+  refreshProfile?: () => Promise<void>;
+  signOut?: () => Promise<void>;
+  isLoading: boolean;
+}
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -14,7 +24,13 @@ const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const navigate = useNavigate();
-  const { user, profile, loading, error, refreshProfile } = useContext(AuthContext);
+  const auth = useContext(AuthContext) as ExtendedAuthContext;
+  const { user, profile, isLoading: loading, error } = auth;
+  
+  // Define a refreshProfile function if it doesn't exist in the context
+  const refreshProfile = auth.refreshProfile || (async () => {
+    console.log("Refresh profile function not provided in context");
+  });
 
   useEffect(() => {
     console.log("LoginForm rendered. Auth state:", { user: !!user, profile, loading, error });
@@ -177,7 +193,7 @@ const LoginForm: React.FC = () => {
         <p className="text-red-400 text-lg font-semibold mb-4">
           Erro de autenticação
         </p>
-        <p className="text-red-300 mb-4">{error}</p>
+        <p className="text-red-300 mb-4">{error.message}</p>
         <div className="flex flex-col space-y-3">
           <button 
             onClick={handleClearSession}

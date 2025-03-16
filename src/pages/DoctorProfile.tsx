@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { AuthContext } from '@/App';
+import { AuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save } from 'lucide-react';
 import { DoctorProfile as DoctorProfileType, fromDoctors } from '@/types/doctorProfile';

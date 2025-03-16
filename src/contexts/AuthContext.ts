@@ -7,6 +7,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: Error | null;
   signOut?: () => Promise<void>;
+  refreshProfile?: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType>({

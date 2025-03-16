@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Home } from "lucide-react";
 import StarBackground from "@/components/StarBackground";
 import Logo from "@/components/Logo";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthContext";
 
 const NotFound = () => {
   const location = useLocation();

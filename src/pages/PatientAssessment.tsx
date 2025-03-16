@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -7,7 +8,7 @@ import { FileText, FilePen, FilePlus2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useContext } from 'react';
-import { AuthContext } from '@/App';
+import { AuthContext } from '@/contexts/AuthContext';
 import { fromPatientAssessments, PatientAssessment as PatientAssessmentType } from '@/types/patientAssessments';
 
 const PatientAssessment = () => {

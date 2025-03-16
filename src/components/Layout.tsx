@@ -3,7 +3,7 @@ import React, { useContext } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import { useLocation } from 'react-router-dom';
-import { AuthContext } from '@/App';
+import { AuthContext } from '@/contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;

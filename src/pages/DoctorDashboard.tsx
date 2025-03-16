@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Users, Calendar, FileText, Search, Plus, MapPin, Clock, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { AuthContext } from '@/App';
+import { AuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,7 +40,6 @@ const DoctorDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Get current date in YYYY-MM-DD format for comparison
   const today = new Date().toISOString().split('T')[0];
   
   useEffect(() => {
@@ -52,7 +51,6 @@ const DoctorDashboard = () => {
         setError(null);
         console.log("Fetching appointments for doctor:", user.id);
         
-        // Fetch appointments
         const { data: appointmentsData, error: appointmentsError } = await supabase
           .from('appointments')
           .select(`
@@ -72,11 +70,9 @@ const DoctorDashboard = () => {
         
         console.log("Appointments data received:", appointmentsData);
         
-        // Fetch patient names for the appointments
         if (appointmentsData && appointmentsData.length > 0) {
           const appointmentsWithNames = await Promise.all(
             appointmentsData.map(async (appointment) => {
-              // Safely check if appointment exists and has patient_id
               if (!appointment || !appointment.patient_id) {
                 return { ...appointment, patient_name: 'Desconhecido' };
               }
@@ -104,12 +100,10 @@ const DoctorDashboard = () => {
           
           setAppointments(appointmentsWithNames as Appointment[]);
           
-          // Calculate statistics
           const todayAppointments = appointmentsWithNames.filter(
             app => app?.date_time?.startsWith(today)
           ).length;
           
-          // Get unique patient count
           const uniquePatients = new Set(
             appointmentsWithNames
               .filter(app => app && app.patient_id)
@@ -122,7 +116,6 @@ const DoctorDashboard = () => {
             active_patients: uniquePatients
           });
         } else {
-          // No appointments found
           console.log("No appointments found for doctor:", user.id);
           setAppointments([]);
           setStats({
@@ -132,7 +125,6 @@ const DoctorDashboard = () => {
           });
         }
         
-        // Fetch patient assessment count to add to total consultations
         try {
           const { count: assessmentCount, error: assessmentError } = await supabase
             .from('patient_assessments')
@@ -147,7 +139,6 @@ const DoctorDashboard = () => {
           }
         } catch (assessmentError) {
           console.error("Error fetching assessments:", assessmentError);
-          // Continue execution even if this query fails
         }
         
       } catch (error) {
@@ -166,7 +157,6 @@ const DoctorDashboard = () => {
     fetchAppointmentsAndStats();
   }, [user, today, toast]);
   
-  // Filter appointments based on search query
   const filteredAppointments = appointments.filter(appointment => {
     if (!searchQuery.trim()) return true;
     
@@ -177,7 +167,6 @@ const DoctorDashboard = () => {
     );
   });
   
-  // Get today's appointments for the agenda
   const todaysAppointments = appointments.filter(
     appointment => appointment.date_time.startsWith(today)
   );
@@ -200,10 +189,8 @@ const DoctorDashboard = () => {
     });
   };
   
-  // Get doctor's name from profile
   const doctorName = profile?.full_name || "Dr. Paulo Oliveira";
   
-  // Loading state for dashboard cards
   const renderDashboardCards = () => {
     if (isLoading) {
       return (
@@ -241,7 +228,6 @@ const DoctorDashboard = () => {
     );
   };
   
-  // Render content for the recent patients section
   const renderRecentPatients = () => {
     if (isLoading) {
       return (
@@ -313,7 +299,6 @@ const DoctorDashboard = () => {
         </p>
       </div>
       
-      {/* Dashboard Cards */}
       {renderDashboardCards()}
       
       {error && (

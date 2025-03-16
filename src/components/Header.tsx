@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
-import { AuthContext } from '@/App';
+import { AuthContext } from '@/contexts/AuthContext';
 
 interface HeaderProps {
   userType?: 'paciente' | 'medico';

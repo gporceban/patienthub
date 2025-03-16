@@ -5,9 +5,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { AuthContext } from '@/App';
+import { AuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { 
+import {
   FileText, FilePlus2, FilePen, Calendar, Clock, Download, 
   Search, Loader2, Upload, Filter, SortDesc 
 } from 'lucide-react';
