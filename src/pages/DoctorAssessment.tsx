@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
@@ -13,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import PatientInfoForm, { PatientInfo } from '@/components/PatientInfoForm';
 import { useContext } from 'react';
 import { AuthContext } from '@/App';
+import { fromPatientAssessments } from '@/types/patientAssessments';
 
 const DoctorAssessment = () => {
   const { toast } = useToast();
@@ -36,13 +36,12 @@ const DoctorAssessment = () => {
   const handlePatientInfoSubmit = async (data: PatientInfo) => {
     try {
       // Create a new assessment record
-      const { data: assessmentData, error } = await supabase
-        .from('patient_assessments')
+      const { data: assessmentData, error } = await fromPatientAssessments(supabase)
         .insert({
           patient_email: data.email,
           patient_name: data.name,
           prontuario_id: data.prontuarioId,
-          doctor_id: user?.id
+          doctor_id: user?.id || null
         })
         .select()
         .single();
@@ -176,10 +175,8 @@ const DoctorAssessment = () => {
           
           // Save transcription to database
           if (assessmentId) {
-            await supabase
-              .from('patient_assessments')
-              .update({ transcription: data.text })
-              .eq('id', assessmentId);
+            await fromPatientAssessments(supabase)
+              .update({ transcription: data.text }, assessmentId);
           }
           
           toast({
@@ -250,13 +247,13 @@ const DoctorAssessment = () => {
             updateData.prescription = data.text;
           } else if (mode === 'summary') {
             updateData.summary = data.text;
+          } else if (mode === 'structured_data' && data.structuredData) {
+            updateData.structured_data = data.structuredData;
           }
           
           if (Object.keys(updateData).length > 0) {
-            await supabase
-              .from('patient_assessments')
-              .update(updateData)
-              .eq('id', assessmentId);
+            await fromPatientAssessments(supabase)
+              .update(updateData, assessmentId);
           }
         }
         

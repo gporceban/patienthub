@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -9,12 +8,13 @@ import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useContext } from 'react';
 import { AuthContext } from '@/App';
+import { fromPatientAssessments, PatientAssessment as PatientAssessmentType } from '@/types/patientAssessments';
 
 const PatientAssessment = () => {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const { user, profile } = useContext(AuthContext);
-  const [assessment, setAssessment] = useState<any>(null);
+  const [assessment, setAssessment] = useState<PatientAssessmentType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,9 +25,8 @@ const PatientAssessment = () => {
       try {
         setLoading(true);
         
-        const { data, error } = await supabase
-          .from('patient_assessments')
-          .select('*')
+        const { data, error } = await fromPatientAssessments(supabase)
+          .select()
           .eq('id', id)
           .maybeSingle();
         

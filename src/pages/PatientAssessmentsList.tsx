@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -9,12 +8,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useContext } from 'react';
 import { AuthContext } from '@/App';
 import { Calendar, FileText, ChevronRight, AlertCircle } from 'lucide-react';
+import { fromPatientAssessments, PatientAssessment } from '@/types/patientAssessments';
 
 const PatientAssessmentsList = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile } = useContext(AuthContext);
-  const [assessments, setAssessments] = useState<any[]>([]);
+  const [assessments, setAssessments] = useState<PatientAssessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,9 +25,8 @@ const PatientAssessmentsList = () => {
       try {
         setLoading(true);
         
-        const { data, error } = await supabase
-          .from('patient_assessments')
-          .select('*')
+        const { data, error } = await fromPatientAssessments(supabase)
+          .select()
           .eq('patient_email', profile.email)
           .order('created_at', { ascending: false });
         

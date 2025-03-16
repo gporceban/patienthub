@@ -87,6 +87,51 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_assessments: {
+        Row: {
+          clinical_note: string | null
+          created_at: string
+          doctor_id: string | null
+          id: string
+          patient_email: string
+          patient_name: string
+          prescription: string | null
+          prontuario_id: string
+          structured_data: Json | null
+          summary: string | null
+          transcription: string | null
+          updated_at: string
+        }
+        Insert: {
+          clinical_note?: string | null
+          created_at?: string
+          doctor_id?: string | null
+          id?: string
+          patient_email: string
+          patient_name: string
+          prescription?: string | null
+          prontuario_id: string
+          structured_data?: Json | null
+          summary?: string | null
+          transcription?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clinical_note?: string | null
+          created_at?: string
+          doctor_id?: string | null
+          id?: string
+          patient_email?: string
+          patient_name?: string
+          prescription?: string | null
+          prontuario_id?: string
+          structured_data?: Json | null
+          summary?: string | null
+          transcription?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       patients: {
         Row: {
           allergies: string | null
