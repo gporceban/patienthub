@@ -12,7 +12,8 @@ import {
   Users,
   Award,
   Folder,
-  Activity
+  Activity,
+  UserPlus
 } from "lucide-react";
 
 interface SidebarProps {
@@ -39,6 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ userType }) => {
         { href: '/medico/agenda', icon: <CalendarClock size={20} />, label: 'Agenda' },
         { href: '/medico/avaliacao', icon: <FileEdit size={20} />, label: 'Nova Avaliação' },
         { href: '/medico/documentos', icon: <FilePlus2 size={20} />, label: 'Documentos' },
+        { href: '/medico/criar-teste', icon: <UserPlus size={20} />, label: 'Criar Paciente Teste' },
         { href: '/medico/perfil', icon: <User size={20} />, label: 'Perfil' },
       ];
   

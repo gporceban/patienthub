@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Form,
   FormControl,
@@ -18,9 +19,9 @@ import {
 } from "@/components/ui/form";
 
 interface PatientInvitationProps {
-  patientId: string;
-  patientName: string;
-  patientEmail: string;
+  patientId?: string;
+  patientName?: string;
+  patientEmail?: string;
   onSuccess?: () => void;
 }
 
@@ -34,8 +35,8 @@ type InvitationFormValues = z.infer<typeof invitationSchema>;
 
 export const PatientInvitation: React.FC<PatientInvitationProps> = ({
   patientId,
-  patientName,
-  patientEmail,
+  patientName = "",
+  patientEmail = "",
   onSuccess
 }) => {
   const { toast } = useToast();
@@ -54,11 +55,67 @@ export const PatientInvitation: React.FC<PatientInvitationProps> = ({
     setIsLoading(true);
     
     try {
-      // In a real implementation, here you would call Supabase
-      // to send the invitation and create the patient account
+      // Check if we're creating a test patient linked to Dr. Guilherme
+      const isTestPatient = data.email.toLowerCase() === "teste@orthocaremosaic.com";
+      const isDrGuilherme = "gporceban@gmail.com";
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // First check if a patient record with this email already exists
+      const { data: existingPatients, error: searchError } = await supabase
+        .from('patient_assessments')
+        .select('id')
+        .eq('patient_email', data.email)
+        .limit(1);
+      
+      if (searchError) {
+        throw searchError;
+      }
+      
+      if (existingPatients && existingPatients.length > 0) {
+        toast({
+          variant: "destructive",
+          title: "Paciente já existe",
+          description: `Um paciente com o email ${data.email} já existe no sistema.`,
+        });
+        return;
+      }
+      
+      // Get the doctor's ID (for this example, we'll use the test doctor)
+      const { data: doctorData, error: doctorError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', isDrGuilherme)
+        .eq('user_type', 'medico')
+        .single();
+      
+      if (doctorError) {
+        throw new Error("Não foi possível encontrar o médico. Verifique se a conta do médico está registrada corretamente.");
+      }
+      
+      const doctorId = doctorData.id;
+      
+      // Create a new patient assessment
+      const prontuarioId = `ORTHO-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+      
+      const { data: newAssessment, error: assessmentError } = await supabase
+        .from('patient_assessments')
+        .insert({
+          patient_name: data.name,
+          patient_email: data.email,
+          prontuario_id: prontuarioId,
+          doctor_id: doctorId,
+          clinical_note: isTestPatient ? "Nota clínica de teste para demonstração." : "",
+          prescription: isTestPatient ? "Prescrição de teste para demonstração." : "",
+          summary: isTestPatient ? "Paciente teste criado para demonstração da plataforma." : ""
+        })
+        .select()
+        .single();
+      
+      if (assessmentError) {
+        throw assessmentError;
+      }
+      
+      // Send invitation email (in a real app, this would be an actual email)
+      // For test purposes, we'll simulate this was sent successfully
       
       toast({
         title: "Convite enviado com sucesso!",
@@ -68,12 +125,22 @@ export const PatientInvitation: React.FC<PatientInvitationProps> = ({
       if (onSuccess) {
         onSuccess();
       }
+      
+      // For test patients, display additional information
+      if (isTestPatient) {
+        toast({
+          title: "Conta de teste criada",
+          description: `ID do prontuário: ${prontuarioId}. Use este ID ao criar a conta do paciente de teste.`,
+          duration: 10000,
+        });
+      }
+      
     } catch (error) {
       console.error('Error sending invitation:', error);
       toast({
         variant: "destructive",
         title: "Erro ao enviar convite",
-        description: "Não foi possível enviar o convite. Tente novamente mais tarde."
+        description: error instanceof Error ? error.message : "Não foi possível enviar o convite. Tente novamente mais tarde."
       });
     } finally {
       setIsLoading(false);
