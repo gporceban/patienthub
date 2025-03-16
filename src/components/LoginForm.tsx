@@ -4,45 +4,57 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { useNavigate } from 'react-router-dom';
-import { User } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { User, RefreshCcw } from 'lucide-react';
+import { supabase, clearAuthState } from '@/integrations/supabase/client';
 import { AuthContext } from '@/App';
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const navigate = useNavigate();
-  const { user, profile, loading } = useContext(AuthContext);
+  const { user, profile, loading, refreshProfile } = useContext(AuthContext);
 
-  // Check if user is already logged in and redirect accordingly
   useEffect(() => {
+    console.log("LoginForm rendered. Auth state:", { user: !!user, profile, loading });
+    
+    // Only redirect if we have both user and profile with user_type
     if (!loading && user && profile?.user_type) {
-      console.log("User already logged in, redirecting based on user type:", profile.user_type);
+      console.log("User already logged in with complete profile, redirecting to:", profile.user_type);
       redirectBasedOnUserType(profile.user_type);
     }
   }, [user, profile, loading]);
 
   const redirectBasedOnUserType = (userType: string) => {
-    console.log(`Redirecting user to /${userType} page`);
+    console.log(`Attempting to redirect user to /${userType} page`);
     
-    // Force a slight delay to ensure state updates complete
-    setTimeout(() => {
-      if (userType === 'paciente') {
-        console.log("Navigating to /paciente with replace=true");
-        navigate('/paciente', { replace: true });
-      } else if (userType === 'medico') {
-        console.log("Navigating to /medico with replace=true");
-        navigate('/medico', { replace: true });
-      } else {
-        console.error("Unknown user type:", userType);
-        toast({
-          variant: "destructive",
-          title: "Erro de perfil",
-          description: "Tipo de usuário desconhecido. Por favor, contate o suporte.",
-        });
-      }
-    }, 100);
+    try {
+      // Use a more substantial delay to ensure all state updates and context changes are propagated
+      setTimeout(() => {
+        if (userType === 'paciente') {
+          console.log("Navigating to /paciente with replace=true");
+          navigate('/paciente', { replace: true });
+        } else if (userType === 'medico') {
+          console.log("Navigating to /medico with replace=true");
+          navigate('/medico', { replace: true });
+        } else {
+          console.error("Unknown user type:", userType);
+          toast({
+            variant: "destructive",
+            title: "Erro de perfil",
+            description: "Tipo de usuário desconhecido. Por favor, contate o suporte.",
+          });
+        }
+      }, 200);
+    } catch (error) {
+      console.error("Error during redirect:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro de redirecionamento",
+        description: "Não foi possível redirecioná-lo. Por favor, atualize a página.",
+      });
+    }
   };
 
   const handleLogin = async () => {
@@ -110,7 +122,10 @@ const LoginForm: React.FC = () => {
           description: `Bem-vindo ao OrthoCareMosaic.`,
         });
         
-        // Redirect based on role immediately after login
+        // Force a refresh of the profile in the global context
+        await refreshProfile();
+        
+        // Then redirect based on the user type from the profile we just fetched
         redirectBasedOnUserType(profileData.user_type);
       }
     } catch (error: any) {
@@ -125,6 +140,33 @@ const LoginForm: React.FC = () => {
     }
   };
 
+  const handleClearSession = async () => {
+    setIsClearing(true);
+    try {
+      const { success, error } = await clearAuthState();
+      
+      if (success) {
+        toast({
+          title: "Sessão limpa",
+          description: "Todas as informações de sessão foram removidas.",
+        });
+        // Force page reload to ensure clean state
+        window.location.reload();
+      } else {
+        throw error || new Error("Failed to clear session");
+      }
+    } catch (error: any) {
+      console.error('Error clearing session:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao limpar sessão",
+        description: error.message || "Ocorreu um erro ao tentar limpar sua sessão.",
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   // If already logged in, show a message or redirect
   if (!loading && user && profile) {
     return (
@@ -132,12 +174,25 @@ const LoginForm: React.FC = () => {
         <p className="text-amber-300/90 text-lg font-semibold mb-4">
           Você já está conectado como {profile.user_type === 'paciente' ? 'Paciente' : 'Médico'}
         </p>
-        <button 
-          onClick={() => redirectBasedOnUserType(profile.user_type)}
-          className="button-gold-gradient px-6 py-2 rounded-lg font-semibold transition-all"
-        >
-          Ir para Dashboard
-        </button>
+        <div className="flex flex-col space-y-3">
+          <button 
+            onClick={() => redirectBasedOnUserType(profile.user_type)}
+            className="button-gold-gradient px-6 py-2 rounded-lg font-semibold transition-all"
+          >
+            Ir para Dashboard
+          </button>
+          <button 
+            onClick={handleClearSession}
+            className="text-red-400 hover:text-red-300 text-sm flex items-center justify-center"
+            disabled={isClearing}
+          >
+            {isClearing ? (
+              <span className="flex items-center"><RefreshCcw size={14} className="animate-spin mr-2" /> Limpando sessão...</span>
+            ) : (
+              <span>Limpar sessão e fazer logout</span>
+            )}
+          </button>
+        </div>
       </div>
     );
   }
@@ -158,6 +213,11 @@ const LoginForm: React.FC = () => {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="dark-input"
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              handleLogin();
+            }
+          }}
         />
         <Input
           type="password"
@@ -185,6 +245,18 @@ const LoginForm: React.FC = () => {
           Esqueci minha senha
         </button>
       </div>
+      
+      {(user || loading) && (
+        <div className="mt-6 text-center">
+          <button 
+            onClick={handleClearSession}
+            className="text-red-400 hover:text-red-300 text-xs"
+            disabled={isClearing}
+          >
+            {isClearing ? 'Limpando sessão...' : 'Problemas para entrar? Limpar dados de sessão'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

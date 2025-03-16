@@ -16,8 +16,8 @@ export const supabase = createClient<Database>(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      storage: localStorage,
-      storageKey: 'ortho-care-auth',
+      storage: window.localStorage, // Explicitly use localStorage instead of the default
+      storageKey: 'ortho-care-auth-token', // Change the key to avoid conflicts with previous sessions
       detectSessionInUrl: true,
       flowType: 'implicit',
       debug: true,
@@ -34,6 +34,23 @@ export const supabase = createClient<Database>(
 supabase.auth.onAuthStateChange((event, session) => {
   console.log('Supabase Auth State Changed:', event, session?.user?.id || 'No user');
 });
+
+// Helper function to clear Supabase session and local storage
+export const clearAuthState = async () => {
+  try {
+    // Sign out from Supabase
+    await supabase.auth.signOut();
+    
+    // Clear the specific auth storage
+    window.localStorage.removeItem('ortho-care-auth-token');
+    
+    console.log('Auth state cleared successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('Error clearing auth state:', error);
+    return { success: false, error };
+  }
+};
 
 // Helper for checking DB connection status
 export const checkSupabaseConnection = async () => {
