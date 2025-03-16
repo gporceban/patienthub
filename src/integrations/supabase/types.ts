@@ -9,13 +9,155 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      appointments: {
+        Row: {
+          created_at: string
+          date_time: string
+          doctor_id: string
+          id: string
+          location: string
+          notes: string | null
+          patient_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date_time: string
+          doctor_id: string
+          id?: string
+          location: string
+          notes?: string | null
+          patient_id: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date_time?: string
+          doctor_id?: string
+          id?: string
+          location?: string
+          notes?: string | null
+          patient_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      doctors: {
+        Row: {
+          biography: string | null
+          created_at: string
+          id: string
+          license_number: string
+          specialty: string
+          updated_at: string
+        }
+        Insert: {
+          biography?: string | null
+          created_at?: string
+          id: string
+          license_number: string
+          specialty: string
+          updated_at?: string
+        }
+        Update: {
+          biography?: string | null
+          created_at?: string
+          id?: string
+          license_number?: string
+          specialty?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      patients: {
+        Row: {
+          allergies: string | null
+          birth_date: string | null
+          blood_type: string | null
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          allergies?: string | null
+          birth_date?: string | null
+          blood_type?: string | null
+          created_at?: string
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          allergies?: string | null
+          birth_date?: string | null
+          blood_type?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          updated_at: string
+          user_type: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name: string
+          id: string
+          updated_at?: string
+          user_type: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          updated_at?: string
+          user_type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_doctor: {
+        Args: {
+          user_id: string
+        }
+        Returns: boolean
+      }
+      is_patient: {
+        Args: {
+          user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

@@ -6,6 +6,7 @@ import { toast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from 'react-router-dom';
 import { Lock, User, UserCog } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -13,32 +14,125 @@ const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (role: 'paciente' | 'medico') => {
+  const handleLogin = async (role: 'paciente' | 'medico') => {
+    if (!email || !password) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao fazer login",
+        description: "Por favor, preencha todos os campos.",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      if (email && password) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: {
+          data: {
+            user_type: role,
+          }
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        // Fetch the user profile to confirm user type
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) {
+          throw profileError;
+        }
+
+        // Check if user type matches the selected role
+        if (profileData.user_type !== role) {
+          toast({
+            variant: "destructive",
+            title: "Tipo de usuário incorreto",
+            description: `Você tentou entrar como ${role}, mas sua conta está registrada como ${profileData.user_type}.`,
+          });
+          await supabase.auth.signOut();
+          setIsLoading(false);
+          return;
+        }
+
         toast({
           title: "Login realizado com sucesso",
           description: `Você entrou como ${role}.`,
         });
         
-        // Simulate a redirect based on role
+        // Redirect based on role
         if (role === 'paciente') {
           navigate('/paciente');
         } else {
           navigate('/medico');
         }
-      } else {
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao fazer login",
+        description: error.message || "Ocorreu um erro durante o login. Verifique suas credenciais.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async (role: 'paciente' | 'medico') => {
+    if (!email || !password) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao criar conta",
+        description: "Por favor, preencha todos os campos.",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            user_type: role,
+            full_name: '',
+          }
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.user) {
         toast({
-          variant: "destructive",
-          title: "Erro ao fazer login",
-          description: "Por favor, preencha todos os campos.",
+          title: "Conta criada com sucesso",
+          description: "Por favor, verifique seu e-mail para confirmar sua conta.",
         });
       }
-    }, 1500);
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao criar conta",
+        description: error.message || "Ocorreu um erro durante o cadastro.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -82,6 +176,16 @@ const LoginForm: React.FC = () => {
               >
                 {isLoading ? 'Processando...' : 'Entrar como Paciente'}
               </Button>
+              <div className="text-sm text-center mt-2 text-muted-foreground">
+                Não tem uma conta?{' '}
+                <button 
+                  onClick={() => handleSignUp('paciente')} 
+                  className="text-gold-400 hover:underline"
+                  disabled={isLoading}
+                >
+                  Cadastre-se
+                </button>
+              </div>
               <div className="text-sm text-center mt-4 text-muted-foreground">
                 <a href="#" className="text-gold-400 hover:underline">Esqueceu sua senha?</a>
               </div>
@@ -116,6 +220,16 @@ const LoginForm: React.FC = () => {
               >
                 {isLoading ? 'Processando...' : 'Entrar como Médico'}
               </Button>
+              <div className="text-sm text-center mt-2 text-muted-foreground">
+                Não tem uma conta?{' '}
+                <button 
+                  onClick={() => handleSignUp('medico')} 
+                  className="text-gold-400 hover:underline"
+                  disabled={isLoading}
+                >
+                  Cadastre-se
+                </button>
+              </div>
               <div className="text-sm text-center mt-4 text-muted-foreground">
                 <a href="#" className="text-gold-400 hover:underline">Esqueceu sua senha?</a>
               </div>
