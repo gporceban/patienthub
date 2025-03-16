@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/App';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Appointment {
   id: string;
@@ -38,6 +39,7 @@ const DoctorDashboard = () => {
     active_patients: 0
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Get current date in YYYY-MM-DD format for comparison
   const today = new Date().toISOString().split('T')[0];
@@ -48,6 +50,8 @@ const DoctorDashboard = () => {
       
       try {
         setIsLoading(true);
+        setError(null);
+        console.log("Fetching appointments for doctor:", user.id);
         
         // Fetch appointments
         const { data: appointmentsData, error: appointmentsError } = await supabase
@@ -62,20 +66,25 @@ const DoctorDashboard = () => {
           .eq('doctor_id', user.id)
           .order('date_time', { ascending: true });
           
-        if (appointmentsError) throw appointmentsError;
+        if (appointmentsError) {
+          console.error("Error fetching appointments:", appointmentsError);
+          throw appointmentsError;
+        }
+        
+        console.log("Appointments data received:", appointmentsData);
         
         // Fetch patient names for the appointments
         if (appointmentsData && appointmentsData.length > 0) {
           const appointmentsWithNames = await Promise.all(
             appointmentsData.map(async (appointment) => {
               if (!appointment || !appointment.patient_id) {
-                return { ...appointment, patient_name: 'Unknown' };
+                return { ...appointment, patient_name: 'Desconhecido' };
               }
               
               const { data: profileData } = await supabase
                 .from('profiles')
                 .select('full_name')
-                .eq('id', appointment.patient_id as any)
+                .eq('id', appointment.patient_id)
                 .maybeSingle();
                 
               return {
@@ -104,6 +113,7 @@ const DoctorDashboard = () => {
           });
         } else {
           // No appointments found
+          console.log("No appointments found for doctor:", user.id);
           setAppointments([]);
           setStats({
             total: 0,
@@ -113,20 +123,26 @@ const DoctorDashboard = () => {
         }
         
         // Fetch patient assessment count to add to total consultations
-        const { count: assessmentCount, error: assessmentError } = await supabase
-          .from('patient_assessments')
-          .select('id', { count: 'exact', head: true })
-          .eq('doctor_id', user.id);
-          
-        if (!assessmentError && assessmentCount !== null) {
-          setStats(prev => ({
-            ...prev,
-            total: prev.total + assessmentCount
-          }));
+        try {
+          const { count: assessmentCount, error: assessmentError } = await supabase
+            .from('patient_assessments')
+            .select('id', { count: 'exact', head: true })
+            .eq('doctor_id', user.id);
+            
+          if (!assessmentError && assessmentCount !== null) {
+            setStats(prev => ({
+              ...prev,
+              total: prev.total + assessmentCount
+            }));
+          }
+        } catch (assessmentError) {
+          console.error("Error fetching assessments:", assessmentError);
+          // Continue execution even if this query fails
         }
         
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        setError("Erro ao carregar dados. Verifique sua conexão com a internet e tente novamente.");
         toast({
           variant: "destructive",
           title: "Erro ao carregar dados",
@@ -177,17 +193,22 @@ const DoctorDashboard = () => {
   // Get doctor's name from profile
   const doctorName = profile?.full_name || "Dr. Paulo Oliveira";
   
-  return (
-    <Layout userType="medico" userName={doctorName}>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2">
-          Bem-vindo, <span className="text-gold-400">{doctorName}</span>
-        </h1>
-        <p className="text-gray-400">
-          Gerencie seus pacientes e consultas
-        </p>
-      </div>
-      
+  // Loading state for dashboard cards
+  const renderDashboardCards = () => {
+    if (isLoading) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {[1, 2, 3].map((index) => (
+            <Card key={index} className="card-gradient p-6">
+              <Skeleton className="h-6 w-1/3 mb-3" />
+              <Skeleton className="h-8 w-1/4" />
+            </Card>
+          ))}
+        </div>
+      );
+    }
+    
+    return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <DashboardCard
           title="Pacientes Ativos"
@@ -207,6 +228,96 @@ const DoctorDashboard = () => {
           icon={FileText}
         />
       </div>
+    );
+  };
+  
+  // Render content for the recent patients section
+  const renderRecentPatients = () => {
+    if (isLoading) {
+      return (
+        <div className="space-y-3">
+          {[1, 2, 3].map((index) => (
+            <div key={index} className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-full" />
+                <div>
+                  <Skeleton className="h-4 w-32 mb-1" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
+    if (filteredAppointments.length === 0) {
+      return (
+        <div className="text-center py-6 border border-dashed border-darkblue-700 rounded-lg">
+          <Users className="h-10 w-10 mx-auto text-gray-400 mb-2" />
+          <h3 className="text-lg font-medium mb-1">Nenhum paciente cadastrado</h3>
+          <p className="text-gray-400 mb-4">Você ainda não possui pacientes cadastrados no sistema.</p>
+          <Button asChild size="sm" className="bg-gold-500 hover:bg-gold-600 text-black">
+            <Link to="/medico/pacientes">
+              <Plus size={16} className="mr-2" />
+              Adicionar Paciente
+            </Link>
+          </Button>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-3">
+        {filteredAppointments.slice(0, 3).map((appointment) => (
+          <div key={appointment.id} className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-darkblue-800 rounded-full h-9 w-9 flex items-center justify-center text-sm font-medium text-gold-400">
+                {appointment.patient_name?.split(' ').map(name => name[0]).join('').substring(0, 2).toUpperCase()}
+              </div>
+              <div>
+                <p className="font-medium">{appointment.patient_name}</p>
+                <p className="text-xs text-gray-400">Consulta: {formatAppointmentDate(appointment.date_time)}, {formatAppointmentTime(appointment.date_time)}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+        
+        <Button asChild variant="link" className="mt-2 text-gold-400">
+          <Link to="/medico/pacientes">
+            Ver Todos os Pacientes
+          </Link>
+        </Button>
+      </div>
+    );
+  };
+  
+  return (
+    <Layout userType="medico" userName={doctorName}>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white mb-2">
+          Bem-vindo, <span className="text-gold-400">{doctorName}</span>
+        </h1>
+        <p className="text-gray-400">
+          Gerencie seus pacientes e consultas
+        </p>
+      </div>
+      
+      {/* Dashboard Cards */}
+      {renderDashboardCards()}
+      
+      {error && (
+        <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 mb-6 text-red-200">
+          <p>{error}</p>
+          <Button 
+            variant="outline" 
+            className="mt-2 border-red-800 hover:bg-red-900/30"
+            onClick={() => window.location.reload()}
+          >
+            Tentar novamente
+          </Button>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -236,8 +347,27 @@ const DoctorDashboard = () => {
             </div>
             
             {isLoading ? (
-              <div className="flex justify-center items-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold-500"></div>
+              <div className="space-y-4">
+                {[1, 2, 3].map((index) => (
+                  <div key={index} className="p-4 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Skeleton className="h-5 w-20" />
+                          <Skeleton className="h-5 w-32" />
+                        </div>
+                        <div className="flex flex-col md:flex-row md:items-center gap-2 text-sm">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-28" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Skeleton className="h-9 w-20" />
+                        <Skeleton className="h-9 w-20" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : todaysAppointments.length === 0 ? (
               <div className="text-center py-10 border border-dashed border-darkblue-700 rounded-lg">
@@ -308,43 +438,59 @@ const DoctorDashboard = () => {
           <Card className="card-gradient p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">Notificações</h2>
             
-            <div className="space-y-4">
-              <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
-                <div className="flex items-start gap-3">
-                  <div className="bg-amber-950 rounded-full p-2 mt-1">
-                    <Calendar className="h-4 w-4 text-amber-400" />
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((index) => (
+                  <div key={index} className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+                    <div className="flex items-start gap-3">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <div>
+                        <Skeleton className="h-4 w-48 mb-1" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-sm">Nova solicitação de consulta de Rodrigo Alves.</p>
-                    <p className="text-xs text-gray-400 mt-1">Há 30 minutos</p>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-amber-950 rounded-full p-2 mt-1">
+                      <Calendar className="h-4 w-4 text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">Nova solicitação de consulta de Rodrigo Alves.</p>
+                      <p className="text-xs text-gray-400 mt-1">Há 30 minutos</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-blue-950 rounded-full p-2 mt-1">
+                      <Calendar className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">Consulta com Maria Silva reagendada para 28/11.</p>
+                      <p className="text-xs text-gray-400 mt-1">Há 2 horas</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-emerald-950 rounded-full p-2 mt-1">
+                      <Users className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">Novo paciente cadastrado: João Pereira.</p>
+                      <p className="text-xs text-gray-400 mt-1">Ontem</p>
+                    </div>
                   </div>
                 </div>
               </div>
-              
-              <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
-                <div className="flex items-start gap-3">
-                  <div className="bg-blue-950 rounded-full p-2 mt-1">
-                    <Calendar className="h-4 w-4 text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">Consulta com Maria Silva reagendada para 28/11.</p>
-                    <p className="text-xs text-gray-400 mt-1">Há 2 horas</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
-                <div className="flex items-start gap-3">
-                  <div className="bg-emerald-950 rounded-full p-2 mt-1">
-                    <Users className="h-4 w-4 text-emerald-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">Novo paciente cadastrado: João Pereira.</p>
-                    <p className="text-xs text-gray-400 mt-1">Ontem</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
             
             <Button variant="link" className="w-full mt-3 text-gold-400">
               Ver Todas Notificações
@@ -354,35 +500,7 @@ const DoctorDashboard = () => {
           <Card className="card-gradient p-6">
             <h2 className="text-xl font-semibold mb-4">Pacientes Recentes</h2>
             
-            {isLoading ? (
-              <div className="flex justify-center items-center py-10">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500"></div>
-              </div>
-            ) : filteredAppointments.length === 0 ? (
-              <p className="text-gray-400 text-center py-4">Nenhum paciente recente.</p>
-            ) : (
-              <div className="space-y-3">
-                {filteredAppointments.slice(0, 3).map((appointment) => (
-                  <div key={appointment.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-darkblue-800 rounded-full h-9 w-9 flex items-center justify-center text-sm font-medium text-gold-400">
-                        {appointment.patient_name?.split(' ').map(name => name[0]).join('').substring(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium">{appointment.patient_name}</p>
-                        <p className="text-xs text-gray-400">Consulta: {formatAppointmentDate(appointment.date_time)}, {formatAppointmentTime(appointment.date_time)}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                <Button asChild variant="link" className="mt-2 text-gold-400">
-                  <Link to="/medico/pacientes">
-                    Ver Todos os Pacientes
-                  </Link>
-                </Button>
-              </div>
-            )}
+            {renderRecentPatients()}
           </Card>
         </div>
       </div>
@@ -391,3 +509,4 @@ const DoctorDashboard = () => {
 };
 
 export default DoctorDashboard;
+
