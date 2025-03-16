@@ -15,7 +15,7 @@ export const supabase = createClient<Database>(
   {
     auth: {
       persistSession: true,
-      // Fixed storage configuration to use a valid SupportedStorage type
+      autoRefreshToken: true,
       storage: localStorage
     },
   }

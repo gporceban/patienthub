@@ -1,194 +1,160 @@
-import React, { useEffect, useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+
+import React, { useState, useEffect, useContext } from 'react';
 import Layout from '@/components/Layout';
-import { AuthContext } from '@/App';
-import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { toast } from '@/components/ui/use-toast';
-import { Loader2, Save, UserCog } from 'lucide-react';
-
-interface DoctorProfile {
-  id: string;
-  license_number: string;
-  specialty: string;
-  biography: string | null;
-}
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
+import { AuthContext } from '@/App';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2, Save } from 'lucide-react';
+import { DoctorProfile as DoctorProfileType, fromDoctors } from '@/types/doctorProfile';
 
 const DoctorProfile = () => {
-  const { user, profile } = useContext(AuthContext);
-  const navigate = useNavigate();
-  const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useContext(AuthContext);
+  const { toast } = useToast();
+  
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [specialty, setSpecialty] = useState('');
+  const [biography, setBiography] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState({
-    license_number: '',
-    specialty: '',
-    biography: '',
-  });
-
-  useEffect(() => {
-    if (!user || profile?.user_type !== 'medico') {
-      navigate('/');
-    }
-  }, [user, profile, navigate]);
-
+  const [isLoading, setIsLoading] = useState(true);
+  const [profile, setProfile] = useState<DoctorProfileType | null>(null);
+  
+  // Fetch doctor profile
   useEffect(() => {
     const fetchDoctorProfile = async () => {
       if (!user) return;
       
       try {
-        const { data, error } = await supabase
-          .from('doctors')
-          .select('*')
+        setIsLoading(true);
+        
+        const { data, error } = await fromDoctors(supabase)
+          .select()
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
         
         if (error) {
-          console.log('Error fetching doctor profile:', error);
-          if (error.code === 'PGRST116') {
-            setDoctorProfile(null);
-          } else {
-            toast({
-              variant: "destructive",
-              title: "Erro ao carregar perfil",
-              description: error.message,
-            });
-          }
-        } else if (data) {
-          setDoctorProfile(data as DoctorProfile);
-          setFormData({
-            license_number: data.license_number || '',
-            specialty: data.specialty || '',
-            biography: data.biography || '',
-          });
+          throw error;
         }
-      } catch (error: any) {
+        
+        if (data) {
+          setProfile(data as DoctorProfileType);
+          setLicenseNumber(data.license_number || '');
+          setSpecialty(data.specialty || '');
+          setBiography(data.biography || '');
+        }
+      } catch (error) {
         console.error('Error fetching doctor profile:', error);
         toast({
           variant: "destructive",
           title: "Erro ao carregar perfil",
-          description: "Não foi possível carregar o perfil do médico.",
+          description: "Não foi possível carregar os dados do seu perfil. Tente novamente mais tarde."
         });
       } finally {
         setIsLoading(false);
       }
     };
-
+    
     fetchDoctorProfile();
-  }, [user]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
+  }, [user, toast]);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!user) return;
     
-    setIsSaving(true);
-    
     try {
-      if (doctorProfile) {
-        const { error } = await supabase
-          .from('doctors')
-          .update({
-            license_number: formData.license_number,
-            specialty: formData.specialty,
-            biography: formData.biography,
-          } as any)
-          .eq('id', user.id);
-          
-        if (error) throw error;
+      setIsSaving(true);
+      
+      const profileData = {
+        license_number: licenseNumber,
+        specialty: specialty,
+        biography: biography
+      };
+      
+      let response;
+      
+      if (profile) {
+        // Update existing profile
+        response = await fromDoctors(supabase)
+          .update(profileData, user.id);
       } else {
-        const { error } = await supabase
-          .from('doctors')
-          .insert({
-            id: user.id,
-            license_number: formData.license_number,
-            specialty: formData.specialty,
-            biography: formData.biography,
-          } as any);
-          
-        if (error) throw error;
-        
-        setDoctorProfile({
-          id: user.id,
-          license_number: formData.license_number,
-          specialty: formData.specialty,
-          biography: formData.biography,
-        });
+        // Create new profile
+        response = await fromDoctors(supabase)
+          .insert({ id: user.id, ...profileData });
+      }
+      
+      if (response.error) {
+        throw response.error;
       }
       
       toast({
         title: "Perfil salvo com sucesso",
-        description: "Suas informações foram atualizadas.",
+        description: "Suas informações foram atualizadas."
       });
-    } catch (error: any) {
+      
+      // Update local state
+      setProfile({
+        id: user.id,
+        license_number: licenseNumber,
+        specialty: specialty,
+        biography: biography
+      });
+      
+    } catch (error) {
       console.error('Error saving doctor profile:', error);
       toast({
         variant: "destructive",
         title: "Erro ao salvar perfil",
-        description: error.message || "Ocorreu um erro ao salvar as informações.",
+        description: "Não foi possível salvar as alterações. Tente novamente mais tarde."
       });
     } finally {
       setIsSaving(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <Layout userType="medico">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-gold-400" />
-        </div>
-      </Layout>
-    );
-  }
-
+  
   return (
     <Layout userType="medico">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">
-          Perfil do <span className="gold-text">Médico</span>
-        </h1>
+        <h1 className="text-2xl font-bold mb-2">Meu Perfil Médico</h1>
         <p className="text-gray-400">
           Atualize suas informações profissionais
         </p>
       </div>
       
-      <Card className="card-gradient">
-        <div className="p-6">
+      <Card className="card-gradient p-6 max-w-2xl">
+        {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-gold-500" />
+          </div>
+        ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="license_number">Número de Registro (CRM)</Label>
+                  <Label htmlFor="license">Número de Registro (CRM)</Label>
                   <Input
-                    id="license_number"
-                    name="license_number"
-                    placeholder="Número de CRM"
-                    value={formData.license_number}
-                    onChange={handleInputChange}
+                    id="license"
+                    value={licenseNumber}
+                    onChange={(e) => setLicenseNumber(e.target.value)}
+                    placeholder="Ex: CRM/SP 123456"
+                    className="bg-darkblue-800/50 border-darkblue-700"
                     required
-                    className="bg-darkblue-900/50 border-darkblue-700"
                   />
                 </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="specialty">Especialidade</Label>
                   <Input
                     id="specialty"
-                    name="specialty"
-                    placeholder="Ex: Ortopedia, Cirurgia da Coluna"
-                    value={formData.specialty}
-                    onChange={handleInputChange}
+                    value={specialty}
+                    onChange={(e) => setSpecialty(e.target.value)}
+                    placeholder="Ex: Ortopedia e Traumatologia"
+                    className="bg-darkblue-800/50 border-darkblue-700"
                     required
-                    className="bg-darkblue-900/50 border-darkblue-700"
                   />
                 </div>
               </div>
@@ -197,35 +163,33 @@ const DoctorProfile = () => {
                 <Label htmlFor="biography">Biografia Profissional</Label>
                 <Textarea
                   id="biography"
-                  name="biography"
+                  value={biography}
+                  onChange={(e) => setBiography(e.target.value)}
                   placeholder="Descreva sua formação, experiência e áreas de atuação..."
-                  value={formData.biography || ''}
-                  onChange={handleInputChange}
-                  rows={5}
-                  className="bg-darkblue-900/50 border-darkblue-700 resize-none"
+                  className="h-40 bg-darkblue-800/50 border-darkblue-700"
                 />
               </div>
             </div>
             
-            <Button
-              type="submit"
-              className="w-full bg-gold-500 hover:bg-gold-600 text-black"
+            <Button 
+              type="submit" 
               disabled={isSaving}
+              className="bg-gold-500 hover:bg-gold-600 text-black"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 size={16} className="mr-2 animate-spin" />
                   Salvando...
                 </>
               ) : (
                 <>
-                  <Save className="mr-2 h-4 w-4" />
+                  <Save size={16} className="mr-2" />
                   Salvar Perfil
                 </>
               )}
             </Button>
           </form>
-        </div>
+        )}
       </Card>
     </Layout>
   );
