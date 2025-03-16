@@ -14,6 +14,7 @@ import PatientAssessment from "./pages/PatientAssessment";
 import PatientAssessmentsList from "./pages/PatientAssessmentsList";
 import DoctorProfile from "./pages/DoctorProfile";
 import DoctorPatients from "./pages/DoctorPatients";
+import DoctorDocuments from "./pages/DoctorDocuments";
 import NotFound from "./pages/NotFound";
 import StarBackground from "./components/StarBackground";
 import { toast } from "./components/ui/use-toast";
@@ -236,6 +237,20 @@ const App = () => {
                   !loading ? (
                     user && profile?.user_type === 'medico' ? (
                       <DoctorAssessment />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
+                  ) : (
+                    <LoadingOrRedirect />
+                  )
+                } 
+              />
+              <Route 
+                path="/medico/documentos" 
+                element={
+                  !loading ? (
+                    user && profile?.user_type === 'medico' ? (
+                      <DoctorDocuments />
                     ) : (
                       <Navigate to="/" replace />
                     )

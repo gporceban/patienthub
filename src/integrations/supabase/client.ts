@@ -19,7 +19,39 @@ export const supabase = createClient<Database>(
       storage: localStorage,
       storageKey: 'ortho-care-auth',
       detectSessionInUrl: true,
-      flowType: 'implicit'
+      flowType: 'implicit',
+      debug: true,
+      cookieOptions: {
+        name: 'ortho-care-auth-token',
+        lifetime: 604800, // 7 days
+        domain: window.location.hostname,
+        path: '/',
+        sameSite: 'lax',
+      },
+    },
+    global: {
+      headers: {
+        'x-app-name': 'ortho-care-mosaic',
+      },
     },
   }
 );
+
+// Add debug logging for auth state changes
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Supabase Auth State Changed:', event, session?.user?.id || 'No user');
+});
+
+// Helper for checking DB connection status
+export const checkSupabaseConnection = async () => {
+  try {
+    const { data, error } = await supabase.from('doctors').select('count(id)', { count: 'exact', head: true });
+    if (error) {
+      throw error;
+    }
+    return { connected: true, message: 'Connected to Supabase successfully' };
+  } catch (error) {
+    console.error('Supabase connection error:', error);
+    return { connected: false, message: 'Error connecting to Supabase', error };
+  }
+};

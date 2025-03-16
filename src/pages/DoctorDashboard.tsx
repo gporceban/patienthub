@@ -1,21 +1,183 @@
 
-import React from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import Layout from '@/components/Layout';
 import DashboardCard from '@/components/DashboardCard';
-import AppointmentCard from '@/components/AppointmentCard';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Users, Calendar, LineChart, Plus, ArrowRight, BellRing, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { Users, Calendar, FileText, Search, Plus, MapPin, Clock, ArrowRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { AuthContext } from '@/App';
+import { useToast } from '@/components/ui/use-toast';
+import { Badge } from '@/components/ui/badge';
+
+interface Appointment {
+  id: string;
+  patient_id: string;
+  date_time: string;
+  location: string;
+  status: string;
+  patient_name?: string;
+}
+
+interface AppointmentStats {
+  total: number;
+  today: number;
+  active_patients: number;
+}
 
 const DoctorDashboard = () => {
-  const doctorName = "Dr. Paulo Oliveira";
+  const { user, profile } = useContext(AuthContext);
+  const { toast } = useToast();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [stats, setStats] = useState<AppointmentStats>({
+    total: 0,
+    today: 0,
+    active_patients: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Get current date in YYYY-MM-DD format for comparison
+  const today = new Date().toISOString().split('T')[0];
+  
+  useEffect(() => {
+    const fetchAppointmentsAndStats = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoading(true);
+        
+        // Fetch appointments
+        const { data: appointmentsData, error: appointmentsError } = await supabase
+          .from('appointments')
+          .select(`
+            id,
+            patient_id,
+            date_time,
+            location,
+            status
+          `)
+          .eq('doctor_id', user.id)
+          .order('date_time', { ascending: true });
+          
+        if (appointmentsError) throw appointmentsError;
+        
+        // Fetch patient names for the appointments
+        if (appointmentsData && appointmentsData.length > 0) {
+          const appointmentsWithNames = await Promise.all(
+            appointmentsData.map(async (appointment) => {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', appointment.patient_id)
+                .maybeSingle();
+                
+              return {
+                ...appointment,
+                patient_name: profileData?.full_name || 'Paciente'
+              };
+            })
+          );
+          
+          setAppointments(appointmentsWithNames);
+          
+          // Calculate statistics
+          const todayAppointments = appointmentsWithNames.filter(
+            app => app.date_time.startsWith(today)
+          ).length;
+          
+          // Get unique patient count
+          const uniquePatients = new Set(
+            appointmentsWithNames.map(app => app.patient_id)
+          ).size;
+          
+          setStats({
+            total: appointmentsWithNames.length,
+            today: todayAppointments,
+            active_patients: uniquePatients
+          });
+        } else {
+          // No appointments found
+          setAppointments([]);
+          setStats({
+            total: 0,
+            today: 0,
+            active_patients: 0
+          });
+        }
+        
+        // Fetch patient assessment count to add to total consultations
+        const { count: assessmentCount, error: assessmentError } = await supabase
+          .from('patient_assessments')
+          .select('id', { count: 'exact', head: true })
+          .eq('doctor_id', user.id);
+          
+        if (!assessmentError && assessmentCount !== null) {
+          setStats(prev => ({
+            ...prev,
+            total: prev.total + assessmentCount
+          }));
+        }
+        
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao carregar dados",
+          description: "Não foi possível carregar os dados do dashboard."
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchAppointmentsAndStats();
+  }, [user, today, toast]);
+  
+  // Filter appointments based on search query
+  const filteredAppointments = appointments.filter(appointment => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    return (
+      appointment.patient_name?.toLowerCase().includes(query) ||
+      appointment.location.toLowerCase().includes(query)
+    );
+  });
+  
+  // Get today's appointments for the agenda
+  const todaysAppointments = appointments.filter(
+    appointment => appointment.date_time.startsWith(today)
+  );
+  
+  const formatAppointmentTime = (dateTimeString: string) => {
+    const date = new Date(dateTimeString);
+    return date.toLocaleTimeString('pt-BR', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+  
+  const formatAppointmentDate = (dateTimeString: string) => {
+    const date = new Date(dateTimeString);
+    return date.toLocaleDateString('pt-BR', { 
+      day: '2-digit', 
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+  
+  // Get doctor's name from profile
+  const doctorName = profile?.full_name || "Dr. Paulo Oliveira";
   
   return (
     <Layout userType="medico" userName={doctorName}>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">
-          Bem-vindo, <span className="gold-text">{doctorName}</span>
+        <h1 className="text-2xl font-bold text-white mb-2">
+          Bem-vindo, <span className="text-gold-400">{doctorName}</span>
         </h1>
         <p className="text-gray-400">
           Gerencie seus pacientes e consultas
@@ -23,171 +185,200 @@ const DoctorDashboard = () => {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <DashboardCard 
-          title="Pacientes Ativos" 
-          value="42" 
-          icon={Users} 
+        <DashboardCard
+          title="Pacientes Ativos"
+          value={stats.active_patients.toString()}
+          icon={<Users size={24} />}
         />
-        <DashboardCard 
-          title="Consultas Hoje" 
-          value="8" 
-          icon={Calendar} 
-          color="gold"
+        
+        <DashboardCard
+          title="Consultas Hoje"
+          value={stats.today.toString()}
+          icon={<Calendar size={24} />}
         />
-        <DashboardCard 
-          title="Total de Atendimentos" 
-          value="156" 
-          icon={LineChart} 
+        
+        <DashboardCard
+          title="Total de Atendimentos"
+          value={stats.total.toString()}
+          icon={<FileText size={24} />}
         />
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Card className="card-gradient mb-6">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Agenda do Dia</h2>
-                <Button variant="ghost" className="text-gold-400 hover:text-gold-300">
-                  Ver agenda completa <ArrowRight size={16} className="ml-2" />
-                </Button>
-              </div>
+          <Card className="card-gradient p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Agenda do Dia</h2>
               
-              <div className="mb-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Buscar paciente..." 
-                    className="pl-10 bg-darkblue-900/50 border-darkblue-700"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <AppointmentCard 
-                  date="Hoje"
-                  time="14:30"
-                  patient="Maria Silva"
-                  location="Clínica Ortopédica Central - Sala 302"
-                  status="upcoming"
-                  userType="medico"
+              <Button asChild variant="link" className="text-gold-400">
+                <Link to="/medico/consultas">
+                  Ver agenda completa 
+                  <ArrowRight size={16} className="ml-2" />
+                </Link>
+              </Button>
+            </div>
+            
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Input
+                  type="search"
+                  placeholder="Buscar paciente..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-darkblue-800/50 border-darkblue-700"
                 />
-                
-                <AppointmentCard 
-                  date="Hoje"
-                  time="16:00"
-                  patient="Carlos Mendes"
-                  location="Clínica Ortopédica Central - Sala 302"
-                  status="upcoming"
-                  userType="medico"
-                />
-                
-                <AppointmentCard 
-                  date="Hoje"
-                  time="10:15"
-                  patient="Ana Oliveira"
-                  location="Clínica Ortopédica Central - Sala 302"
-                  status="completed"
-                  userType="medico"
-                />
-              </div>
-              
-              <div className="mt-4 flex justify-center">
-                <Button className="bg-darkblue-700 hover:bg-darkblue-800 text-white">
-                  <Plus size={16} className="mr-2" />
-                  Adicionar Consulta
-                </Button>
               </div>
             </div>
+            
+            {isLoading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold-500"></div>
+              </div>
+            ) : todaysAppointments.length === 0 ? (
+              <div className="text-center py-10 border border-dashed border-darkblue-700 rounded-lg">
+                <Calendar className="h-10 w-10 mx-auto text-gray-400 mb-2" />
+                <h3 className="text-lg font-medium mb-1">Sem consultas hoje</h3>
+                <p className="text-gray-400 mb-4">Você não tem consultas agendadas para hoje.</p>
+                <Button asChild size="sm" className="bg-gold-500 hover:bg-gold-600 text-black">
+                  <Link to="/medico/consultas">
+                    <Plus size={16} className="mr-2" />
+                    Agendar Consulta
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredAppointments.map((appointment) => (
+                  <div 
+                    key={appointment.id} 
+                    className="p-4 border border-darkblue-700 rounded-lg bg-darkblue-800/40 hover:bg-darkblue-800/60 transition-colors"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge 
+                            className={
+                              appointment.status === 'agendada' 
+                                ? "bg-emerald-900/70 text-emerald-300 hover:bg-emerald-900" 
+                                : appointment.status === 'concluída'
+                                ? "bg-blue-900/70 text-blue-300 hover:bg-blue-900"
+                                : "bg-orange-900/70 text-orange-300 hover:bg-orange-900"
+                            }
+                          >
+                            {appointment.status === 'agendada' ? 'Agendada' :
+                             appointment.status === 'concluída' ? 'Concluída' : 'Pendente'}
+                          </Badge>
+                          <span className="text-gold-400 font-semibold">{appointment.patient_name}</span>
+                        </div>
+                        <div className="flex flex-col md:flex-row md:items-center gap-2 text-sm text-gray-400">
+                          <div className="flex items-center">
+                            <Clock size={14} className="mr-1" />
+                            {formatAppointmentTime(appointment.date_time)}
+                          </div>
+                          <div className="hidden md:block text-gray-500">•</div>
+                          <div className="flex items-center">
+                            <MapPin size={14} className="mr-1" />
+                            {appointment.location}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="border-darkblue-700">
+                          Remarcar
+                        </Button>
+                        <Button size="sm" variant="outline" className="border-red-800 text-red-400 hover:bg-red-950">
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
         
         <div>
-          <Card className="card-gradient mb-6">
-            <div className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Notificações</h2>
-              
-              <div className="space-y-4">
-                <div className="flex gap-3 p-3 rounded-lg bg-darkblue-800/50 border border-darkblue-700/30">
-                  <div className="flex-shrink-0">
-                    <BellRing size={20} className="text-gold-400 mt-1" />
+          <Card className="card-gradient p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">Notificações</h2>
+            
+            <div className="space-y-4">
+              <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+                <div className="flex items-start gap-3">
+                  <div className="bg-amber-950 rounded-full p-2 mt-1">
+                    <Calendar className="h-4 w-4 text-amber-400" />
                   </div>
                   <div>
-                    <p className="text-sm">Nova solicitação de consulta de Rodrigo Alves.</p>
+                    <p className="font-medium text-sm">Nova solicitação de consulta de Rodrigo Alves.</p>
                     <p className="text-xs text-gray-400 mt-1">Há 30 minutos</p>
                   </div>
                 </div>
-                
-                <div className="flex gap-3 p-3 rounded-lg bg-darkblue-800/50 border border-darkblue-700/30">
-                  <div className="flex-shrink-0">
-                    <Calendar size={20} className="text-gold-400 mt-1" />
+              </div>
+              
+              <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-950 rounded-full p-2 mt-1">
+                    <Calendar className="h-4 w-4 text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-sm">Consulta com Maria Silva reagendada para 28/11.</p>
+                    <p className="font-medium text-sm">Consulta com Maria Silva reagendada para 28/11.</p>
                     <p className="text-xs text-gray-400 mt-1">Há 2 horas</p>
                   </div>
                 </div>
-                
-                <div className="flex gap-3 p-3 rounded-lg bg-darkblue-800/50 border border-darkblue-700/30">
-                  <div className="flex-shrink-0">
-                    <Users size={20} className="text-gold-400 mt-1" />
+              </div>
+              
+              <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+                <div className="flex items-start gap-3">
+                  <div className="bg-emerald-950 rounded-full p-2 mt-1">
+                    <Users className="h-4 w-4 text-emerald-400" />
                   </div>
                   <div>
-                    <p className="text-sm">Novo paciente cadastrado: João Pereira.</p>
+                    <p className="font-medium text-sm">Novo paciente cadastrado: João Pereira.</p>
                     <p className="text-xs text-gray-400 mt-1">Ontem</p>
                   </div>
                 </div>
               </div>
-              
-              <div className="mt-4 flex justify-center">
-                <Button variant="outline" className="border-darkblue-700 w-full hover:bg-darkblue-800">
-                  Ver Todas Notificações
-                </Button>
-              </div>
             </div>
+            
+            <Button variant="link" className="w-full mt-3 text-gold-400">
+              Ver Todas Notificações
+            </Button>
           </Card>
           
-          <Card className="card-gradient">
-            <div className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Pacientes Recentes</h2>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-darkblue-800/50 transition-colors cursor-pointer">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-darkblue-700 to-darkblue-900 flex items-center justify-center">
-                    <span className="text-white font-medium">MS</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Maria Silva</p>
-                    <p className="text-xs text-gray-400">Consulta: Hoje, 14:30</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-darkblue-800/50 transition-colors cursor-pointer">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-darkblue-700 to-darkblue-900 flex items-center justify-center">
-                    <span className="text-white font-medium">CM</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Carlos Mendes</p>
-                    <p className="text-xs text-gray-400">Consulta: Hoje, 16:00</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-darkblue-800/50 transition-colors cursor-pointer">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-darkblue-700 to-darkblue-900 flex items-center justify-center">
-                    <span className="text-white font-medium">AO</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Ana Oliveira</p>
-                    <p className="text-xs text-gray-400">Última consulta: Hoje, 10:15</p>
-                  </div>
-                </div>
+          <Card className="card-gradient p-6">
+            <h2 className="text-xl font-semibold mb-4">Pacientes Recentes</h2>
+            
+            {isLoading ? (
+              <div className="flex justify-center items-center py-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500"></div>
               </div>
-              
-              <div className="mt-4 flex justify-center">
-                <Button variant="outline" className="border-darkblue-700 w-full hover:bg-darkblue-800">
-                  Ver Todos os Pacientes
+            ) : filteredAppointments.length === 0 ? (
+              <p className="text-gray-400 text-center py-4">Nenhum paciente recente.</p>
+            ) : (
+              <div className="space-y-3">
+                {filteredAppointments.slice(0, 3).map((appointment) => (
+                  <div key={appointment.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-darkblue-800 rounded-full h-9 w-9 flex items-center justify-center text-sm font-medium text-gold-400">
+                        {appointment.patient_name?.split(' ').map(name => name[0]).join('').substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium">{appointment.patient_name}</p>
+                        <p className="text-xs text-gray-400">Consulta: {formatAppointmentDate(appointment.date_time)}, {formatAppointmentTime(appointment.date_time)}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <Button asChild variant="link" className="mt-2 text-gold-400">
+                  <Link to="/medico/pacientes">
+                    Ver Todos os Pacientes
+                  </Link>
                 </Button>
               </div>
-            </div>
+            )}
           </Card>
         </div>
       </div>
