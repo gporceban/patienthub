@@ -40,24 +40,28 @@ function processBase64Chunks(base64String: string, chunkSize = 32768) {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { audio } = await req.json()
+    const requestData = await req.json();
+    const { audio } = requestData;
     
     if (!audio) {
-      throw new Error('No audio data provided')
+      throw new Error('No audio data provided');
     }
 
     // Process audio in chunks
-    const binaryAudio = processBase64Chunks(audio)
+    const binaryAudio = processBase64Chunks(audio);
     
     // Prepare form data
-    const formData = new FormData()
-    const blob = new Blob([binaryAudio], { type: 'audio/webm' })
-    formData.append('file', blob, 'audio.webm')
-    formData.append('model', 'whisper-1')
+    const formData = new FormData();
+    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
+    formData.append('file', blob, 'audio.webm');
+    formData.append('model', 'whisper-1');
+
+    // Log API key presence (without revealing it)
+    console.log('OPENAI_API_KEY present:', !!Deno.env.get('OPENAI_API_KEY'));
 
     // Send to OpenAI
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -66,21 +70,21 @@ serve(async (req) => {
         'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
       },
       body: formData,
-    })
+    });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${errorData}`);
+      const errorText = await response.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${errorText}`);
     }
 
-    const result = await response.json()
+    const result = await response.json();
     console.log('Transcription successful:', result);
 
     return new Response(
       JSON.stringify({ text: result.text }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
 
   } catch (error) {
     console.error('Error in transcribe function:', error);
@@ -90,6 +94,6 @@ serve(async (req) => {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
-    )
+    );
   }
-})
+});

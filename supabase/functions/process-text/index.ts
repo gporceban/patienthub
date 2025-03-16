@@ -10,48 +10,28 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { text, mode } = await req.json()
-    
+    const { text, mode } = await req.json();
+
     if (!text) {
-      throw new Error('No text provided')
+      throw new Error('No text provided');
     }
 
-    if (!mode) {
-      throw new Error('No processing mode specified')
+    if (!mode || !['clinical_note', 'prescription', 'summary'].includes(mode)) {
+      throw new Error('Invalid or missing mode. Must be one of: clinical_note, prescription, summary');
     }
 
-    let systemPrompt = '';
-    
-    // Define system prompts based on the mode
-    switch (mode) {
-      case 'clinical_note':
-        systemPrompt = `Você é um assistente médico especializado em criar notas clínicas estruturadas a partir de transcrições de consultas médicas. 
-        Siga o formato SOAP (Subjetivo, Objetivo, Avaliação, Plano). 
-        Organize de forma clara e profissional, utilizando linguagem médica apropriada.
-        Inclua apenas informações presentes na transcrição.`;
-        break;
-      case 'prescription':
-        systemPrompt = `Você é um assistente médico especializado em formatar prescrições médicas a partir de transcrições de consultas.
-        Siga o formato padrão de prescrição médica brasileira.
-        Inclua: Nome do medicamento, Dosagem, Via de administração, Frequência, Duração do tratamento.
-        Organize de forma clara e profissional, utilizando linguagem médica apropriada.
-        Inclua apenas medicamentos mencionados na transcrição.`;
-        break;
-      case 'summary':
-        systemPrompt = `Você é um assistente médico especializado em criar resumos concisos de consultas médicas.
-        Extraia os pontos principais da consulta incluindo: queixa principal, histórico relevante, achados do exame, diagnóstico e plano de tratamento.
-        Seja objetivo e use linguagem médica apropriada.
-        Limite o resumo a no máximo 150 palavras.`;
-        break;
-      default:
-        throw new Error(`Unsupported processing mode: ${mode}`);
-    }
+    // Different system prompts based on mode
+    const systemPrompts = {
+      clinical_note: "Você é um assistente médico especializado em criar notas clínicas detalhadas. Formate a nota clínica de maneira estruturada com seções como: Dados do Paciente, Queixa Principal, História da Doença Atual, Exame Físico, Diagnósticos, Plano de Tratamento, e Recomendações. Mantenha um tom profissional e use terminologia médica apropriada. A nota deve ser escrita em português do Brasil.",
+      prescription: "Você é um assistente médico especializado em criar receitas médicas. Formate a receita de maneira clara com o nome do medicamento, dosagem, via de administração, frequência, duração do tratamento e quaisquer instruções especiais. A receita deve ser escrita em português do Brasil e seguir o formato padrão usado no Brasil, incluindo nome do paciente e data no topo.",
+      summary: "Você é um assistente médico que cria resumos concisos de consultas. Extraia apenas as informações mais importantes da transcrição e crie um resumo breve, estruturado e objetivo da consulta médica. Destaque os pontos principais da queixa, diagnóstico e plano de tratamento. O resumo deve ser escrito em português do Brasil."
+    };
 
-    // Send to OpenAI
+    // Send to OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -59,29 +39,28 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: systemPrompts[mode] },
           { role: 'user', content: text }
         ],
-        temperature: 0.3,
+        temperature: 0.7,
       }),
-    })
+    });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${errorData}`);
+      const errorText = await response.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${errorText}`);
     }
 
-    const result = await response.json()
+    const result = await response.json();
     const processedText = result.choices[0].message.content;
-    console.log(`${mode} processing successful`);
 
     return new Response(
       JSON.stringify({ text: processedText }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
 
   } catch (error) {
     console.error('Error in process-text function:', error);
@@ -91,6 +70,6 @@ serve(async (req) => {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
-    )
+    );
   }
-})
+});
