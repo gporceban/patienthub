@@ -16,6 +16,7 @@ import DoctorProfile from "./pages/DoctorProfile";
 import DoctorPatients from "./pages/DoctorPatients";
 import NotFound from "./pages/NotFound";
 import StarBackground from "./components/StarBackground";
+import { toast } from "./components/ui/use-toast";
 
 const queryClient = new QueryClient();
 
@@ -35,28 +36,52 @@ const App = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Fetch profile helper function to avoid code duplication
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      console.log("Fetching profile for user:", userId);
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+        return null;
+      }
+      
+      if (profileData) {
+        console.log("Profile loaded successfully:", profileData);
+        return profileData;
+      } else {
+        console.warn("No profile found for user:", userId);
+        return null;
+      }
+    } catch (error) {
+      console.error("Exception in fetchUserProfile:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     // Get initial auth state
     const getInitialSession = async () => {
       try {
+        console.log("Getting initial session...");
         const { data } = await supabase.auth.getSession();
         
         if (data.session?.user) {
+          console.log("Session found for user:", data.session.user.id);
           setUser(data.session.user);
           
           // Fetch user profile
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.session.user.id)
-            .single();
-          
-          if (!profileError && profileData) {
+          const profileData = await fetchUserProfile(data.session.user.id);
+          if (profileData) {
             setProfile(profileData);
-            console.log("Profile loaded:", profileData);
-          } else {
-            console.error("Error fetching profile:", profileError);
           }
+        } else {
+          console.log("No active session found");
         }
       } catch (error) {
         console.error("Error getting initial session:", error);
@@ -71,28 +96,21 @@ const App = () => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("Auth state changed:", event, session?.user?.id);
-        setUser(session?.user || null);
         
-        if (session?.user) {
-          // Fetch user profile when auth state changes
-          try {
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-            
-            if (!profileError && profileData) {
-              setProfile(profileData);
-              console.log("Profile updated:", profileData);
-            } else {
-              console.error("Error fetching updated profile:", profileError);
-            }
-          } catch (error) {
-            console.error("Error in auth state change handler:", error);
-          }
-        } else {
+        if (event === 'SIGNED_OUT') {
+          console.log("User signed out, clearing state");
+          setUser(null);
           setProfile(null);
+          queryClient.clear(); // Clear any cached queries
+        } else if (session?.user) {
+          console.log("User session updated:", session.user.id);
+          setUser(session.user);
+          
+          // Fetch user profile when auth state changes
+          const profileData = await fetchUserProfile(session.user.id);
+          if (profileData) {
+            setProfile(profileData);
+          }
         }
         
         setLoading(false);
@@ -103,6 +121,20 @@ const App = () => {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  // Auth-aware loading component
+  const LoadingOrRedirect = () => {
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="card-gradient rounded-lg p-8">
+            <p className="text-xl text-gold-400">Carregando...</p>
+          </div>
+        </div>
+      );
+    }
+    return <Navigate to="/" replace />;
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -117,98 +149,98 @@ const App = () => {
               <Route 
                 path="/paciente" 
                 element={
-                  !loading && user ? (
-                    profile?.user_type === 'paciente' ? (
+                  !loading ? (
+                    user && profile?.user_type === 'paciente' ? (
                       <PatientDashboard />
                     ) : (
                       <Navigate to="/" replace />
                     )
                   ) : (
-                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
+                    <LoadingOrRedirect />
                   )
                 } 
               />
               <Route 
                 path="/paciente/avaliacoes" 
                 element={
-                  !loading && user ? (
-                    profile?.user_type === 'paciente' ? (
+                  !loading ? (
+                    user && profile?.user_type === 'paciente' ? (
                       <PatientAssessmentsList />
                     ) : (
                       <Navigate to="/" replace />
                     )
                   ) : (
-                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
+                    <LoadingOrRedirect />
                   )
                 } 
               />
               <Route 
                 path="/paciente/avaliacoes/:id" 
                 element={
-                  !loading && user ? (
-                    profile?.user_type === 'paciente' ? (
+                  !loading ? (
+                    user && profile?.user_type === 'paciente' ? (
                       <PatientAssessment />
                     ) : (
                       <Navigate to="/" replace />
                     )
                   ) : (
-                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
+                    <LoadingOrRedirect />
                   )
                 } 
               />
               <Route 
                 path="/medico" 
                 element={
-                  !loading && user ? (
-                    profile?.user_type === 'medico' ? (
+                  !loading ? (
+                    user && profile?.user_type === 'medico' ? (
                       <DoctorDashboard />
                     ) : (
                       <Navigate to="/" replace />
                     )
                   ) : (
-                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
+                    <LoadingOrRedirect />
                   )
                 } 
               />
               <Route 
                 path="/medico/perfil" 
                 element={
-                  !loading && user ? (
-                    profile?.user_type === 'medico' ? (
+                  !loading ? (
+                    user && profile?.user_type === 'medico' ? (
                       <DoctorProfile />
                     ) : (
                       <Navigate to="/" replace />
                     )
                   ) : (
-                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
+                    <LoadingOrRedirect />
                   )
                 } 
               />
               <Route 
                 path="/medico/pacientes" 
                 element={
-                  !loading && user ? (
-                    profile?.user_type === 'medico' ? (
+                  !loading ? (
+                    user && profile?.user_type === 'medico' ? (
                       <DoctorPatients />
                     ) : (
                       <Navigate to="/" replace />
                     )
                   ) : (
-                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
+                    <LoadingOrRedirect />
                   )
                 } 
               />
               <Route 
                 path="/medico/avaliacao" 
                 element={
-                  !loading && user ? (
-                    profile?.user_type === 'medico' ? (
+                  !loading ? (
+                    user && profile?.user_type === 'medico' ? (
                       <DoctorAssessment />
                     ) : (
                       <Navigate to="/" replace />
                     )
                   ) : (
-                    loading ? <div>Carregando...</div> : <Navigate to="/" replace />
+                    <LoadingOrRedirect />
                   )
                 } 
               />

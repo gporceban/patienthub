@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,20 +13,21 @@ const LoginForm: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, profile } = useContext(AuthContext);
+  const { user, profile, loading } = useContext(AuthContext);
 
   // Check if user is already logged in and redirect accordingly
   useEffect(() => {
-    if (user && profile) {
+    if (!loading && user && profile?.user_type) {
+      console.log("User already logged in, redirecting based on user type:", profile.user_type);
       redirectBasedOnUserType(profile.user_type);
     }
-  }, [user, profile]);
+  }, [user, profile, loading]);
 
   const redirectBasedOnUserType = (userType: string) => {
     if (userType === 'paciente') {
-      navigate('/paciente');
+      navigate('/paciente', { replace: true });
     } else if (userType === 'medico') {
-      navigate('/medico');
+      navigate('/medico', { replace: true });
     }
   };
 
@@ -44,6 +44,8 @@ const LoginForm: React.FC = () => {
     setIsLoading(true);
 
     try {
+      console.log(`Attempting login as ${role} with email: ${email}`);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -53,20 +55,35 @@ const LoginForm: React.FC = () => {
         throw error;
       }
 
-      if (data.user) {
+      if (data?.user) {
+        console.log("Login successful, fetching profile...");
+        
         // Fetch the user profile to confirm user type
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
         if (profileError) {
+          console.error("Error fetching profile:", profileError);
           throw profileError;
+        }
+
+        if (!profileData) {
+          console.error("No profile found for user:", data.user.id);
+          toast({
+            variant: "destructive",
+            title: "Erro de perfil",
+            description: "Perfil de usuário não encontrado. Por favor, contate o suporte.",
+          });
+          await supabase.auth.signOut();
+          return;
         }
 
         // Check if user type matches the selected role
         if (profileData.user_type !== role) {
+          console.error(`User type mismatch: expected ${role}, got ${profileData.user_type}`);
           toast({
             variant: "destructive",
             title: "Tipo de usuário incorreto",
@@ -74,6 +91,7 @@ const LoginForm: React.FC = () => {
           });
           await supabase.auth.signOut();
         } else {
+          console.log(`Login successful as ${role}, redirecting...`);
           toast({
             title: "Login realizado com sucesso",
             description: `Você entrou como ${role}.`,
@@ -108,6 +126,8 @@ const LoginForm: React.FC = () => {
     setIsLoading(true);
 
     try {
+      console.log(`Attempting to sign up as ${role} with email: ${email}`);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -124,6 +144,8 @@ const LoginForm: React.FC = () => {
       }
 
       if (data?.user) {
+        console.log("Signup successful:", data.user);
+        
         toast({
           title: "Conta criada com sucesso",
           description: "Por favor, verifique seu e-mail para confirmar sua conta.",
@@ -142,7 +164,7 @@ const LoginForm: React.FC = () => {
   };
 
   // If already logged in, show a message or redirect
-  if (user && profile) {
+  if (!loading && user && profile) {
     return (
       <div className="text-center">
         <p className="text-gold-400 text-lg font-semibold mb-4">

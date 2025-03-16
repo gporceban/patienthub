@@ -16,7 +16,10 @@ export const supabase = createClient<Database>(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      storage: localStorage
+      storage: localStorage,
+      storageKey: 'ortho-care-auth',
+      detectSessionInUrl: true,
+      flowType: 'implicit'
     },
   }
 );
