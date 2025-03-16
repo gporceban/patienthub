@@ -1,6 +1,6 @@
 
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import { Session, User, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
@@ -123,8 +123,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log("User signed in:", currentSession.user.id);
         setUser(currentSession.user);
         await fetchProfile(currentSession.user.id);
-      } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-        console.log("User signed out or deleted");
+      } else if (event === 'SIGNED_OUT') {
+        console.log("User signed out");
         setUser(null);
         setProfile(null);
       } else if (event === 'TOKEN_REFRESHED' && currentSession) {
