@@ -10,6 +10,8 @@ import Index from "./pages/Index";
 import PatientDashboard from "./pages/PatientDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import DoctorAssessment from "./pages/DoctorAssessment";
+import PatientAssessment from "./pages/PatientAssessment";
+import PatientAssessmentsList from "./pages/PatientAssessmentsList";
 import NotFound from "./pages/NotFound";
 import StarBackground from "./components/StarBackground";
 
@@ -104,6 +106,26 @@ const App = () => {
                 element={
                   profile?.user_type === 'paciente' ? (
                     <PatientDashboard />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                } 
+              />
+              <Route 
+                path="/paciente/avaliacoes" 
+                element={
+                  profile?.user_type === 'paciente' ? (
+                    <PatientAssessmentsList />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                } 
+              />
+              <Route 
+                path="/paciente/avaliacoes/:id" 
+                element={
+                  profile?.user_type === 'paciente' ? (
+                    <PatientAssessment />
                   ) : (
                     <Navigate to="/" replace />
                   )
