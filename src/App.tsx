@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +7,8 @@ import { useState, useEffect, createContext } from "react";
 import { supabase } from "./integrations/supabase/client";
 import Index from "./pages/Index";
 import PatientDashboard from "./pages/PatientDashboard";
+import PatientCalendar from "./pages/PatientCalendar";
+import PatientRecords from "./pages/PatientRecords";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import DoctorAssessment from "./pages/DoctorAssessment";
 import PatientAssessment from "./pages/PatientAssessment";
@@ -21,7 +22,6 @@ import { toast } from "./components/ui/use-toast";
 
 const queryClient = new QueryClient();
 
-// Create auth context
 export const AuthContext = createContext<{
   user: any;
   profile: any;
@@ -42,12 +42,10 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch profile helper function to avoid code duplication
   const fetchUserProfile = async (userId: string) => {
     try {
       console.log("Fetching profile for user:", userId);
       
-      // Add timeout to prevent infinite loading
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error("Profile fetch timeout")), 10000);
       });
@@ -58,7 +56,6 @@ const App = () => {
         .eq('id', userId)
         .maybeSingle();
       
-      // Race between fetch and timeout
       const { data: profileData, error: profileError } = await Promise.race([
         fetchPromise,
         timeoutPromise.then(() => {
@@ -88,7 +85,6 @@ const App = () => {
     }
   };
 
-  // Function to refresh profile - can be called after profile updates
   const refreshProfile = async () => {
     if (user) {
       setLoading(true);
@@ -101,7 +97,6 @@ const App = () => {
   };
 
   useEffect(() => {
-    // Get initial auth state
     const getInitialSession = async () => {
       try {
         console.log("Getting initial session...");
@@ -111,7 +106,6 @@ const App = () => {
           console.log("Session found for user:", data.session.user.id);
           setUser(data.session.user);
           
-          // Fetch user profile
           const profileData = await fetchUserProfile(data.session.user.id);
           if (profileData) {
             setProfile(profileData);
@@ -129,7 +123,6 @@ const App = () => {
 
     getInitialSession();
 
-    // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("Auth state changed:", event, session?.user?.id);
@@ -139,12 +132,11 @@ const App = () => {
           setUser(null);
           setProfile(null);
           setError(null);
-          queryClient.clear(); // Clear any cached queries
+          queryClient.clear();
         } else if (session?.user) {
           console.log("User session updated:", session.user.id);
           setUser(session.user);
           
-          // Fetch user profile when auth state changes
           const profileData = await fetchUserProfile(session.user.id);
           if (profileData) {
             setProfile(profileData);
@@ -160,7 +152,6 @@ const App = () => {
     };
   }, []);
 
-  // Auth-aware loading component
   const LoadingOrRedirect = () => {
     if (loading) {
       return (
@@ -202,6 +193,34 @@ const App = () => {
                   !loading ? (
                     user && profile?.user_type === 'paciente' ? (
                       <PatientDashboard />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
+                  ) : (
+                    <LoadingOrRedirect />
+                  )
+                } 
+              />
+              <Route 
+                path="/paciente/agenda" 
+                element={
+                  !loading ? (
+                    user && profile?.user_type === 'paciente' ? (
+                      <PatientCalendar />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
+                  ) : (
+                    <LoadingOrRedirect />
+                  )
+                } 
+              />
+              <Route 
+                path="/paciente/records" 
+                element={
+                  !loading ? (
+                    user && profile?.user_type === 'paciente' ? (
+                      <PatientRecords />
                     ) : (
                       <Navigate to="/" replace />
                     )
@@ -281,6 +300,20 @@ const App = () => {
                 } 
               />
               <Route 
+                path="/medico/agenda" 
+                element={
+                  !loading ? (
+                    user && profile?.user_type === 'medico' ? (
+                      <PatientCalendar />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
+                  ) : (
+                    <LoadingOrRedirect />
+                  )
+                } 
+              />
+              <Route 
                 path="/medico/avaliacao" 
                 element={
                   !loading ? (
@@ -308,7 +341,6 @@ const App = () => {
                   )
                 } 
               />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
