@@ -3,10 +3,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
+// Update the CORS headers to include x-app-name
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-app-name',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+};
 
 // Define system prompts for specialized "agents"
 const specializedAgents = {
@@ -371,13 +374,18 @@ ${patientHistory.map((record: any) => {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Improved CORS preflight handling
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    console.log('Handling OPTIONS preflight request');
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    });
   }
 
   try {
     const { text, mode, patientInfo, reviewRequired } = await req.json();
+    console.log(`Processing request: mode=${mode}, has patientInfo=${!!patientInfo}, reviewRequired=${!!reviewRequired}`);
 
     if (!text) {
       throw new Error('No text provided');
@@ -452,6 +460,8 @@ serve(async (req) => {
         structuredData: processingResult.structuredData 
       };
     }
+
+    console.log('Successfully processed text, returning response');
 
     return new Response(
       JSON.stringify(formattedResponse),
