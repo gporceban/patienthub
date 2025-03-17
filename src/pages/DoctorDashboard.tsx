@@ -11,6 +11,7 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Notification, fromNotifications } from '@/types/notifications';
 
 interface Appointment {
   id: string;
@@ -25,15 +26,6 @@ interface AppointmentStats {
   total: number;
   today: number;
   active_patients: number;
-}
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  icon_type: string;
-  created_at: string;
-  read: boolean;
 }
 
 const DoctorDashboard = () => {
@@ -175,13 +167,8 @@ const DoctorDashboard = () => {
       try {
         setNotificationsLoading(true);
         
-        const { data, error } = await supabase
-          .from('doctor_notifications')
-          .select('*')
-          .eq('doctor_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(5);
-          
+        const { data, error } = await fromNotifications(supabase).getByDoctorId(user.id);
+        
         if (error) {
           throw error;
         }
@@ -576,18 +563,25 @@ const DoctorDashboard = () => {
                 if (notifications.length === 0) return;
                 
                 try {
-                  await supabase
-                    .from('doctor_notifications')
-                    .update({ read: true })
-                    .eq('doctor_id', user?.id || '')
-                    .eq('read', false);
+                  const { error } = await fromNotifications(supabase).markAsRead(user?.id || '');
+                  
+                  if (error) throw error;
                     
                   toast({
                     title: "Notificações marcadas como lidas",
                     description: "Todas as notificações foram marcadas como lidas."
                   });
+                  
+                  setNotifications(prevNotifications => 
+                    prevNotifications.map(notif => ({ ...notif, read: true }))
+                  );
                 } catch (error) {
                   console.error('Error marking notifications as read:', error);
+                  toast({
+                    variant: "destructive",
+                    title: "Erro",
+                    description: "Não foi possível marcar as notificações como lidas."
+                  });
                 }
               }}
             >

@@ -60,6 +60,36 @@ export type Database = {
           },
         ]
       }
+      doctor_notifications: {
+        Row: {
+          created_at: string
+          doctor_id: string
+          icon_type: string
+          id: string
+          message: string
+          read: boolean
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          doctor_id: string
+          icon_type: string
+          id?: string
+          message: string
+          read?: boolean
+          title: string
+        }
+        Update: {
+          created_at?: string
+          doctor_id?: string
+          icon_type?: string
+          id?: string
+          message?: string
+          read?: boolean
+          title?: string
+        }
+        Relationships: []
+      }
       doctors: {
         Row: {
           biography: string | null
