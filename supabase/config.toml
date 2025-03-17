@@ -33,4 +33,3 @@ port = 54321
 
 [[functions.serve]]
 handler = "supabase/functions"
-
