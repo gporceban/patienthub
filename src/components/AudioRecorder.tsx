@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, Square, Loader2 } from 'lucide-react';
+import { Mic, Square, Loader2, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import AudioRecorderStatus from './AudioRecorderStatus';
@@ -30,13 +30,81 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [transcriptionComplete, setTranscriptionComplete] = useState(false);
   const [processingComplete, setProcessingComplete] = useState(false);
+  
+  // Agent progress tracking
+  const [agentProgress, setAgentProgress] = useState({
+    patientInfo: false,
+    symptoms: false,
+    examFindings: false,
+    diagnosis: false,
+    treatment: false,
+    orchestration: false
+  });
   
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Simulate agent progress updates for better UX
+  useEffect(() => {
+    if (isProcessing && !processingComplete) {
+      // Clear any existing timer
+      if (progressTimerRef.current) {
+        clearTimeout(progressTimerRef.current);
+      }
+      
+      // Reset progress
+      setAgentProgress({
+        patientInfo: false,
+        symptoms: false,
+        examFindings: false,
+        diagnosis: false,
+        treatment: false,
+        orchestration: false
+      });
+      
+      // Patient info extraction (fast)
+      progressTimerRef.current = setTimeout(() => {
+        setAgentProgress(prev => ({ ...prev, patientInfo: true }));
+        
+        // Symptoms extraction
+        progressTimerRef.current = setTimeout(() => {
+          setAgentProgress(prev => ({ ...prev, symptoms: true }));
+          
+          // Exam findings extraction
+          progressTimerRef.current = setTimeout(() => {
+            setAgentProgress(prev => ({ ...prev, examFindings: true }));
+            
+            // Diagnosis extraction
+            progressTimerRef.current = setTimeout(() => {
+              setAgentProgress(prev => ({ ...prev, diagnosis: true }));
+              
+              // Treatment extraction
+              progressTimerRef.current = setTimeout(() => {
+                setAgentProgress(prev => ({ ...prev, treatment: true }));
+                
+                // Final orchestration
+                progressTimerRef.current = setTimeout(() => {
+                  setAgentProgress(prev => ({ ...prev, orchestration: true }));
+                }, 3000);
+              }, 2000);
+            }, 2000);
+          }, 2000);
+        }, 1500);
+      }, 1000);
+    }
+    
+    return () => {
+      if (progressTimerRef.current) {
+        clearTimeout(progressTimerRef.current);
+      }
+    };
+  }, [isProcessing, processingComplete]);
 
   // Cleanup on component unmount
   useEffect(() => {
@@ -44,14 +112,26 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop();
       }
+      if (progressTimerRef.current) {
+        clearTimeout(progressTimerRef.current);
+      }
     };
   }, [isRecording]);
 
   const startRecording = async () => {
     // Reset all states
     setHasError(false);
+    setErrorMessage('');
     setTranscriptionComplete(false);
     setProcessingComplete(false);
+    setAgentProgress({
+      patientInfo: false,
+      symptoms: false,
+      examFindings: false,
+      diagnosis: false,
+      treatment: false,
+      orchestration: false
+    });
     audioChunksRef.current = [];
     
     try {
@@ -82,6 +162,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     } catch (error) {
       console.error('Erro ao acessar o microfone:', error);
       setHasError(true);
+      setErrorMessage('Erro ao acessar o microfone. Verifique permissões.');
       toast({
         variant: "destructive",
         title: "Erro ao acessar o microfone",
@@ -113,6 +194,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
     setIsTranscribing(true);
     setHasError(false);
+    setErrorMessage('');
     
     try {
       // Convert blob to base64
@@ -138,7 +220,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           setTranscriptionComplete(true);
           toast({
             title: "Transcrição completa",
-            description: "O áudio foi transcrito com sucesso."
+            description: "O áudio foi transcrito com sucesso e está sendo processado pelo sistema de agentes IA."
           });
           
           onTranscriptionComplete(data.text);
@@ -152,6 +234,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     } catch (error) {
       console.error('Erro ao transcrever áudio:', error);
       setHasError(true);
+      setErrorMessage(`Erro na transcrição: ${error instanceof Error ? error.message : 'Motivo desconhecido'}`);
       toast({
         variant: "destructive",
         title: "Erro na transcrição",
@@ -166,9 +249,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     onProcessingStart();
     setIsProcessing(true);
     setHasError(false);
+    setErrorMessage('');
     
     try {
-      // Process the transcription with OpenAI to generate clinical documents
+      // Process the transcription with OpenAI's agentic system to generate clinical documents
       const { data, error } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -223,7 +307,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       setProcessingComplete(true);
       toast({
         title: "Documentos gerados",
-        description: "Nota clínica, prescrição e resumo foram gerados com sucesso."
+        description: "Nota clínica, prescrição e resumo foram gerados pelos agentes IA com sucesso."
       });
       
       onProcessingComplete({
@@ -235,6 +319,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     } catch (error) {
       console.error('Erro ao processar transcrição:', error);
       setHasError(true);
+      setErrorMessage(`Erro no processamento: ${error instanceof Error ? error.message : 'Motivo desconhecido'}`);
       toast({
         variant: "destructive",
         title: "Erro no processamento",
@@ -250,7 +335,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       <div className="flex flex-col items-center">
         <h3 className="text-lg font-medium mb-2">Gravação de Áudio</h3>
         <p className="text-sm text-gray-400 mb-4">
-          Grave a consulta para gerar documentos automaticamente
+          Grave a consulta para gerar documentos automaticamente utilizando Agentes IA especializados
         </p>
         
         <div className="flex gap-4 mb-4">
@@ -286,6 +371,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
                 </>
               ) : (
                 <>
+                  <FileText className="h-4 w-4 mr-2" />
                   Transcrever e Processar
                 </>
               )}
@@ -298,8 +384,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           isTranscribing={isTranscribing}
           isProcessing={isProcessing}
           hasError={hasError}
+          errorMessage={errorMessage}
           transcriptionComplete={transcriptionComplete}
           processingComplete={processingComplete}
+          agentProgress={agentProgress}
         />
       </div>
     </div>
