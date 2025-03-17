@@ -13,7 +13,7 @@ import { PatientAssessment } from '@/types/patientAssessments';
 
 const PatientAssessmentDetails = () => {
   const { id } = useParams<{ id: string }>();
-  const { profile } = useContext(AuthContext);
+  const { profile, userType } = useContext(AuthContext);
   const { toast } = useToast();
   
   const [assessment, setAssessment] = useState<PatientAssessment | null>(null);
@@ -35,7 +35,10 @@ const PatientAssessmentDetails = () => {
           
         if (error) throw error;
         
-        if (data.patient_email.toLowerCase() !== profile.email.toLowerCase()) {
+        const isPatientOwner = profile.email.toLowerCase() === data.patient_email.toLowerCase();
+        const isDoctorOwner = userType === 'medico' && profile.id === data.doctor_id;
+        
+        if (!isPatientOwner && !isDoctorOwner) {
           toast({
             variant: "destructive",
             title: "Acesso negado",
@@ -59,7 +62,7 @@ const PatientAssessmentDetails = () => {
     };
     
     fetchAssessmentDetails();
-  }, [id, profile, toast]);
+  }, [id, profile, toast, userType]);
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -74,7 +77,7 @@ const PatientAssessmentDetails = () => {
   
   if (isLoading) {
     return (
-      <Layout userType="paciente">
+      <Layout userType={userType || "paciente"}>
         <div className="flex items-center mb-6">
           <Button variant="ghost" size="icon" className="mr-2">
             <ArrowLeft className="h-5 w-5" />
@@ -97,10 +100,10 @@ const PatientAssessmentDetails = () => {
   
   if (!assessment) {
     return (
-      <Layout userType="paciente">
+      <Layout userType={userType || "paciente"}>
         <div className="flex items-center mb-6">
           <Button asChild variant="ghost" size="icon" className="mr-2">
-            <Link to="/paciente/avaliacoes">
+            <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
@@ -113,7 +116,9 @@ const PatientAssessmentDetails = () => {
           <h2 className="text-xl font-semibold mb-2">Avaliação não disponível</h2>
           <p className="text-gray-400 mb-4">A avaliação solicitada não foi encontrada ou você não tem permissão para acessá-la.</p>
           <Button asChild>
-            <Link to="/paciente/avaliacoes">Voltar para lista de avaliações</Link>
+            <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
+              Voltar para lista de {userType === 'medico' ? 'pacientes' : 'avaliações'}
+            </Link>
           </Button>
         </Card>
       </Layout>
@@ -121,10 +126,10 @@ const PatientAssessmentDetails = () => {
   }
   
   return (
-    <Layout userType="paciente">
+    <Layout userType={userType || "paciente"}>
       <div className="flex items-center mb-6">
         <Button asChild variant="ghost" size="icon" className="mr-2">
-          <Link to="/paciente/avaliacoes">
+          <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
@@ -179,7 +184,9 @@ const PatientAssessmentDetails = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {assessment.summary ? (
+              {userType === 'paciente' && assessment.patient_friendly_summary ? (
+                <div className="whitespace-pre-wrap">{assessment.patient_friendly_summary}</div>
+              ) : assessment.summary ? (
                 <div className="whitespace-pre-wrap">{assessment.summary}</div>
               ) : (
                 <div className="text-center text-gray-400 py-8">
@@ -257,18 +264,20 @@ const PatientAssessmentDetails = () => {
       
       <div className="flex justify-between mt-8">
         <Button asChild variant="outline">
-          <Link to="/paciente/avaliacoes">
+          <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar para lista
           </Link>
         </Button>
         
-        <Button asChild variant="outline">
-          <Link to="/paciente/agenda">
-            <Calendar className="h-4 w-4 mr-2" />
-            Agendar consulta
-          </Link>
-        </Button>
+        {userType === 'paciente' && (
+          <Button asChild variant="outline">
+            <Link to="/paciente/agenda">
+              <Calendar className="h-4 w-4 mr-2" />
+              Agendar consulta
+            </Link>
+          </Button>
+        )}
       </div>
     </Layout>
   );

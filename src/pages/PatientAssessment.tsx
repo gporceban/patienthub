@@ -21,6 +21,7 @@ interface Assessment {
   prescription: string | null;
   summary: string | null;
   structured_data: any | null;
+  patient_friendly_summary: string | null;
 }
 
 interface DoctorProfile {
@@ -31,7 +32,7 @@ interface DoctorProfile {
 
 const PatientAssessment = () => {
   const { id } = useParams<{ id: string }>();
-  const { user, profile } = useContext(AuthContext);
+  const { user, profile, userType } = useContext(AuthContext);
   const { toast } = useToast();
   
   const [assessment, setAssessment] = useState<Assessment | null>(null);
@@ -51,15 +52,21 @@ const PatientAssessment = () => {
           .from('patient_assessments')
           .select('*')
           .eq('id', id)
-          .eq('patient_email', profile.email)
           .single();
         
         if (assessmentError) {
-          throw new Error('Avaliação não encontrada ou você não tem permissão para visualizá-la');
+          throw new Error('Avaliação não encontrada');
         }
         
         if (!assessmentData) {
           throw new Error('Avaliação não encontrada');
+        }
+        
+        const isPatientOwner = profile.email === assessmentData.patient_email;
+        const isDoctorOwner = userType === 'medico' && profile.id === assessmentData.doctor_id;
+        
+        if (!isPatientOwner && !isDoctorOwner) {
+          throw new Error('Você não tem permissão para visualizar esta avaliação');
         }
         
         setAssessment(assessmentData as Assessment);
@@ -89,7 +96,7 @@ const PatientAssessment = () => {
     };
     
     fetchAssessment();
-  }, [id, profile, toast]);
+  }, [id, profile, toast, userType]);
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -115,15 +122,15 @@ const PatientAssessment = () => {
   
   if (error) {
     return (
-      <Layout userType="paciente">
+      <Layout userType={userType || "paciente"}>
         <div className="p-6 text-center">
           <FileText className="h-16 w-16 text-gold-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold mb-2">Erro ao carregar avaliação</h2>
           <p className="text-gray-400 mb-6">{error}</p>
           <Button asChild variant="outline">
-            <Link to="/paciente/avaliacoes">
+            <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar para lista de avaliações
+              {userType === 'medico' ? 'Voltar para lista de pacientes' : 'Voltar para lista de avaliações'}
             </Link>
           </Button>
         </div>
@@ -133,15 +140,15 @@ const PatientAssessment = () => {
   
   if (!assessment) {
     return (
-      <Layout userType="paciente">
+      <Layout userType={userType || "paciente"}>
         <div className="p-6 text-center">
           <FileText className="h-16 w-16 text-gold-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold mb-2">Avaliação não encontrada</h2>
           <p className="text-gray-400 mb-6">A avaliação solicitada não foi encontrada ou você não tem permissão para visualizá-la.</p>
           <Button asChild variant="outline">
-            <Link to="/paciente/avaliacoes">
+            <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar para lista de avaliações
+              {userType === 'medico' ? 'Voltar para lista de pacientes' : 'Voltar para lista de avaliações'}
             </Link>
           </Button>
         </div>
@@ -150,7 +157,7 @@ const PatientAssessment = () => {
   }
   
   return (
-    <Layout userType="paciente">
+    <Layout userType={userType || "paciente"}>
       <div className="mb-6">
         <Button
           variant="outline"
@@ -158,7 +165,7 @@ const PatientAssessment = () => {
           asChild
           className="mb-4"
         >
-          <Link to="/paciente/avaliacoes">
+          <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
             <ArrowLeft size={16} className="mr-2" />
             Voltar para lista
           </Link>
@@ -240,7 +247,11 @@ const PatientAssessment = () => {
           
           <Card className="card-gradient p-6">
             <h2 className="text-lg font-semibold mb-4">Resumo</h2>
-            {assessment.summary ? (
+            {userType === 'paciente' && assessment.patient_friendly_summary ? (
+              <div className="bg-darkblue-800/50 rounded-lg p-4 whitespace-pre-wrap">
+                {assessment.patient_friendly_summary}
+              </div>
+            ) : assessment.summary ? (
               <div className="bg-darkblue-800/50 rounded-lg p-4 whitespace-pre-wrap">
                 {assessment.summary}
               </div>
