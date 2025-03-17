@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Users, Calendar, FileText, Search, Plus, MapPin, Clock, ArrowRight } from 'lucide-react';
+import { Users, Calendar, FileText, Search, Plus, MapPin, Clock, ArrowRight, Bell } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -27,10 +27,21 @@ interface AppointmentStats {
   active_patients: number;
 }
 
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  icon_type: string;
+  created_at: string;
+  read: boolean;
+}
+
 const DoctorDashboard = () => {
   const { user, profile } = useContext(AuthContext);
   const { toast } = useToast();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [stats, setStats] = useState<AppointmentStats>({
     total: 0,
@@ -157,6 +168,42 @@ const DoctorDashboard = () => {
     fetchAppointmentsAndStats();
   }, [user, today, toast]);
   
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!user) return;
+      
+      try {
+        setNotificationsLoading(true);
+        
+        const { data, error } = await supabase
+          .from('doctor_notifications')
+          .select('*')
+          .eq('doctor_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+          
+        if (error) {
+          throw error;
+        }
+        
+        if (data) {
+          setNotifications(data as Notification[]);
+        }
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao carregar notificações",
+          description: "Não foi possível carregar as notificações."
+        });
+      } finally {
+        setNotificationsLoading(false);
+      }
+    };
+    
+    fetchNotifications();
+  }, [user, toast]);
+  
   const filteredAppointments = appointments.filter(appointment => {
     if (!searchQuery.trim()) return true;
     
@@ -187,6 +234,45 @@ const DoctorDashboard = () => {
       month: '2-digit',
       year: 'numeric'
     });
+  };
+  
+  const formatNotificationTime = (dateTimeString: string) => {
+    const now = new Date();
+    const date = new Date(dateTimeString);
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 60) {
+      return `Há ${diffInMinutes} minuto${diffInMinutes !== 1 ? 's' : ''}`;
+    } else if (diffInMinutes < 1440) { // less than a day
+      const hours = Math.floor(diffInMinutes / 60);
+      return `Há ${hours} hora${hours !== 1 ? 's' : ''}`;
+    } else {
+      const days = Math.floor(diffInMinutes / 1440);
+      if (days === 1) return 'Ontem';
+      return `Há ${days} dias`;
+    }
+  };
+  
+  const getIconForNotification = (iconType: string) => {
+    switch (iconType) {
+      case 'calendar':
+        return <Calendar className="h-4 w-4 text-blue-400" />;
+      case 'user':
+        return <Users className="h-4 w-4 text-emerald-400" />;
+      default:
+        return <Bell className="h-4 w-4 text-amber-400" />;
+    }
+  };
+  
+  const getIconBgForNotification = (iconType: string) => {
+    switch (iconType) {
+      case 'calendar':
+        return 'bg-blue-950';
+      case 'user':
+        return 'bg-emerald-950';
+      default:
+        return 'bg-amber-950';
+    }
   };
   
   const doctorName = profile?.full_name || "Dr. Paulo Oliveira";
@@ -284,6 +370,54 @@ const DoctorDashboard = () => {
             Ver Todos os Pacientes
           </Link>
         </Button>
+      </div>
+    );
+  };
+  
+  const renderNotifications = () => {
+    if (notificationsLoading) {
+      return (
+        <div className="space-y-4">
+          {[1, 2, 3].map((index) => (
+            <div key={index} className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+              <div className="flex items-start gap-3">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <div>
+                  <Skeleton className="h-4 w-48 mb-1" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
+    if (notifications.length === 0) {
+      return (
+        <div className="text-center py-6 border border-dashed border-darkblue-700 rounded-lg">
+          <Bell className="h-10 w-10 mx-auto text-gray-400 mb-2" />
+          <h3 className="text-lg font-medium mb-1">Sem notificações</h3>
+          <p className="text-gray-400">Você não tem novas notificações no momento.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-4">
+        {notifications.map((notification) => (
+          <div key={notification.id} className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+            <div className="flex items-start gap-3">
+              <div className={`${getIconBgForNotification(notification.icon_type)} rounded-full p-2 mt-1`}>
+                {getIconForNotification(notification.icon_type)}
+              </div>
+              <div>
+                <p className="font-medium text-sm">{notification.message}</p>
+                <p className="text-xs text-gray-400 mt-1">{formatNotificationTime(notification.created_at)}</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     );
   };
@@ -433,62 +567,31 @@ const DoctorDashboard = () => {
           <Card className="card-gradient p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">Notificações</h2>
             
-            {isLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((index) => (
-                  <div key={index} className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
-                    <div className="flex items-start gap-3">
-                      <Skeleton className="h-8 w-8 rounded-full" />
-                      <div>
-                        <Skeleton className="h-4 w-48 mb-1" />
-                        <Skeleton className="h-3 w-20" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-amber-950 rounded-full p-2 mt-1">
-                      <Calendar className="h-4 w-4 text-amber-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">Nova solicitação de consulta de Rodrigo Alves.</p>
-                      <p className="text-xs text-gray-400 mt-1">Há 30 minutos</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-blue-950 rounded-full p-2 mt-1">
-                      <Calendar className="h-4 w-4 text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">Consulta com Maria Silva reagendada para 28/11.</p>
-                      <p className="text-xs text-gray-400 mt-1">Há 2 horas</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-emerald-950 rounded-full p-2 mt-1">
-                      <Users className="h-4 w-4 text-emerald-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">Novo paciente cadastrado: João Pereira.</p>
-                      <p className="text-xs text-gray-400 mt-1">Ontem</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {renderNotifications()}
             
-            <Button variant="link" className="w-full mt-3 text-gold-400">
-              Ver Todas Notificações
+            <Button 
+              variant="link" 
+              className="w-full mt-3 text-gold-400"
+              onClick={async () => {
+                if (notifications.length === 0) return;
+                
+                try {
+                  await supabase
+                    .from('doctor_notifications')
+                    .update({ read: true })
+                    .eq('doctor_id', user?.id || '')
+                    .eq('read', false);
+                    
+                  toast({
+                    title: "Notificações marcadas como lidas",
+                    description: "Todas as notificações foram marcadas como lidas."
+                  });
+                } catch (error) {
+                  console.error('Error marking notifications as read:', error);
+                }
+              }}
+            >
+              Marcar Todas Como Lidas
             </Button>
           </Card>
           
