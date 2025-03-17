@@ -82,3 +82,42 @@
   width: 100%;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
+
+/* Mobile responsiveness improvements */
+@media (max-width: 768px) {
+  .form-section {
+    padding: 1.5rem;
+    max-width: 100%;
+  }
+  
+  h1, h2, h3 {
+    word-break: break-word;
+  }
+  
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Fix for mobile modal scrolling issues */
+  .modal-content {
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  
+  /* Ensure buttons are more tappable on mobile */
+  button, .button, [role="button"] {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+  
+  /* Improve table responsiveness */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}

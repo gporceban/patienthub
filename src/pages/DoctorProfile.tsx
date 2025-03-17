@@ -118,20 +118,20 @@ const DoctorProfile = () => {
   
   return (
     <Layout userType="medico">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Meu Perfil Médico</h1>
-        <p className="text-gray-400">
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-bold mb-2">Meu Perfil Médico</h1>
+        <p className="text-sm md:text-base text-gray-400">
           Atualize suas informações profissionais
         </p>
       </div>
       
-      <Card className="card-gradient p-6 max-w-2xl">
+      <Card className="card-gradient p-4 md:p-6 max-w-2xl">
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-gold-500" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -174,7 +174,7 @@ const DoctorProfile = () => {
             <Button 
               type="submit" 
               disabled={isSaving}
-              className="bg-gold-500 hover:bg-gold-600 text-black"
+              className="w-full md:w-auto bg-gold-500 hover:bg-gold-600 text-black"
             >
               {isSaving ? (
                 <>

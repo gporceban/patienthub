@@ -87,19 +87,19 @@ const DoctorPatients = () => {
   
   return (
     <Layout userType="medico">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Meus Pacientes</h1>
-        <p className="text-gray-400">
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-bold mb-2">Meus Pacientes</h1>
+        <p className="text-sm md:text-base text-gray-400">
           Gerencie os pacientes e avaliações
         </p>
       </div>
       
-      <div className="mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div className="relative w-full md:w-96">
+      <div className="mb-4 md:mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+        <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
           <Input
             type="search"
-            placeholder="Buscar por nome, email ou ID do prontuário..."
+            placeholder="Buscar por nome, email ou ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 bg-darkblue-800/50 border-darkblue-700"
@@ -108,7 +108,7 @@ const DoctorPatients = () => {
         
         <Button 
           asChild
-          className="bg-gold-500 hover:bg-gold-600 text-black"
+          className="w-full md:w-auto bg-gold-500 hover:bg-gold-600 text-black"
         >
           <Link to="/medico/avaliacao">
             <FileText size={18} className="mr-2" />
@@ -122,47 +122,48 @@ const DoctorPatients = () => {
           <Loader2 className="h-8 w-8 animate-spin text-gold-500" />
         </div>
       ) : filteredAssessments.length === 0 ? (
-        <Card className="card-gradient p-8 text-center">
-          <h3 className="text-xl font-medium mb-2">Nenhum paciente encontrado</h3>
+        <Card className="card-gradient p-6 md:p-8 text-center">
+          <h3 className="text-lg md:text-xl font-medium mb-2">Nenhum paciente encontrado</h3>
           {searchQuery ? (
-            <p className="text-gray-400">Nenhum resultado para "{searchQuery}". Tente outra busca ou crie uma nova avaliação.</p>
+            <p className="text-sm md:text-base text-gray-400">Nenhum resultado para "{searchQuery}". Tente outra busca ou crie uma nova avaliação.</p>
           ) : (
-            <p className="text-gray-400">Você ainda não possui nenhuma avaliação de paciente. Clique em "Nova Avaliação" para começar.</p>
+            <p className="text-sm md:text-base text-gray-400">Você ainda não possui nenhuma avaliação de paciente. Clique em "Nova Avaliação" para começar.</p>
           )}
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredAssessments.map((assessment) => (
             <Card key={assessment.id} className="card-gradient p-4 hover:bg-darkblue-800/50 transition-colors">
-              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+              <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="bg-darkblue-700 rounded-full p-3">
+                  <div className="bg-darkblue-700 rounded-full p-3 flex-shrink-0">
                     <User className="h-6 w-6 text-gold-500" />
                   </div>
                   
-                  <div>
-                    <h3 className="font-semibold">{assessment.patient_name}</h3>
-                    <p className="text-sm text-gray-400">{assessment.patient_email}</p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold truncate">{assessment.patient_name}</h3>
+                    <p className="text-sm text-gray-400 truncate">{assessment.patient_email}</p>
                     <p className="text-sm text-gray-400">ID: {assessment.prontuario_id}</p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <Calendar size={14} />
-                  <span>{formatDate(assessment.created_at)}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <Calendar size={14} />
+                    <span>{formatDate(assessment.created_at)}</span>
+                  </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    asChild
+                  >
+                    <Link to={`/paciente/avaliacoes/${assessment.id}`}>
+                      Ver Detalhes
+                      <ArrowRight size={14} className="ml-2" />
+                    </Link>
+                  </Button>
                 </div>
-                
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  asChild
-                  className="ml-auto md:ml-0"
-                >
-                  <Link to={`/paciente/avaliacoes/${assessment.id}`}>
-                    Ver Detalhes
-                    <ArrowRight size={14} className="ml-2" />
-                  </Link>
-                </Button>
               </div>
             </Card>
           ))}

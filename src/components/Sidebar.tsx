@@ -1,67 +1,87 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { cn } from "@/lib/utils";
-import {
-  CalendarClock,
-  FileText,
-  Home,
-  User,
-  FileEdit,
-  FilePlus2,
-  Users,
-  Award,
-  Folder,
-  Activity,
-  UserPlus
-} from "lucide-react";
+import { 
+  Home, Users, Calendar, FileText, 
+  ClipboardCheck, User, X
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SidebarProps {
-  userType: 'paciente' | 'medico';
+  userType?: 'paciente' | 'medico';
+  className?: string;
+  onClose?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ userType }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  userType = 'paciente',
+  className = '',
+  onClose
+}) => {
   const location = useLocation();
+  const isMobile = useIsMobile();
   
-  // Define sidebar items based on user type
-  const sidebarItems = userType === 'paciente' 
-    ? [
-        { href: '/paciente', icon: <Home size={20} />, label: 'Início' },
-        { href: '/paciente/agenda', icon: <CalendarClock size={20} />, label: 'Agenda' },
-        { href: '/paciente/avaliacoes', icon: <FileText size={20} />, label: 'Avaliações' },
-        { href: '/paciente/records', icon: <Folder size={20} />, label: 'Prontuário' },
-        { href: '/paciente/progress', icon: <Activity size={20} />, label: 'Progresso' },
-        { href: '/paciente/achievements', icon: <Award size={20} />, label: 'Conquistas' },
-        { href: '/paciente/perfil', icon: <User size={20} />, label: 'Perfil' },
-      ]
-    : [
-        { href: '/medico', icon: <Home size={20} />, label: 'Início' },
-        { href: '/medico/pacientes', icon: <Users size={20} />, label: 'Pacientes' },
-        { href: '/medico/agenda', icon: <CalendarClock size={20} />, label: 'Agenda' },
-        { href: '/medico/avaliacao', icon: <FileEdit size={20} />, label: 'Nova Avaliação' },
-        { href: '/medico/documentos', icon: <FilePlus2 size={20} />, label: 'Documentos' },
-        { href: '/medico/criar-teste', icon: <UserPlus size={20} />, label: 'Criar Paciente Teste' },
-        { href: '/medico/perfil', icon: <User size={20} />, label: 'Perfil' },
-      ];
+  const doctorLinks = [
+    { name: 'Dashboard', path: '/medico', icon: Home },
+    { name: 'Pacientes', path: '/medico/pacientes', icon: Users },
+    { name: 'Agenda', path: '/medico/agenda', icon: Calendar },
+    { name: 'Documentos', path: '/medico/documentos', icon: FileText },
+    { name: 'Meu Perfil', path: '/medico/perfil', icon: User }
+  ];
+  
+  const patientLinks = [
+    { name: 'Dashboard', path: '/paciente', icon: Home },
+    { name: 'Agenda', path: '/paciente/agenda', icon: Calendar },
+    { name: 'Avaliações', path: '/paciente/avaliacoes', icon: ClipboardCheck },
+  ];
+  
+  const links = userType === 'medico' ? doctorLinks : patientLinks;
   
   return (
-    <div className="hidden md:flex flex-col w-64 min-h-screen p-4 bg-darkblue-900 border-r border-darkblue-800">
-      <div className="flex-1 space-y-1 mt-8">
-        {sidebarItems.map((item) => (
-          <Link
-            key={item.href}
-            to={item.href}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all",
-              location.pathname === item.href
-                ? "bg-darkblue-800 text-gold-400"
-                : "text-gray-300 hover:bg-darkblue-800 hover:text-gold-300"
-            )}
+    <div 
+      className={cn(
+        "w-64 h-screen bg-darkblue-900/95 border-r border-darkblue-800 overflow-y-auto",
+        className
+      )}
+    >
+      {isMobile && (
+        <div className="flex justify-end p-2">
+          <button 
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-white"
           >
-            {item.icon}
-            {item.label}
-          </Link>
-        ))}
+            <X size={24} />
+          </button>
+        </div>
+      )}
+      
+      <div className="p-6">
+        <h2 className="text-xl font-bold mb-6 gold-text">
+          {userType === 'medico' ? 'Área do Médico' : 'Área do Paciente'}
+        </h2>
+        
+        <nav className="space-y-1">
+          {links.map((link) => {
+            const Icon = link.icon;
+            const isActive = location.pathname === link.path;
+            
+            return (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`flex items-center gap-3 px-3 py-3 rounded-md transition-colors ${
+                  isActive
+                    ? 'bg-darkblue-800 text-gold-500'
+                    : 'text-gray-300 hover:bg-darkblue-800/60 hover:text-white'
+                }`}
+                onClick={isMobile ? onClose : undefined}
+              >
+                <Icon size={18} />
+                <span>{link.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </div>
   );
