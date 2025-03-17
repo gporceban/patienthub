@@ -161,7 +161,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          cal_com_refresh_token: string | null
           cal_com_token: string | null
+          cal_com_user_id: number | null
           created_at: string
           email: string
           full_name: string
@@ -170,7 +172,9 @@ export type Database = {
           user_type: string
         }
         Insert: {
+          cal_com_refresh_token?: string | null
           cal_com_token?: string | null
+          cal_com_user_id?: number | null
           created_at?: string
           email: string
           full_name: string
@@ -179,7 +183,9 @@ export type Database = {
           user_type: string
         }
         Update: {
+          cal_com_refresh_token?: string | null
           cal_com_token?: string | null
+          cal_com_user_id?: number | null
           created_at?: string
           email?: string
           full_name?: string

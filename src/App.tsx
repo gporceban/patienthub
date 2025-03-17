@@ -19,6 +19,7 @@ import PatientCalendar from './pages/PatientCalendar';
 import DoctorProfile from './pages/DoctorProfile';
 import StarBackground from './components/StarBackground';
 import DoctorCreateTestPatient from './pages/DoctorCreateTestPatient';
+import CalComCallback from './components/CalComCallback';
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
             <Route path="/medico/documentos" element={<DoctorDocuments />} />
             <Route path="/medico/perfil" element={<DoctorProfile />} />
             <Route path="/medico/criar-teste" element={<DoctorCreateTestPatient />} />
+            <Route path="/calcom/callback" element={<CalComCallback />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <Toaster />

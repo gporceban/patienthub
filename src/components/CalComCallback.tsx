@@ -50,7 +50,9 @@ const CalComCallback = () => {
         if (tokenData.refresh_token) {
           const { error: updateError } = await supabase
             .from('profiles')
-            .update({ cal_com_refresh_token: tokenData.refresh_token })
+            .update({ 
+              cal_com_refresh_token: tokenData.refresh_token 
+            })
             .eq('id', user.id);
             
           if (updateError) {
