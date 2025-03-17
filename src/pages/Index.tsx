@@ -18,7 +18,6 @@ const Index = () => {
       <div className="w-full max-w-md space-y-6 relative z-10">
         <div className="text-center mb-4">
           <Logo size="medium" />
-          <h1 className="mt-4 text-2xl font-bold gold-text heading-text">OrthoCareMosaic</h1>
           <p className="mt-2 text-gray-400">
             Plataforma de acompanhamento ortopédico do Dr. Guilherme Porceban
           </p>
