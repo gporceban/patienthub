@@ -1,11 +1,13 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+
+import React, { useContext } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, Users, Calendar, FileText, 
   ClipboardCheck, User, X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { AuthContext } from '@/contexts/AuthContext';
 
 interface SidebarProps {
   userType?: 'paciente' | 'medico';
@@ -14,12 +16,17 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
-  userType = 'paciente',
+  userType,
   className = '',
   onClose
 }) => {
   const location = useLocation();
   const isMobile = useIsMobile();
+  const { userType: contextUserType } = useContext(AuthContext);
+  const navigate = useNavigate();
+  
+  // Use context user type as fallback if not explicitly provided
+  const effectiveUserType = userType || contextUserType || 'paciente';
   
   const doctorLinks = [
     { name: 'Dashboard', path: '/medico', icon: Home },
@@ -35,7 +42,18 @@ const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Avaliações', path: '/paciente/avaliacoes', icon: ClipboardCheck },
   ];
   
-  const links = userType === 'medico' ? doctorLinks : patientLinks;
+  const links = effectiveUserType === 'medico' ? doctorLinks : patientLinks;
+  
+  // Check if current location matches the expected user type
+  const currentPathBase = location.pathname.split('/')[1]; // 'medico' or 'paciente'
+  
+  // If there's a mismatch between the URL path and the user type, redirect
+  React.useEffect(() => {
+    if (contextUserType && currentPathBase !== contextUserType) {
+      const correctPath = contextUserType === 'medico' ? '/medico' : '/paciente';
+      navigate(correctPath, { replace: true });
+    }
+  }, [contextUserType, currentPathBase, navigate]);
   
   return (
     <div 
@@ -57,7 +75,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       
       <div className="p-6">
         <h2 className="text-xl font-bold mb-6 gold-text">
-          {userType === 'medico' ? 'Área do Médico' : 'Área do Paciente'}
+          {effectiveUserType === 'medico' ? 'Área do Médico' : 'Área do Paciente'}
         </h2>
         
         <nav className="space-y-1">

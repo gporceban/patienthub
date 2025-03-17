@@ -2,7 +2,7 @@
 import React, { useContext, useState } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Navigate } from 'react-router-dom';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Menu } from 'lucide-react';
@@ -20,14 +20,29 @@ const Layout: React.FC<LayoutProps> = ({
   userName
 }) => {
   const location = useLocation();
-  const { profile } = useContext(AuthContext);
-  const showSidebar = userType && location.pathname !== '/';
+  const { profile, userType: contextUserType, isLoading } = useContext(AuthContext);
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
+  // Check if the current route matches the user's type from context
+  const currentPath = location.pathname.split('/')[1]; // 'medico' or 'paciente'
+  const effectiveUserType = userType || profile?.user_type;
+  
+  // If user is logged in and trying to access the wrong module (doctor accessing patient or vice versa)
+  if (!isLoading && profile && contextUserType && userType) {
+    if (contextUserType !== userType) {
+      console.warn(`User type mismatch: context=${contextUserType}, requested=${userType}`);
+      // Redirect to correct dashboard based on user type
+      const correctPath = contextUserType === 'medico' ? '/medico' : '/paciente';
+      return <Navigate to={correctPath} replace />;
+    }
+  }
+  
+  const showSidebar = effectiveUserType && location.pathname !== '/';
+  
   return (
     <div className="min-h-screen">
-      <Header userType={userType} userName={userName || profile?.full_name} />
+      <Header userType={effectiveUserType} userName={userName || profile?.full_name} />
       
       <div className="flex relative">
         {showSidebar && (
@@ -44,7 +59,7 @@ const Layout: React.FC<LayoutProps> = ({
             )}
             
             <Sidebar 
-              userType={userType} 
+              userType={effectiveUserType} 
               className={`${isMobile ? 'fixed z-40 transition-transform duration-300 ease-in-out' : 'relative'} 
                 ${isMobile && !sidebarOpen ? '-translate-x-full' : 'translate-x-0'}`}
               onClose={() => setSidebarOpen(false)}

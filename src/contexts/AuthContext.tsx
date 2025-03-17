@@ -11,6 +11,7 @@ interface AuthContextType {
   session: Session | null;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  userType: 'medico' | 'paciente' | null;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -19,6 +20,7 @@ export const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   error: null,
   session: null,
+  userType: null,
   signOut: async () => {},
   refreshProfile: async () => {},
 });
@@ -33,6 +35,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [userType, setUserType] = useState<'medico' | 'paciente' | null>(null);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -48,6 +51,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       setProfile(profileData);
+      // Set user type based on the profile data
+      if (profileData?.user_type) {
+        setUserType(profileData.user_type as 'medico' | 'paciente');
+      }
     } catch (err: any) {
       console.error("Profile fetch error:", err.message);
       setError(err);
@@ -72,6 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setProfile(null);
       setSession(null);
+      setUserType(null);
     } catch (err: any) {
       console.error("Sign Out Error:", err.message);
       setError(err);
@@ -127,6 +135,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log("User signed out");
         setUser(null);
         setProfile(null);
+        setUserType(null);
       } else if (event === 'TOKEN_REFRESHED' && currentSession) {
         console.log("Token refreshed for user:", currentSession.user.id);
       }
@@ -145,6 +154,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     error,
     session,
+    userType,
     signOut,
     refreshProfile,
   };
