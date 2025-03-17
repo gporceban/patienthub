@@ -49,8 +49,8 @@ export const PatientAchievement: React.FC<PatientAchievementProps> = ({
           
           <Progress 
             value={progress} 
-            className="h-1.5 bg-darkblue-700" 
-            indicatorClassName={cn(
+            className={cn(
+              "h-1.5 bg-darkblue-700",
               completed ? "bg-gold-500" : "bg-blue-500"
             )}
           />

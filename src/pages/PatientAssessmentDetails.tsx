@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -9,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, FileText, Prescription, ListChecks, Calendar, History } from 'lucide-react';
+import { ArrowLeft, FileText, Stethoscope, ListChecks, Calendar, History } from 'lucide-react';
 import { PatientAssessment } from '@/types/patientAssessments';
 
 const PatientAssessmentDetails = () => {
@@ -36,7 +35,6 @@ const PatientAssessmentDetails = () => {
           
         if (error) throw error;
         
-        // Verificar se o e-mail do paciente corresponde ao perfil logado
         if (data.patient_email.toLowerCase() !== profile.email.toLowerCase()) {
           toast({
             variant: "destructive",
@@ -163,7 +161,7 @@ const PatientAssessmentDetails = () => {
             <span className="hidden md:inline">Nota Clínica</span>
           </TabsTrigger>
           <TabsTrigger value="prescription" className="flex items-center">
-            <Prescription className="h-4 w-4 mr-2" />
+            <Stethoscope className="h-4 w-4 mr-2" />
             <span className="hidden md:inline">Prescrição</span>
           </TabsTrigger>
           <TabsTrigger value="transcription" className="flex items-center">
@@ -218,7 +216,7 @@ const PatientAssessmentDetails = () => {
           <Card className="card-gradient">
             <CardHeader>
               <CardTitle className="flex items-center text-gold-300">
-                <Prescription className="h-5 w-5 mr-2" />
+                <Stethoscope className="h-5 w-5 mr-2" />
                 Prescrição Médica
               </CardTitle>
             </CardHeader>
@@ -227,7 +225,7 @@ const PatientAssessmentDetails = () => {
                 <div className="whitespace-pre-wrap">{assessment.prescription}</div>
               ) : (
                 <div className="text-center text-gray-400 py-8">
-                  <Prescription className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                  <Stethoscope className="h-12 w-12 mx-auto mb-2 opacity-30" />
                   <p>Prescrição não disponível para esta avaliação.</p>
                 </div>
               )}
