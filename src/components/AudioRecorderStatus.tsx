@@ -53,7 +53,7 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
     return (
       <div className="flex items-center text-blue-400 mt-4">
         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-        <span>Transcrevendo áudio...</span>
+        <span>Transcrevendo áudio com modelo especializado em contexto médico...</span>
       </div>
     );
   }
@@ -63,7 +63,7 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
       <div className="flex flex-col items-start mt-4">
         <div className="flex items-center text-gold-500 mb-3">
           <Sparkles className="h-4 w-4 mr-2" />
-          <span className="font-medium">Processamento com Agentes IA</span>
+          <span className="font-medium">Processamento com Agentes IA Especializados</span>
         </div>
 
         <div className="flex items-center text-blue-400 mb-2">
@@ -84,7 +84,7 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
               <Loader2 className="h-3 w-3 mr-2 animate-spin" />
             }
             <span className={agentProgress?.patientInfo ? "text-green-500" : "text-blue-400"}>
-              Extração de dados do paciente
+              Agente de Extração de Dados do Paciente
             </span>
           </div>
           
@@ -94,7 +94,7 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
               <Loader2 className="h-3 w-3 mr-2 animate-spin" />
             }
             <span className={agentProgress?.symptoms ? "text-green-500" : "text-blue-400"}>
-              Extração de sintomas
+              Agente de Extração de Sintomas
             </span>
           </div>
           
@@ -104,7 +104,7 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
               <Loader2 className="h-3 w-3 mr-2 animate-spin" />
             }
             <span className={agentProgress?.examFindings ? "text-green-500" : "text-blue-400"}>
-              Análise de exames
+              Agente de Análise de Exames
             </span>
           </div>
           
@@ -114,7 +114,7 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
               <Loader2 className="h-3 w-3 mr-2 animate-spin" />
             }
             <span className={agentProgress?.diagnosis ? "text-green-500" : "text-blue-400"}>
-              Diagnóstico clínico
+              Agente de Diagnóstico Clínico
             </span>
           </div>
           
@@ -124,7 +124,7 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
               <Loader2 className="h-3 w-3 mr-2 animate-spin" />
             }
             <span className={agentProgress?.treatment ? "text-green-500" : "text-blue-400"}>
-              Plano de tratamento
+              Agente de Plano de Tratamento
             </span>
           </div>
         </div>
@@ -135,7 +135,7 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           }
           <span className={agentProgress?.orchestration ? "text-green-500" : "text-blue-400"}>
-            Orquestração de documentos clínicos
+            Agente Orquestrador de Documentos Clínicos
           </span>
         </div>
       </div>
@@ -146,7 +146,7 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
     return (
       <div className="flex items-center text-green-500 mt-4">
         <CheckCircle className="h-5 w-5 mr-2" />
-        <span>Processamento concluído com sucesso</span>
+        <span>Processamento concluído com sucesso por Agentes IA</span>
       </div>
     );
   }

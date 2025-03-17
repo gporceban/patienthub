@@ -1,9 +1,7 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
-// Update the CORS headers to include x-app-name
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-app-name',
@@ -11,9 +9,7 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 };
 
-// Define system prompts for specialized "agents"
 const specializedAgents = {
-  // Patient Info extractor
   patientInfoExtractor: `Você é uma IA especializada em extrair informações de pacientes em contexto ambulatorial brasileiro.
   Extraia APENAS as informações básicas do paciente do texto, incluindo:
   - Nome do paciente (se disponível)
@@ -23,7 +19,6 @@ const specializedAgents = {
   - Data da consulta
   Formate sua resposta em terminologia médica profissional e clara em português brasileiro.`,
 
-  // Symptom extractor
   symptomExtractor: `Você é uma IA especializada em identificar sintomas de pacientes em contexto ambulatorial brasileiro.
   Extraia APENAS os sintomas mencionados no texto, incluindo:
   - Queixas principais
@@ -32,7 +27,6 @@ const specializedAgents = {
   - Sintomas relacionados
   Liste esses sintomas em formato claro e organizado, usando terminologia médica profissional em português brasileiro.`,
 
-  // Exam findings extractor
   examExtractor: `Você é uma IA especializada em extrair achados de exame físico em contexto ambulatorial brasileiro.
   Extraia APENAS os resultados do exame físico do texto, incluindo:
   - Sinais vitais
@@ -41,7 +35,6 @@ const specializedAgents = {
   - Achados anormais
   Formate estes em formato clínico estruturado usando terminologia médica profissional em português brasileiro.`,
 
-  // Diagnosis extractor
   diagnosisExtractor: `Você é uma IA especializada em extrair diagnósticos médicos em contexto ambulatorial brasileiro.
   Extraia APENAS os diagnósticos mencionados no texto, incluindo:
   - Diagnóstico principal
@@ -49,7 +42,6 @@ const specializedAgents = {
   - Diagnósticos confirmados vs. suspeitos
   Formate usando terminologia médica adequada e classificação em português brasileiro.`,
 
-  // Treatment extractor
   treatmentExtractor: `Você é uma IA especializada em extrair planos de tratamento em contexto ambulatorial brasileiro.
   Extraia APENAS os planos de tratamento do texto, incluindo:
   - Medicamentos prescritos
@@ -58,7 +50,6 @@ const specializedAgents = {
   - Modificações no estilo de vida
   Formate em um formato claro e acionável usando terminologia médica profissional em português brasileiro.`,
 
-  // Clinical history extractor
   historyExtractor: `Você é uma IA especializada em extrair histórico clínico do paciente em contexto ambulatorial brasileiro.
   Extraia APENAS o histórico clínico relevante do texto, incluindo:
   - Histórico médico passado
@@ -68,7 +59,6 @@ const specializedAgents = {
   Formate em um formato estruturado usando terminologia médica profissional em português brasileiro.`,
 }
 
-// Define each document type "orchestrator"
 const documentOrchestrators = {
   clinical_note: `Você é um assistente médico gerando uma nota clínica estruturada no estilo do Dr. Porceban, um renomado cirurgião de coluna em São Paulo, Brasil.
   Usando as informações extraídas, compile uma nota clínica COMPLETA em português brasileiro com estas seções:
@@ -157,17 +147,14 @@ const documentOrchestrators = {
   Garanta que o relatório seja completo, preciso e formatado profissionalmente.`
 }
 
-// Main function to coordinate the "agents" workflow
-async function runAgentBasedProcessing(text: string, mode: string, patientHistory: any = null) {
-  console.log(`Running agent-based processing for mode: ${mode}`);
+async function runAgentBasedProcessing(text: string, mode: string, patientHistory: any = null, humanInstructions: string = "") {
+  console.log(`Running agent-based processing for mode: ${mode}${humanInstructions ? ' with human instructions' : ''}`);
   
-  // Initialize OpenAI API key
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiApiKey) {
     throw new Error('OpenAI API key not configured');
   }
 
-  // Step 1: Prepare final prompt with history if available
   let contextPrompt = '';
   if (patientHistory && patientHistory.length > 0) {
     const historyText = patientHistory.map((record: any) => {
@@ -182,10 +169,8 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
     contextPrompt = `CONSULTA AMBULATORIAL:\n${text}`;
   }
 
-  // Step 2: Run specialized extractions as needed for the document type
   const extractors = [];
   
-  // Select which extractors to use based on document type
   switch(mode) {
     case 'clinical_note':
       extractors.push('patientInfoExtractor', 'symptomExtractor', 'examExtractor', 'diagnosisExtractor', 'treatmentExtractor');
@@ -209,7 +194,6 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
 
   console.log(`Selected extractors: ${extractors.join(', ')}`);
   
-  // Step 3: Run extractors in parallel for efficiency
   const extractionPromises = extractors.map(async (extractor) => {
     try {
       console.log(`Running extractor: ${extractor}`);
@@ -232,7 +216,7 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
               content: contextPrompt 
             }
           ],
-          temperature: 0.3, // Lower temperature for more deterministic extraction
+          temperature: 0.3,
         }),
       });
       
@@ -264,26 +248,21 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
     }
   });
   
-  // Wait for all extractions to complete
   const extractionResults = await Promise.all(extractionPromises);
   console.log(`Completed ${extractionResults.length} extractions`);
   
-  // Check if any extractions failed
   const failedExtractions = extractionResults.filter(result => result.error);
   if (failedExtractions.length > 0) {
     console.warn(`${failedExtractions.length} extractions failed`);
   }
   
-  // Step 4: Compile the extracted information
   const compiledExtractions = extractionResults.reduce((acc, result) => {
     const extractorName = result.extractor.replace('Extractor', '').toUpperCase();
     return acc + `\n\n### ${extractorName} INFORMATION:\n${result.content}`;
   }, '');
   
-  // Step 5: Run the final orchestrator to generate the complete document
-  console.log(`Running orchestrator for ${mode}`);
+  console.log(`Running orchestrator for ${mode}${humanInstructions ? ' with human instructions' : ''}`);
   
-  // Add context about Dr. Porceban for more personalized results
   const doctorContext = `
 CONTEXTO DO MÉDICO:
 Dr. Porceban é um cirurgião de coluna renomado em São Paulo, Brasil. Ele tem um estilo de escrita conciso 
@@ -291,9 +270,17 @@ mas completo, e segue rigorosamente os padrões brasileiros de documentação m�
 ambulatorial e está especialmente interessado em doenças da coluna vertebral.
 `;
 
-  // Prepare the final prompt for the orchestrator
+  const instructionsContext = humanInstructions ? `
+INSTRUÇÕES ESPECÍFICAS DO MÉDICO:
+${humanInstructions}
+
+Estas instruções têm prioridade sobre as demais diretrizes. Por favor, adapte a saída conforme solicitado.
+` : '';
+
   const orchestratorPrompt = `
 ${doctorContext}
+
+${instructionsContext}
 
 TRANSCRIÇÃO DA CONSULTA AMBULATORIAL:
 ${text}
@@ -311,7 +298,6 @@ ${patientHistory.map((record: any) => {
 }).join('---\n')}` : ''}
 `;
 
-  // Run the orchestrator to generate the final document
   const orchestratorResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -343,7 +329,6 @@ ${patientHistory.map((record: any) => {
   const orchestratorResult = await orchestratorResponse.json();
   const finalDocument = orchestratorResult.choices[0].message.content;
   
-  // Process structured data if needed
   let structuredData = null;
   if (mode === 'structured_data') {
     try {
@@ -358,7 +343,6 @@ ${patientHistory.map((record: any) => {
           structuredData = JSON.parse(jsonMatch[1]);
         }
       } else {
-        // Try to parse directly
         structuredData = JSON.parse(finalDocument);
       }
     } catch (jsonError) {
@@ -374,7 +358,6 @@ ${patientHistory.map((record: any) => {
 }
 
 serve(async (req) => {
-  // Improved CORS preflight handling
   if (req.method === 'OPTIONS') {
     console.log('Handling OPTIONS preflight request');
     return new Response(null, { 
@@ -384,8 +367,8 @@ serve(async (req) => {
   }
 
   try {
-    const { text, mode, patientInfo, reviewRequired } = await req.json();
-    console.log(`Processing request: mode=${mode}, has patientInfo=${!!patientInfo}, reviewRequired=${!!reviewRequired}`);
+    const { text, mode, patientInfo, reviewRequired, additionalInstructions } = await req.json();
+    console.log(`Processing request: mode=${mode}, has patientInfo=${!!patientInfo}, reviewRequired=${!!reviewRequired}, hasInstructions=${!!additionalInstructions}`);
 
     if (!text) {
       throw new Error('No text provided');
@@ -395,12 +378,10 @@ serve(async (req) => {
       throw new Error('Invalid or missing mode. Must be one of: clinical_note, prescription, summary, structured_data, evolution, medical_report');
     }
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch patient history if patient info is provided
     let patientHistory = null;
     let promptWithHistory = text;
 
@@ -431,17 +412,18 @@ serve(async (req) => {
       }
     }
 
-    // Add review notice if review is required
     const reviewInstructions = reviewRequired 
       ? "IMPORTANTE: Esta é uma versão preliminar que requer revisão médica antes da finalização. Destaque áreas que necessitam de especial atenção ou confirmação pelo médico." 
       : "";
 
-    console.log(`Starting agent-based processing for ${mode} mode, review required: ${!!reviewRequired}`);
+    const humanInstructions = additionalInstructions
+      ? `\n\nINSTRUÇÕES ADICIONAIS DO MÉDICO: ${additionalInstructions}`
+      : "";
+
+    console.log(`Starting agent-based processing for ${mode} mode, review required: ${!!reviewRequired}, has human instructions: ${!!additionalInstructions}`);
     
-    // Run the agent-based processing
-    const processingResult = await runAgentBasedProcessing(text, mode, patientHistory);
+    const processingResult = await runAgentBasedProcessing(text, mode, patientHistory, humanInstructions);
     
-    // Add review notice to the final text if required
     let finalText = processingResult.text;
     if (reviewRequired && finalText) {
       finalText = `${finalText}\n\n${reviewInstructions}`;
@@ -451,7 +433,8 @@ serve(async (req) => {
       text: finalText,
       isReviewRequired: !!reviewRequired,
       wasGeneratedWithHistory: !!patientHistory,
-      historyCount: patientHistory ? patientHistory.length : 0
+      historyCount: patientHistory ? patientHistory.length : 0,
+      includedHumanInstructions: !!additionalInstructions
     };
     
     if (mode === 'structured_data' && processingResult.structuredData) {
