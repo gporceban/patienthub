@@ -22,8 +22,8 @@ export const exchangeCodeForToken = async (
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        client_id: 'your-cal-com-client-id', // Replace with your actual client ID
-        client_secret: 'your-cal-com-client-secret', // Replace with your actual client secret
+        client_id: 'cm8cfb46t00dtp81l5a5yre86', // Updated with provided client ID
+        client_secret: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcmVEZWZhdWx0RXZlbnRUeXBlc0VuYWJsZWQiOmZhbHNlLCJuYW1lIjoiRHIuIFBvcmNlYmFuIiwicGVybWlzc2lvbnMiOjEwMjMsInJlZGlyZWN0VXJpcyI6WyJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8iXSwiYm9va2luZ1JlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvIiwiYm9va2luZ0NhbmNlbFJlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvL2NhbmNlbCIsImJvb2tpbmdSZXNjaGVkdWxlUmVkaXJlY3RVcmkiOiJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8vYXNzZXNzbWVudCIsImFyZUVtYWlsc0VuYWJsZWQiOnRydWUsImlhdCI6MTc0MjE3NzE3NX0.ruccBtCPGcDWwuuDBkBYOdraCPNHnvdCrr6OPZQw0KU', // Updated with provided client secret
         grant_type: 'authorization_code',
         code,
         redirect_uri: redirectUri,
@@ -106,7 +106,7 @@ export const refreshCalComToken = async (userId: string): Promise<string | null>
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${data.cal_com_token}`,
+        'Authorization': `Bearer ${data.cal_com_refresh_token}`, // Fixed: using cal_com_refresh_token instead of non-existent cal_com_token
       },
     });
 
@@ -171,7 +171,7 @@ export const createCalComManagedUser = async (
  * Generate Cal.com OAuth URL
  */
 export const getCalComOAuthUrl = (redirectUri: string): string => {
-  const clientId = 'your-cal-com-client-id'; // Replace with your actual client ID
+  const clientId = 'cm8cfb46t00dtp81l5a5yre86'; // Updated with provided client ID
   const scope = 'availability calendar bookings profile'; // Adjust scopes as needed
   
   return `https://api.cal.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
