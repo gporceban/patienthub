@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
@@ -9,6 +10,8 @@ import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
+import AudioRecorder from '@/components/AudioRecorder';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const DoctorAssessment = () => {
   const { user } = useContext(AuthContext);
@@ -20,7 +23,11 @@ const DoctorAssessment = () => {
   const [summary, setSummary] = useState('');
   const [clinicalNote, setClinicalNote] = useState('');
   const [prescription, setPrescription] = useState('');
+  const [transcription, setTranscription] = useState('');
+  const [structuredData, setStructuredData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentTab, setCurrentTab] = useState('form');
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +49,8 @@ const DoctorAssessment = () => {
             summary: summary,
             clinical_note: clinicalNote,
             prescription: prescription,
+            transcription: transcription,
+            structured_data: structuredData,
             created_at: new Date().toISOString(),
           },
         ]);
@@ -62,6 +71,8 @@ const DoctorAssessment = () => {
       setSummary('');
       setClinicalNote('');
       setPrescription('');
+      setTranscription('');
+      setStructuredData(null);
       
     } catch (error) {
       console.error('Error saving assessment:', error);
@@ -75,6 +86,42 @@ const DoctorAssessment = () => {
     }
   };
   
+  const handleTranscriptionComplete = (text: string) => {
+    setTranscription(text);
+  };
+  
+  const handleProcessingStart = () => {
+    setIsProcessing(true);
+  };
+  
+  const handleProcessingComplete = (data: {
+    clinical_note?: string;
+    prescription?: string;
+    summary?: string;
+    structured_data?: any;
+  }) => {
+    if (data.clinical_note) setClinicalNote(data.clinical_note);
+    if (data.prescription) setPrescription(data.prescription);
+    if (data.summary) setSummary(data.summary);
+    if (data.structured_data) setStructuredData(data.structured_data);
+    
+    setIsProcessing(false);
+    
+    // If we got patient info from the structured data, use it
+    if (data.structured_data?.paciente) {
+      const paciente = data.structured_data.paciente;
+      if (!patientName && paciente.nome) {
+        setPatientName(paciente.nome);
+      }
+      if (!prontuarioId && paciente.id) {
+        setProntuarioId(paciente.id);
+      }
+    }
+    
+    // Switch to form tab to show the results
+    setCurrentTab('form');
+  };
+  
   return (
     <Layout userType="medico">
       <div className="mb-6">
@@ -84,105 +131,133 @@ const DoctorAssessment = () => {
         </p>
       </div>
       
-      <Card className="card-gradient p-6 max-w-2xl">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="patientName" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                  Nome do Paciente
-                </label>
-                <Input
-                  id="patientName"
-                  placeholder="Nome completo do paciente"
-                  type="text"
-                  value={patientName}
-                  onChange={(e) => setPatientName(e.target.value)}
-                  className="bg-darkblue-800/50 border-darkblue-700"
-                  required
-                />
+      <Tabs value={currentTab} onValueChange={setCurrentTab} className="max-w-2xl">
+        <TabsList className="grid grid-cols-2 mb-6">
+          <TabsTrigger value="form">Formulário</TabsTrigger>
+          <TabsTrigger value="audio">Gravação de Áudio</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="audio" className="space-y-4">
+          <Card className="card-gradient p-6">
+            <AudioRecorder 
+              onTranscriptionComplete={handleTranscriptionComplete}
+              onProcessingStart={handleProcessingStart}
+              onProcessingComplete={handleProcessingComplete}
+            />
+            
+            {transcription && (
+              <div className="mt-6">
+                <h3 className="text-lg font-medium mb-2">Transcrição</h3>
+                <div className="bg-darkblue-900/50 p-4 rounded-md border border-darkblue-700">
+                  <p className="text-sm whitespace-pre-wrap">{transcription}</p>
+                </div>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="form" className="space-y-4">
+          <Card className="card-gradient p-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label htmlFor="patientName" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                      Nome do Paciente
+                    </label>
+                    <Input
+                      id="patientName"
+                      placeholder="Nome completo do paciente"
+                      type="text"
+                      value={patientName}
+                      onChange={(e) => setPatientName(e.target.value)}
+                      className="bg-darkblue-800/50 border-darkblue-700"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="patientEmail" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                      Email do Paciente
+                    </label>
+                    <Input
+                      id="patientEmail"
+                      placeholder="Email do paciente"
+                      type="email"
+                      value={patientEmail}
+                      onChange={(e) => setPatientEmail(e.target.value)}
+                      className="bg-darkblue-800/50 border-darkblue-700"
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="prontuarioId" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                    ID do Prontuário
+                  </label>
+                  <Input
+                    id="prontuarioId"
+                    placeholder="ID do prontuário do paciente"
+                    type="text"
+                    value={prontuarioId}
+                    onChange={(e) => setProntuarioId(e.target.value)}
+                    className="bg-darkblue-800/50 border-darkblue-700"
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="summary" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                    Resumo da Avaliação
+                  </label>
+                  <Textarea
+                    id="summary"
+                    placeholder="Resumo da avaliação do paciente"
+                    value={summary}
+                    onChange={(e) => setSummary(e.target.value)}
+                    className="h-24 bg-darkblue-800/50 border-darkblue-700"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="clinicalNote" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                    Nota Clínica
+                  </label>
+                  <Textarea
+                    id="clinicalNote"
+                    placeholder="Nota clínica sobre o paciente"
+                    value={clinicalNote}
+                    onChange={(e) => setClinicalNote(e.target.value)}
+                    className="h-32 bg-darkblue-800/50 border-darkblue-700"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="prescription" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                    Prescrição
+                  </label>
+                  <Textarea
+                    id="prescription"
+                    placeholder="Prescrição para o paciente"
+                    value={prescription}
+                    onChange={(e) => setPrescription(e.target.value)}
+                    className="h-32 bg-darkblue-800/50 border-darkblue-700"
+                  />
+                </div>
               </div>
               
-              <div className="space-y-2">
-                <label htmlFor="patientEmail" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                  Email do Paciente
-                </label>
-                <Input
-                  id="patientEmail"
-                  placeholder="Email do paciente"
-                  type="email"
-                  value={patientEmail}
-                  onChange={(e) => setPatientEmail(e.target.value)}
-                  className="bg-darkblue-800/50 border-darkblue-700"
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="prontuarioId" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                ID do Prontuário
-              </label>
-              <Input
-                id="prontuarioId"
-                placeholder="ID do prontuário do paciente"
-                type="text"
-                value={prontuarioId}
-                onChange={(e) => setProntuarioId(e.target.value)}
-                className="bg-darkblue-800/50 border-darkblue-700"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="summary" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                Resumo da Avaliação
-              </label>
-              <Textarea
-                id="summary"
-                placeholder="Resumo da avaliação do paciente"
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                className="h-24 bg-darkblue-800/50 border-darkblue-700"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="clinicalNote" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                Nota Clínica
-              </label>
-              <Textarea
-                id="clinicalNote"
-                placeholder="Nota clínica sobre o paciente"
-                value={clinicalNote}
-                onChange={(e) => setClinicalNote(e.target.value)}
-                className="h-32 bg-darkblue-800/50 border-darkblue-700"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="prescription" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
-                Prescrição
-              </label>
-              <Textarea
-                id="prescription"
-                placeholder="Prescrição para o paciente"
-                value={prescription}
-                onChange={(e) => setPrescription(e.target.value)}
-                className="h-32 bg-darkblue-800/50 border-darkblue-700"
-              />
-            </div>
-          </div>
-          
-          <Button 
-            type="submit" 
-            disabled={isSaving}
-            className="bg-gold-500 hover:bg-gold-600 text-black"
-          >
-            {isSaving ? 'Salvando...' : 'Salvar Avaliação'}
-          </Button>
-        </form>
-      </Card>
+              <Button 
+                type="submit" 
+                disabled={isSaving || isProcessing}
+                className="bg-gold-500 hover:bg-gold-600 text-black"
+              >
+                {isSaving ? 'Salvando...' : 'Salvar Avaliação'}
+              </Button>
+            </form>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </Layout>
   );
 };
