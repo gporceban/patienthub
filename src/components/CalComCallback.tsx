@@ -5,6 +5,7 @@ import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import { exchangeCodeForToken, storeCalComToken } from '@/services/calComService';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 
 const CalComCallback = () => {
   const location = useLocation();
@@ -44,6 +45,18 @@ const CalComCallback = () => {
 
         // Store the token in Supabase
         await storeCalComToken(user.id, tokenData.access_token);
+
+        // Update profile fields for refresh token if it exists
+        if (tokenData.refresh_token) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ cal_com_refresh_token: tokenData.refresh_token })
+            .eq('id', user.id);
+            
+          if (updateError) {
+            console.error("Error storing refresh token:", updateError);
+          }
+        }
 
         // Redirect to calendar page
         setIsLoading(false);

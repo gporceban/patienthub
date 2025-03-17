@@ -49,7 +49,7 @@ const PatientCalendar = () => {
           "light": {"cal-brand":"#1b3341"},
           "dark": {"cal-brand":"#f9f9f9"}
         },
-        "hideEventTypeDetails": false, // Changed from "false" to false
+        "hideEventTypeDetails": false,
         "layout": "month_view"
       });
     })();
@@ -138,7 +138,7 @@ const PatientCalendar = () => {
               style={{width:"100%", height:"100%", overflow:"scroll"}}
               config={{
                 "layout": "month_view",
-                "hideEventTypeDetails": false, // Changed from "false" to false
+                "hideEventTypeDetails": false,
                 "calOrigin": "https://cal.com",
                 "apiKey": "cal_live_5247aff40f6b3e5b267eff4ed6a9f8be"
               }}

@@ -7,6 +7,10 @@ import { useContext } from "react";
 const CAL_COM_API_URL = "https://api.cal.com/v2";
 const CAL_COM_API_KEY = "cal_live_5247aff40f6b3e5b267eff4ed6a9f8be";
 
+// Cal.com OAuth Client credentials
+const CAL_COM_CLIENT_ID = "your-cal-com-client-id"; // Replace with your actual client ID
+const CAL_COM_CLIENT_SECRET = "your-cal-com-client-secret"; // Replace with your actual client secret
+
 // Interface for appointment data
 export interface CalComAppointment {
   id: string;
@@ -20,6 +24,15 @@ export interface CalComAppointment {
   }[];
   location?: string;
   status: "ACCEPTED" | "PENDING" | "CANCELLED" | "REJECTED";
+}
+
+// Interface for Cal.com managed user
+export interface CalComManagedUser {
+  id: number;
+  email: string;
+  username: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
 // Helper function to format headers with authentication
@@ -84,9 +97,7 @@ export const useCalComToken = () => {
 
 // OAuth redirect URL handler
 export const getOAuthRedirectUrl = (callbackUrl: string) => {
-  const clientId = "your-cal-com-client-id"; // Replace with your Cal.com Client ID
-  const redirectUri = encodeURIComponent(callbackUrl);
-  return `https://api.cal.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code`;
+  return `https://api.cal.com/oauth/authorize?client_id=${CAL_COM_CLIENT_ID}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code`;
 };
 
 // Exchange authorization code for token
@@ -98,8 +109,8 @@ export const exchangeCodeForToken = async (code: string, redirectUri: string) =>
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        client_id: "your-cal-com-client-id", // Replace with your Cal.com Client ID
-        client_secret: "your-cal-com-client-secret", // Replace with your Cal.com Client Secret
+        client_id: CAL_COM_CLIENT_ID,
+        client_secret: CAL_COM_CLIENT_SECRET,
         grant_type: "authorization_code",
         code,
         redirect_uri: redirectUri,
@@ -114,6 +125,94 @@ export const exchangeCodeForToken = async (code: string, redirectUri: string) =>
   }
 };
 
+// Create a managed user in Cal.com
+export const createCalComManagedUser = async (userData: {
+  email: string;
+  name?: string;
+  timeFormat?: 12 | 24;
+  weekStart?: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
+  timeZone?: string;
+}) => {
+  try {
+    const response = await fetch(`${CAL_COM_API_URL}/oauth-clients/${CAL_COM_CLIENT_ID}/users`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cal-secret-key": CAL_COM_CLIENT_SECRET
+      },
+      body: JSON.stringify(userData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to create managed user');
+    }
+    
+    const data = await response.json();
+    return data.data as { 
+      user: { id: number; email: string; username: string }; 
+      accessToken: string; 
+      refreshToken: string; 
+    };
+  } catch (error) {
+    console.error("Error creating Cal.com managed user:", error);
+    return null;
+  }
+};
+
+// Store Cal.com managed user info in Supabase
+export const storeCalComManagedUser = async (
+  userId: string, 
+  calComUserId: number, 
+  accessToken: string, 
+  refreshToken: string
+) => {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        cal_com_token: accessToken,
+        cal_com_user_id: calComUserId,
+        cal_com_refresh_token: refreshToken
+      })
+      .eq('id', userId);
+      
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error("Error storing Cal.com managed user info:", error);
+    return { success: false, error };
+  }
+};
+
+// Refresh Cal.com access token
+export const refreshCalComToken = async (refreshToken: string) => {
+  try {
+    const response = await fetch(`${CAL_COM_API_URL}/oauth/${CAL_COM_CLIENT_ID}/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cal-secret-key": CAL_COM_CLIENT_SECRET
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to refresh token');
+    }
+    
+    const data = await response.json();
+    return {
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken
+    };
+  } catch (error) {
+    console.error("Error refreshing Cal.com token:", error);
+    return null;
+  }
+};
+
 // Get user's appointments
 export const fetchUserAppointments = async (token: string) => {
   try {
@@ -121,6 +220,11 @@ export const fetchUserAppointments = async (token: string) => {
       method: "GET",
       headers: getHeaders(token),
     });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch appointments');
+    }
     
     const data = await response.json();
     return data.bookings;
@@ -187,4 +291,53 @@ export const createAppointment = async (token: string, appointmentData: {
     console.error("Error creating appointment:", error);
     return { success: false, error };
   }
+};
+
+// Create a token refresh endpoint for Cal.com
+export const setupCalComRefreshEndpoint = () => {
+  const handleRefreshToken = async (accessToken: string) => {
+    try {
+      // Fetch the user info from the database using the access token
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('cal_com_refresh_token')
+        .eq('cal_com_token', accessToken)
+        .maybeSingle();
+        
+      if (error || !data) {
+        throw new Error('Failed to find user with this access token');
+      }
+      
+      const refreshToken = data.cal_com_refresh_token;
+      if (!refreshToken) {
+        throw new Error('Refresh token not found');
+      }
+      
+      // Get a new token
+      const tokens = await refreshCalComToken(refreshToken);
+      if (!tokens) {
+        throw new Error('Failed to refresh token');
+      }
+      
+      // Update the token in the database
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          cal_com_token: tokens.accessToken,
+          cal_com_refresh_token: tokens.refreshToken
+        })
+        .eq('cal_com_refresh_token', refreshToken);
+        
+      if (updateError) {
+        throw updateError;
+      }
+      
+      return { accessToken: tokens.accessToken };
+    } catch (error) {
+      console.error('Error in refreshing token:', error);
+      throw error;
+    }
+  };
+  
+  return handleRefreshToken;
 };
