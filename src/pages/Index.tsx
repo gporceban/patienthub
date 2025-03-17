@@ -10,28 +10,28 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("login");
   
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 py-8">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center mb-4">
           <Logo size="medium" />
-          <h1 className="mt-4 text-2xl font-bold">OrthoCareMosaic</h1>
+          <h1 className="mt-4 text-2xl font-bold text-white">OrthoCareMosaic</h1>
           <p className="mt-2 text-gray-400">
             Plataforma de acompanhamento ortopédico do Dr. Guilherme Porceban
           </p>
         </div>
         
-        <Card className="card-gradient p-6">
+        <Card className="card-gradient p-6 shadow-lg border border-darkblue-700/50">
           <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="login">Entrar</TabsTrigger>
               <TabsTrigger value="register">Criar Conta</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="login">
+            <TabsContent value="login" className="space-y-4 mt-2">
               <LoginForm />
             </TabsContent>
             
-            <TabsContent value="register">
+            <TabsContent value="register" className="space-y-4 mt-2">
               <PatientRegisterForm />
             </TabsContent>
           </Tabs>
