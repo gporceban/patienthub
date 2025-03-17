@@ -62,14 +62,15 @@ const PatientRegisterForm: React.FC = () => {
       // Format the prontuario_id by removing any hyphens for consistency
       const formattedProntuarioId = prontuarioId.replace(/-/g, '');
       
-      console.log(`Checking prontuario with normalized ID: ${formattedProntuarioId} and email: ${email}`);
+      console.log(`Checking prontuario with ID: ${prontuarioId} and email: ${email}`);
       
       // First check if a patient record with this email and prontuario_id exists in patient_assessments table
+      // Using a more direct and simpler query approach
       const { data: existingAssessment, error: checkError } = await supabase
         .from('patient_assessments')
         .select('id')
-        .or(`prontuario_id.eq.${formattedProntuarioId},prontuario_id.eq.${prontuarioId}`)
-        .eq('patient_email', email)
+        .eq('patient_email', email.trim().toLowerCase())
+        .eq('prontuario_id', prontuarioId.trim())
         .maybeSingle();
 
       if (checkError) {
@@ -79,14 +80,15 @@ const PatientRegisterForm: React.FC = () => {
 
       console.log("Assessment check result:", existingAssessment);
 
-      // Fix: The query format was incorrect. Let's try a different approach
-      if (!existingAssessment) {
-        // Try another query approach with proper parameter binding
+      // If not found with exact match, try with the formatted ID
+      if (!existingAssessment && formattedProntuarioId !== prontuarioId) {
+        console.log(`Trying with formatted ID: ${formattedProntuarioId}`);
+        
         const { data: secondAttempt, error: secondError } = await supabase
           .from('patient_assessments')
           .select('id')
-          .in('prontuario_id', [prontuarioId, formattedProntuarioId])
-          .eq('patient_email', email)
+          .eq('patient_email', email.trim().toLowerCase())
+          .eq('prontuario_id', formattedProntuarioId.trim())
           .maybeSingle();
           
         console.log("Second attempt result:", secondAttempt);
@@ -97,13 +99,30 @@ const PatientRegisterForm: React.FC = () => {
         }
         
         if (!secondAttempt) {
-          throw new Error(`Não encontramos nenhum prontuário com ID ${prontuarioId} associado ao email ${email}. Verifique as informações ou entre em contato com seu médico.`);
+          // One more attempt with case insensitive email check
+          const { data: thirdAttempt, error: thirdError } = await supabase
+            .from('patient_assessments')
+            .select('id, patient_email, prontuario_id')
+            .filter('patient_email', 'ilike', email.trim().toLowerCase())
+            .or(`prontuario_id.eq.${prontuarioId.trim()},prontuario_id.eq.${formattedProntuarioId.trim()}`)
+            .maybeSingle();
+            
+          console.log("Third attempt case-insensitive check:", thirdAttempt);
+          
+          if (thirdError) {
+            console.error("Third database check error:", thirdError);
+            throw thirdError;
+          }
+          
+          if (!thirdAttempt) {
+            throw new Error(`Não encontramos nenhum prontuário com ID ${prontuarioId} associado ao email ${email}. Verifique as informações ou entre em contato com seu médico.`);
+          }
         }
       }
 
       // Register the user
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
         options: {
           data: {
