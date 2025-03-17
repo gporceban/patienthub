@@ -15,6 +15,7 @@ import PatientAssessment from './pages/PatientAssessment';
 import PatientAssessmentDetails from './pages/PatientAssessmentDetails';
 import PatientProgress from './pages/PatientProgress';
 import PatientAchievements from './pages/PatientAchievements';
+import PatientCalendar from './pages/PatientCalendar';
 import DoctorProfile from './pages/DoctorProfile';
 import StarBackground from './components/StarBackground';
 import DoctorCreateTestPatient from './pages/DoctorCreateTestPatient';
@@ -32,6 +33,7 @@ function App() {
             <Route path="/paciente/avaliacoes/:id" element={<PatientAssessmentDetails />} />
             <Route path="/paciente/progresso" element={<PatientProgress />} />
             <Route path="/paciente/conquistas" element={<PatientAchievements />} />
+            <Route path="/paciente/calendario" element={<PatientCalendar />} />
             <Route path="/medico" element={<DoctorDashboard />} />
             <Route path="/medico/avaliacao" element={<DoctorAssessment />} />
             <Route path="/medico/pacientes" element={<DoctorPatients />} />
