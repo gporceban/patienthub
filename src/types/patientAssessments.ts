@@ -12,7 +12,7 @@ export type PatientAssessment = {
   clinical_note: string | null;
   prescription: string | null;
   summary: string | null;
-  patient_friendly_summary: string | null; // New field for patient-friendly summary
+  patient_friendly_summary: string | null; // Optional field for patient-friendly summary
   structured_data: any | null;
   created_at: string;
   updated_at: string;

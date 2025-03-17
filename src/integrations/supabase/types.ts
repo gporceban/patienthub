@@ -124,6 +124,7 @@ export type Database = {
           doctor_id: string | null
           id: string
           patient_email: string
+          patient_friendly_summary: string | null
           patient_name: string
           prescription: string | null
           prontuario_id: string
@@ -138,6 +139,7 @@ export type Database = {
           doctor_id?: string | null
           id?: string
           patient_email: string
+          patient_friendly_summary?: string | null
           patient_name: string
           prescription?: string | null
           prontuario_id: string
@@ -152,6 +154,7 @@ export type Database = {
           doctor_id?: string | null
           id?: string
           patient_email?: string
+          patient_friendly_summary?: string | null
           patient_name?: string
           prescription?: string | null
           prontuario_id?: string
