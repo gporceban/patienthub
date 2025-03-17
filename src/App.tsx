@@ -12,6 +12,9 @@ import DoctorDocuments from './pages/DoctorDocuments';
 import NotFound from './pages/NotFound';
 import PatientAssessmentsList from './pages/PatientAssessmentsList';
 import PatientAssessment from './pages/PatientAssessment';
+import PatientAssessmentDetails from './pages/PatientAssessmentDetails';
+import PatientProgress from './pages/PatientProgress';
+import PatientAchievements from './pages/PatientAchievements';
 import DoctorProfile from './pages/DoctorProfile';
 import StarBackground from './components/StarBackground';
 import DoctorCreateTestPatient from './pages/DoctorCreateTestPatient';
@@ -26,7 +29,9 @@ function App() {
             <Route path="/" element={<Index />} />
             <Route path="/paciente" element={<PatientDashboard />} />
             <Route path="/paciente/avaliacoes" element={<PatientAssessmentsList />} />
-            <Route path="/paciente/avaliacoes/:id" element={<PatientAssessment />} />
+            <Route path="/paciente/avaliacoes/:id" element={<PatientAssessmentDetails />} />
+            <Route path="/paciente/progresso" element={<PatientProgress />} />
+            <Route path="/paciente/conquistas" element={<PatientAchievements />} />
             <Route path="/medico" element={<DoctorDashboard />} />
             <Route path="/medico/avaliacao" element={<DoctorAssessment />} />
             <Route path="/medico/pacientes" element={<DoctorPatients />} />

@@ -126,11 +126,15 @@ const PatientDashboard = () => {
             </div>
           </div>
           <div className="mb-4">
-            <p className="text-2xl font-bold">--</p>
-            <p className="text-sm text-gray-400">Dados ainda não disponíveis</p>
+            <p className="text-2xl font-bold">{assessments.length > 0 ? 'Ativo' : '--'}</p>
+            <p className="text-sm text-gray-400">
+              {assessments.length > 0 
+                ? `Desde ${assessments.length > 0 ? formatDate(assessments[assessments.length - 1].created_at) : ''}` 
+                : 'Dados ainda não disponíveis'}
+            </p>
           </div>
           <Button asChild variant="outline" size="sm" className="w-full">
-            <Link to="/paciente/progress">Ver progresso</Link>
+            <Link to="/paciente/progresso">Ver progresso</Link>
           </Button>
         </Card>
       </div>
@@ -214,14 +218,14 @@ const PatientDashboard = () => {
                 </div>
               </div>
               
-              <div className="bg-darkblue-800/30 rounded-lg p-3 border border-darkblue-700/30">
-                <div className="flex items-center opacity-50">
-                  <div className="bg-gray-700/20 p-2 rounded-full mr-3">
-                    <Award className="h-4 w-4 text-gray-500" />
+              <div className={`bg-darkblue-800/${assessments.length > 1 ? '70' : '30'} rounded-lg p-3 border border-darkblue-700/${assessments.length > 1 ? '50' : '30'}`}>
+                <div className={`flex items-center ${assessments.length > 1 ? '' : 'opacity-50'}`}>
+                  <div className={`${assessments.length > 1 ? 'bg-gold-500/20' : 'bg-gray-700/20'} p-2 rounded-full mr-3`}>
+                    <Award className={`h-4 w-4 ${assessments.length > 1 ? 'text-gold-500' : 'text-gray-500'}`} />
                   </div>
                   <div>
-                    <h4 className="font-medium text-sm">30 Dias de Tratamento</h4>
-                    <p className="text-xs text-gray-400">Um mês de evolução</p>
+                    <h4 className="font-medium text-sm">Consultas Múltiplas</h4>
+                    <p className="text-xs text-gray-400">Realizou mais de uma consulta</p>
                   </div>
                 </div>
               </div>
@@ -241,7 +245,7 @@ const PatientDashboard = () => {
             
             <div className="mt-4 text-center">
               <Button asChild variant="link" className="text-gold-400">
-                <Link to="/paciente/achievements">Ver todas as conquistas</Link>
+                <Link to="/paciente/conquistas">Ver todas as conquistas</Link>
               </Button>
             </div>
           </Card>
