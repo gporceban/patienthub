@@ -41,7 +41,7 @@ export const storeCalComToken = async (userId: string, calComToken: string) => {
   try {
     const { error } = await supabase
       .from('profiles')
-      .update({ cal_com_token: calComToken })
+      .update({ cal_com_token: calComToken }) // Now this field exists in the DB
       .eq('id', userId);
       
     if (error) throw error;
@@ -57,9 +57,9 @@ export const getCalComToken = async (userId: string) => {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('cal_com_token')
+      .select('cal_com_token') // Now this field exists in the DB
       .eq('id', userId)
-      .single();
+      .maybeSingle(); // Changed from single() to maybeSingle() to avoid errors
       
     if (error) throw error;
     return { success: true, token: data?.cal_com_token };
