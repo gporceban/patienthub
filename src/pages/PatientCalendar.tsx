@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { AuthContext } from '@/contexts/AuthContext';
-import { Calendar, Plus, ClipboardList, Link as LinkIcon } from 'lucide-react';
+import { Calendar, Plus, ClipboardList, Link as LinkIcon, FileText } from 'lucide-react';
 import { getCalComOAuthUrl, getCalComToken } from '@/services/calComService';
 import { supabase } from '@/integrations/supabase/client';
 import { fromAppointments } from '@/types/doctorProfile';
