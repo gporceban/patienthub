@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -144,7 +145,28 @@ const documentOrchestrators = {
 
   Formate como um relatório médico formal adequado para fins oficiais em português brasileiro.
   Siga o estilo estruturado e completo do Dr. Porceban para documentação oficial.
-  Garanta que o relatório seja completo, preciso e formatado profissionalmente.`
+  Garanta que o relatório seja completo, preciso e formatado profissionalmente.`,
+  
+  patient_friendly: `Você é um assistente médico da equipe de relacionamento com pacientes criando uma explicação em linguagem acessível para o paciente.
+  Seu trabalho é transformar linguagem médica técnica em uma explicação CLARA e ACESSÍVEL, mantendo a precisão das informações.
+  
+  Crie um resumo visualmente atraente no estilo do Gamma.app (https://gamma.app) com:
+  
+  1. Um título amigável e motivador sobre a consulta
+  2. Uma explicação clara do diagnóstico em linguagem simples, sem jargão médico
+  3. Uma visualização simples do plano de tratamento com passos claros
+  4. Benefícios esperados e orientações de acompanhamento
+  5. Dicas de estilo de vida e autocuidado relevantes à condição
+  
+  Regras importantes:
+  - Evite COMPLETAMENTE jargão médico técnico, explicando tudo em linguagem do dia-a-dia
+  - Use analogias e comparações simples para explicar conceitos médicos complexos
+  - Inclua elementos visuais (usando emojis e formatação de texto) similar ao estilo Gamma.app
+  - Utilize linguagem encorajadora e positiva, enfatizando o progresso e melhora
+  - Formate o documento para ser visualmente atraente, com seções claras e espaçamento adequado
+  - Certifique-se que o conteúdo seja motivador e empoderante para o paciente
+  
+  O documento deve ser acolhedor, fácil de entender e fazer o paciente se sentir apoiado.`
 }
 
 async function runAgentBasedProcessing(text: string, mode: string, patientHistory: any = null, humanInstructions: string = "") {
@@ -190,76 +212,82 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
     case 'medical_report':
       extractors.push('patientInfoExtractor', 'symptomExtractor', 'examExtractor', 'diagnosisExtractor', 'treatmentExtractor', 'historyExtractor');
       break;
+    case 'patient_friendly':
+      // For patient-friendly mode, we don't need extractors as we're just transforming existing medical content
+      break;
   }
 
-  console.log(`Selected extractors: ${extractors.join(', ')}`);
-  
-  const extractionPromises = extractors.map(async (extractor) => {
-    try {
-      console.log(`Running extractor: ${extractor}`);
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            { 
-              role: 'system', 
-              content: specializedAgents[extractor as keyof typeof specializedAgents] 
-            },
-            { 
-              role: 'user', 
-              content: contextPrompt 
-            }
-          ],
-          temperature: 0.3,
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Error from OpenAI (${extractor}):`, errorText);
+  // Skip extraction for patient-friendly summaries which directly use the input text
+  if (mode !== 'patient_friendly') {
+    console.log(`Selected extractors: ${extractors.join(', ')}`);
+    
+    const extractionPromises = extractors.map(async (extractor) => {
+      try {
+        console.log(`Running extractor: ${extractor}`);
+        
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              { 
+                role: 'system', 
+                content: specializedAgents[extractor as keyof typeof specializedAgents] 
+              },
+              { 
+                role: 'user', 
+                content: contextPrompt 
+              }
+            ],
+            temperature: 0.3,
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Error from OpenAI (${extractor}):`, errorText);
+          return {
+            extractor,
+            content: `Error: Failed to extract ${extractor.replace('Extractor', '')} information`,
+            error: true
+          };
+        }
+        
+        const result = await response.json();
+        const extractedContent = result.choices[0].message.content;
+        
         return {
           extractor,
-          content: `Error: Failed to extract ${extractor.replace('Extractor', '')} information`,
+          content: extractedContent,
+          error: false
+        };
+      } catch (error) {
+        console.error(`Error in extractor ${extractor}:`, error);
+        return {
+          extractor,
+          content: `Error: ${error.message}`,
           error: true
         };
       }
-      
-      const result = await response.json();
-      const extractedContent = result.choices[0].message.content;
-      
-      return {
-        extractor,
-        content: extractedContent,
-        error: false
-      };
-    } catch (error) {
-      console.error(`Error in extractor ${extractor}:`, error);
-      return {
-        extractor,
-        content: `Error: ${error.message}`,
-        error: true
-      };
+    });
+    
+    const extractionResults = await Promise.all(extractionPromises);
+    console.log(`Completed ${extractionResults.length} extractions`);
+    
+    const failedExtractions = extractionResults.filter(result => result.error);
+    if (failedExtractions.length > 0) {
+      console.warn(`${failedExtractions.length} extractions failed`);
     }
-  });
-  
-  const extractionResults = await Promise.all(extractionPromises);
-  console.log(`Completed ${extractionResults.length} extractions`);
-  
-  const failedExtractions = extractionResults.filter(result => result.error);
-  if (failedExtractions.length > 0) {
-    console.warn(`${failedExtractions.length} extractions failed`);
+    
+    var compiledExtractions = extractionResults.reduce((acc, result) => {
+      const extractorName = result.extractor.replace('Extractor', '').toUpperCase();
+      return acc + `\n\n### ${extractorName} INFORMATION:\n${result.content}`;
+    }, '');
   }
-  
-  const compiledExtractions = extractionResults.reduce((acc, result) => {
-    const extractorName = result.extractor.replace('Extractor', '').toUpperCase();
-    return acc + `\n\n### ${extractorName} INFORMATION:\n${result.content}`;
-  }, '');
   
   console.log(`Running orchestrator for ${mode}${humanInstructions ? ' with human instructions' : ''}`);
   
@@ -277,7 +305,32 @@ ${humanInstructions}
 Estas instruções têm prioridade sobre as demais diretrizes. Por favor, adapte a saída conforme solicitado.
 ` : '';
 
-  const orchestratorPrompt = `
+  let orchestratorPrompt;
+  
+  if (mode === 'patient_friendly') {
+    // For patient-friendly mode, we use the text directly as it's already processed medical content
+    orchestratorPrompt = `
+${doctorContext}
+
+${instructionsContext}
+
+CONTEÚDO MÉDICO PARA TRANSFORMAR EM LINGUAGEM ACESSÍVEL AO PACIENTE:
+${text}
+
+${patientHistory && patientHistory.length > 0 ? `
+HISTÓRICO DO PACIENTE:
+${patientHistory.map((record: any) => {
+  return `Data: ${new Date(record.created_at).toLocaleDateString('pt-BR')}\n` +
+         `Resumo: ${record.summary || 'Não disponível'}\n` +
+         `Nota Clínica: ${record.clinical_note || 'Não disponível'}\n` + 
+         `Prescrição: ${record.prescription || 'Não disponível'}\n\n`;
+}).join('---\n')}` : ''}
+
+TRANSFORME O CONTEÚDO ACIMA EM UMA EXPLICAÇÃO ATRATIVA E ACESSÍVEL PARA O PACIENTE NO ESTILO DO GAMMA.APP.
+`;
+  } else {
+    // For regular medical document generation with extracted data
+    orchestratorPrompt = `
 ${doctorContext}
 
 ${instructionsContext}
@@ -297,6 +350,7 @@ ${patientHistory.map((record: any) => {
          `Prescrição: ${record.prescription || 'Não disponível'}\n\n`;
 }).join('---\n')}` : ''}
 `;
+  }
 
   const orchestratorResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -374,8 +428,8 @@ serve(async (req) => {
       throw new Error('No text provided');
     }
 
-    if (!mode || !['clinical_note', 'prescription', 'summary', 'structured_data', 'evolution', 'medical_report'].includes(mode)) {
-      throw new Error('Invalid or missing mode. Must be one of: clinical_note, prescription, summary, structured_data, evolution, medical_report');
+    if (!mode || !['clinical_note', 'prescription', 'summary', 'structured_data', 'evolution', 'medical_report', 'patient_friendly'].includes(mode)) {
+      throw new Error('Invalid or missing mode. Must be one of: clinical_note, prescription, summary, structured_data, evolution, medical_report, patient_friendly');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';

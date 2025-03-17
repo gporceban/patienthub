@@ -12,6 +12,7 @@ export type PatientAssessment = {
   clinical_note: string | null;
   prescription: string | null;
   summary: string | null;
+  patient_friendly_summary: string | null; // New field for patient-friendly summary
   structured_data: any | null;
   created_at: string;
   updated_at: string;
@@ -35,6 +36,7 @@ export const fromPatientAssessments = (supabase: any) => {
       clinical_note?: string | null;
       prescription?: string | null;
       summary?: string | null;
+      patient_friendly_summary?: string | null; // Add to insert type
       structured_data?: any | null;
       id?: string;
     }) => {
@@ -55,6 +57,13 @@ export const fromPatientAssessments = (supabase: any) => {
         .from('patient_assessments')
         .select('*')
         .eq('doctor_id', doctorId)
+        .order('created_at', { ascending: false }) as any;
+    },
+    getByProntuarioId: (prontuarioId: string) => {
+      return supabase
+        .from('patient_assessments')
+        .select('*')
+        .eq('prontuario_id', prontuarioId)
         .order('created_at', { ascending: false }) as any;
     }
   };

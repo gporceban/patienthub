@@ -29,9 +29,18 @@ const Layout: React.FC<LayoutProps> = ({
   const effectiveUserType = userType || profile?.user_type;
   
   // If user is logged in and trying to access the wrong module (doctor accessing patient or vice versa)
-  if (!isLoading && profile && contextUserType && userType) {
-    if (contextUserType !== userType) {
+  if (!isLoading && profile && contextUserType) {
+    // Check if userType is explicitly provided and doesn't match context
+    if (userType && contextUserType !== userType) {
       console.warn(`User type mismatch: context=${contextUserType}, requested=${userType}`);
+      // Redirect to correct dashboard based on user type
+      const correctPath = contextUserType === 'medico' ? '/medico' : '/paciente';
+      return <Navigate to={correctPath} replace />;
+    }
+    
+    // Check if URL path doesn't match the user's type
+    if (currentPath !== contextUserType && (currentPath === 'medico' || currentPath === 'paciente')) {
+      console.warn(`Path type mismatch: context=${contextUserType}, path=${currentPath}`);
       // Redirect to correct dashboard based on user type
       const correctPath = contextUserType === 'medico' ? '/medico' : '/paciente';
       return <Navigate to={correctPath} replace />;

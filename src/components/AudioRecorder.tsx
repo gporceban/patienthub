@@ -15,12 +15,17 @@ interface AudioRecorderProps {
     summary?: string;
     structured_data?: any;
   }) => void;
+  patientInfo?: {
+    prontuarioId?: string;
+    email?: string;
+  };
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
   onTranscriptionComplete,
   onProcessingStart,
-  onProcessingComplete
+  onProcessingComplete,
+  patientInfo
 }) => {
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -252,12 +257,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     setErrorMessage('');
     
     try {
+      // Include patient history in the request if available
+      const patientHistoryParam = patientInfo ? {
+        prontuarioId: patientInfo.prontuarioId,
+        email: patientInfo.email
+      } : null;
+      
       // Process the transcription with OpenAI's agentic system to generate clinical documents
       const { data, error } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
           mode: 'clinical_note',
-          reviewRequired: true
+          reviewRequired: true,
+          patientInfo: patientHistoryParam
         }
       });
       
@@ -270,7 +282,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         body: { 
           text: transcription,
           mode: 'summary',
-          reviewRequired: true
+          reviewRequired: true,
+          patientInfo: patientHistoryParam
         }
       });
       
@@ -283,7 +296,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         body: { 
           text: transcription,
           mode: 'prescription',
-          reviewRequired: true
+          reviewRequired: true,
+          patientInfo: patientHistoryParam
         }
       });
       
@@ -296,7 +310,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         body: { 
           text: transcription,
           mode: 'structured_data',
-          reviewRequired: false
+          reviewRequired: false,
+          patientInfo: patientHistoryParam
         }
       });
       
@@ -305,9 +320,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       }
       
       setProcessingComplete(true);
+      const historyMessage = patientInfo ? "integrado com histórico do paciente" : "";
+      
       toast({
         title: "Documentos gerados",
-        description: "Nota clínica, prescrição e resumo foram gerados pelos agentes IA com sucesso."
+        description: `Nota clínica, prescrição e resumo foram gerados pelos agentes IA com sucesso ${historyMessage}.`
       });
       
       onProcessingComplete({
@@ -335,7 +352,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       <div className="flex flex-col items-center">
         <h3 className="text-lg font-medium mb-2">Gravação de Áudio</h3>
         <p className="text-sm text-gray-400 mb-4">
-          Grave a consulta para gerar documentos automaticamente utilizando Agentes IA especializados
+          {patientInfo ? "Grave a consulta para gerar documentos integrados com o histórico do paciente" : "Grave a consulta para gerar documentos automaticamente utilizando Agentes IA especializados"}
         </p>
         
         <div className="flex gap-4 mb-4">

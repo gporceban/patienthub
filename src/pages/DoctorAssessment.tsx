@@ -11,8 +11,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import AudioRecorder from '@/components/AudioRecorder';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, PencilLine, Check, RotateCcw } from 'lucide-react';
+import { Loader2, PencilLine, Check, RotateCcw, History } from 'lucide-react';
 import PatientInfoForm, { PatientInfo } from '@/components/PatientInfoForm';
+import { PatientAssessment } from '@/types/patientAssessments';
 
 const DoctorAssessment = () => {
   const { user } = useContext(AuthContext);
@@ -26,12 +27,18 @@ const DoctorAssessment = () => {
   const [clinicalNote, setClinicalNote] = useState('');
   const [prescription, setPrescription] = useState('');
   const [transcription, setTranscription] = useState('');
+  const [patientFriendlySummary, setPatientFriendlySummary] = useState('');
   const [structuredData, setStructuredData] = useState<any>(null);
+  
+  // Previous assessments state
+  const [previousAssessments, setPreviousAssessments] = useState<PatientAssessment[]>([]);
+  const [hasPreviousAssessments, setHasPreviousAssessments] = useState(false);
   
   // Editing state for human-in-the-loop
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [isEditingClinicalNote, setIsEditingClinicalNote] = useState(false);
   const [isEditingPrescription, setIsEditingPrescription] = useState(false);
+  const [isEditingPatientSummary, setIsEditingPatientSummary] = useState(false);
   
   // AI instruction state for refinement
   const [aiInstruction, setAiInstruction] = useState('');
@@ -42,6 +49,47 @@ const DoctorAssessment = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [docsGenerated, setDocsGenerated] = useState(false);
+  const [isGeneratingPatientSummary, setIsGeneratingPatientSummary] = useState(false);
+  
+  // Fetch previous assessments when patient info changes
+  useEffect(() => {
+    const fetchPreviousAssessments = async () => {
+      if (patientInfo && patientInfo.prontuarioId) {
+        try {
+          const { data, error } = await supabase
+            .from('patient_assessments')
+            .select('*')
+            .eq('prontuario_id', patientInfo.prontuarioId)
+            .order('created_at', { ascending: false })
+            .limit(5);
+          
+          if (error) throw error;
+          
+          if (data && data.length > 0) {
+            setPreviousAssessments(data);
+            setHasPreviousAssessments(true);
+            
+            toast({
+              title: `${data.length} avaliações anteriores encontradas`,
+              description: "Histórico do paciente será utilizado para gerar uma avaliação mais completa."
+            });
+          } else {
+            setPreviousAssessments([]);
+            setHasPreviousAssessments(false);
+          }
+        } catch (error) {
+          console.error('Error fetching previous assessments:', error);
+          toast({
+            variant: "destructive",
+            title: "Erro ao buscar histórico",
+            description: "Não foi possível recuperar avaliações anteriores do paciente."
+          });
+        }
+      }
+    };
+    
+    fetchPreviousAssessments();
+  }, [patientInfo, toast]);
   
   // Save completed assessment
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,6 +119,7 @@ const DoctorAssessment = () => {
             summary: summary,
             clinical_note: clinicalNote,
             prescription: prescription,
+            patient_friendly_summary: patientFriendlySummary,
             transcription: transcription,
             structured_data: structuredData,
             created_at: new Date().toISOString(),
@@ -108,10 +157,13 @@ const DoctorAssessment = () => {
     setClinicalNote('');
     setPrescription('');
     setTranscription('');
+    setPatientFriendlySummary('');
     setStructuredData(null);
     setDocsGenerated(false);
     setCurrentStep('info');
     setAiInstruction('');
+    setPreviousAssessments([]);
+    setHasPreviousAssessments(false);
   };
   
   // Transcription completion handler
@@ -160,6 +212,50 @@ const DoctorAssessment = () => {
     });
   };
   
+  // Generate patient-friendly summary
+  const generatePatientFriendlySummary = async () => {
+    if (!clinicalNote || !summary) {
+      toast({
+        variant: "destructive",
+        title: "Conteúdo insuficiente",
+        description: "A nota clínica e o resumo são necessários para gerar o sumário para o paciente."
+      });
+      return;
+    }
+    
+    try {
+      setIsGeneratingPatientSummary(true);
+      
+      const { data, error } = await supabase.functions.invoke('process-text', {
+        body: { 
+          text: `Nota Clínica: ${clinicalNote}\n\nResumo: ${summary}`,
+          mode: 'patient_friendly',
+          reviewRequired: true
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.text) {
+        setPatientFriendlySummary(data.text);
+        
+        toast({
+          title: "Sumário para paciente gerado",
+          description: "Um sumário em linguagem acessível foi criado para o paciente."
+        });
+      }
+    } catch (error) {
+      console.error('Error generating patient summary:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao gerar sumário",
+        description: "Não foi possível criar o sumário para o paciente."
+      });
+    } finally {
+      setIsGeneratingPatientSummary(false);
+    }
+  };
+  
   // Regenerate AI content with human instruction
   const submitAiInstruction = async () => {
     if (!transcription || !aiInstruction) {
@@ -180,7 +276,10 @@ const DoctorAssessment = () => {
           text: transcription,
           mode: 'clinical_note',
           reviewRequired: true,
-          additionalInstructions: aiInstruction
+          additionalInstructions: aiInstruction,
+          patientInfo: patientInfo && hasPreviousAssessments ? {
+            prontuarioId: patientInfo.prontuarioId
+          } : null
         }
       });
       
@@ -248,18 +347,27 @@ const DoctorAssessment = () => {
           <div className="bg-darkblue-800/50 p-4 rounded-md border border-darkblue-700 mb-4">
             <p className="text-sm font-medium text-gray-300">Paciente: {patientInfo.name}</p>
             <p className="text-sm font-medium text-gray-300">Prontuário: {patientInfo.prontuarioId}</p>
+            {hasPreviousAssessments && (
+              <div className="mt-2 flex items-center text-gold-500">
+                <History className="h-4 w-4 mr-1" />
+                <p className="text-sm font-medium">{previousAssessments.length} avaliações anteriores encontradas</p>
+              </div>
+            )}
           </div>
           
           <AudioRecorder 
             onTranscriptionComplete={handleTranscriptionComplete}
             onProcessingStart={handleProcessingStart}
             onProcessingComplete={handleProcessingComplete}
+            patientInfo={hasPreviousAssessments ? {
+              prontuarioId: patientInfo.prontuarioId
+            } : undefined}
           />
           
           {transcription && (
             <div className="mt-6">
               <h3 className="text-md font-medium mb-2">Transcrição</h3>
-              <div className="bg-darkblue-900/50 p-4 rounded-md border border-darkblue-700">
+              <div className="bg-darkblue-900/50 p-4 rounded-md border border-darkblue-700 overflow-y-auto max-h-60">
                 <p className="text-sm whitespace-pre-wrap">{transcription}</p>
               </div>
             </div>
@@ -286,111 +394,176 @@ const DoctorAssessment = () => {
             <div className="bg-darkblue-800/50 p-4 rounded-md border border-darkblue-700 mb-6">
               <p className="text-sm font-medium text-gray-300">Paciente: {patientInfo?.name}</p>
               <p className="text-sm font-medium text-gray-300">Prontuário: {patientInfo?.prontuarioId}</p>
+              {hasPreviousAssessments && (
+                <div className="mt-2 flex items-center text-gold-500">
+                  <History className="h-4 w-4 mr-1" />
+                  <p className="text-sm font-medium">{previousAssessments.length} avaliações anteriores integradas</p>
+                </div>
+              )}
             </div>
             
-            {/* Summary field with edit capability */}
-            <div className="space-y-2 mb-6">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-medium leading-none">
-                  Resumo da Avaliação
-                </label>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setIsEditingSummary(!isEditingSummary)}
-                  className="h-7 px-2"
-                >
-                  {isEditingSummary ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
-                </Button>
-              </div>
-              <Textarea
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                className="h-24 bg-darkblue-800/50 border-darkblue-700"
-                readOnly={!isEditingSummary}
-              />
-            </div>
-            
-            {/* Clinical Note field with edit capability */}
-            <div className="space-y-2 mb-6">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-medium leading-none">
-                  Nota Clínica
-                </label>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setIsEditingClinicalNote(!isEditingClinicalNote)}
-                  className="h-7 px-2"
-                >
-                  {isEditingClinicalNote ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
-                </Button>
-              </div>
-              <Textarea
-                value={clinicalNote}
-                onChange={(e) => setClinicalNote(e.target.value)}
-                className="h-32 bg-darkblue-800/50 border-darkblue-700"
-                readOnly={!isEditingClinicalNote}
-              />
-            </div>
-            
-            {/* Prescription field with edit capability */}
-            <div className="space-y-2 mb-6">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-medium leading-none">
-                  Prescrição
-                </label>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setIsEditingPrescription(!isEditingPrescription)}
-                  className="h-7 px-2"
-                >
-                  {isEditingPrescription ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
-                </Button>
-              </div>
-              <Textarea
-                value={prescription}
-                onChange={(e) => setPrescription(e.target.value)}
-                className="h-32 bg-darkblue-800/50 border-darkblue-700"
-                readOnly={!isEditingPrescription}
-              />
-            </div>
-            
-            {/* AI Instruction for feedback to improve content */}
-            <div className="space-y-2 mb-6">
-              <label className="text-sm font-medium leading-none">
-                Instruções para a IA (opcional)
-              </label>
-              <Textarea
-                value={aiInstruction}
-                onChange={(e) => setAiInstruction(e.target.value)}
-                placeholder="Instrua a IA para melhorar a nota clínica, ex: 'Adicione mais detalhes sobre o tratamento' ou 'Foque mais nos sintomas respiratórios'"
-                className="h-24 bg-darkblue-800/50 border-darkblue-700"
-              />
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={submitAiInstruction}
-                disabled={isSubmittingInstruction || !aiInstruction}
-                className="w-full"
-              >
-                {isSubmittingInstruction ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processando instruções...
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Atualizar documentação com instruções
-                  </>
-                )}
-              </Button>
-            </div>
+            <Tabs defaultValue="medical" className="w-full mb-6">
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="medical">Documentação Médica</TabsTrigger>
+                <TabsTrigger value="patient">Sumário para Paciente</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="medical" className="space-y-6 pt-4">
+                {/* Summary field with edit capability */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium leading-none">
+                      Resumo da Avaliação
+                    </label>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setIsEditingSummary(!isEditingSummary)}
+                      className="h-7 px-2"
+                    >
+                      {isEditingSummary ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={summary}
+                    onChange={(e) => setSummary(e.target.value)}
+                    className="h-24 bg-darkblue-800/50 border-darkblue-700"
+                    readOnly={!isEditingSummary}
+                  />
+                </div>
+                
+                {/* Clinical Note field with edit capability */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium leading-none">
+                      Nota Clínica
+                    </label>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setIsEditingClinicalNote(!isEditingClinicalNote)}
+                      className="h-7 px-2"
+                    >
+                      {isEditingClinicalNote ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={clinicalNote}
+                    onChange={(e) => setClinicalNote(e.target.value)}
+                    className="h-32 bg-darkblue-800/50 border-darkblue-700"
+                    readOnly={!isEditingClinicalNote}
+                  />
+                </div>
+                
+                {/* Prescription field with edit capability */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium leading-none">
+                      Prescrição
+                    </label>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setIsEditingPrescription(!isEditingPrescription)}
+                      className="h-7 px-2"
+                    >
+                      {isEditingPrescription ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={prescription}
+                    onChange={(e) => setPrescription(e.target.value)}
+                    className="h-32 bg-darkblue-800/50 border-darkblue-700"
+                    readOnly={!isEditingPrescription}
+                  />
+                </div>
+                
+                {/* AI Instruction for feedback to improve content */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">
+                    Instruções para a IA (opcional)
+                  </label>
+                  <Textarea
+                    value={aiInstruction}
+                    onChange={(e) => setAiInstruction(e.target.value)}
+                    placeholder="Instrua a IA para melhorar a nota clínica, ex: 'Adicione mais detalhes sobre o tratamento' ou 'Foque mais nos sintomas respiratórios'"
+                    className="h-24 bg-darkblue-800/50 border-darkblue-700"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={submitAiInstruction}
+                    disabled={isSubmittingInstruction || !aiInstruction}
+                    className="w-full"
+                  >
+                    {isSubmittingInstruction ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processando instruções...
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Atualizar documentação com instruções
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="patient" className="space-y-6 pt-4">
+                {/* Patient-friendly summary */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium leading-none">
+                      Sumário para o Paciente
+                    </label>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setIsEditingPatientSummary(!isEditingPatientSummary)}
+                      className="h-7 px-2"
+                      disabled={!patientFriendlySummary}
+                    >
+                      {isEditingPatientSummary ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={patientFriendlySummary}
+                    onChange={(e) => setPatientFriendlySummary(e.target.value)}
+                    className="h-64 bg-darkblue-800/50 border-darkblue-700"
+                    readOnly={!isEditingPatientSummary}
+                    placeholder={patientFriendlySummary ? "" : "Clique em 'Gerar sumário para paciente' para criar um resumo em linguagem acessível."}
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={generatePatientFriendlySummary}
+                    disabled={isGeneratingPatientSummary || !clinicalNote || !summary}
+                    className="w-full"
+                  >
+                    {isGeneratingPatientSummary ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Gerando sumário para paciente...
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        {patientFriendlySummary ? "Regenerar sumário para paciente" : "Gerar sumário para paciente"}
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-gray-400 italic">
+                    Este sumário será apresentado ao paciente em linguagem não-técnica, similar ao estilo visual do Gamma.app
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
             
             <div className="flex gap-4">
               <Button 
