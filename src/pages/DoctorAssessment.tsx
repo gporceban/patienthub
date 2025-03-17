@@ -12,11 +12,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import AudioRecorder from '@/components/AudioRecorder';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2 } from 'lucide-react';
 
 const DoctorAssessment = () => {
   const { user } = useContext(AuthContext);
   const { toast } = useToast();
   
+  // Form fields
   const [patientName, setPatientName] = useState('');
   const [patientEmail, setPatientEmail] = useState('');
   const [prontuarioId, setProntuarioId] = useState('');
@@ -25,14 +27,24 @@ const DoctorAssessment = () => {
   const [prescription, setPrescription] = useState('');
   const [transcription, setTranscription] = useState('');
   const [structuredData, setStructuredData] = useState<any>(null);
+  
+  // State management
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTab, setCurrentTab] = useState('form');
+  const [docsGenerated, setDocsGenerated] = useState(false);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user) return;
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Usuário não autenticado",
+        description: "Você precisa estar logado para salvar uma avaliação."
+      });
+      return;
+    }
     
     try {
       setIsSaving(true);
@@ -73,6 +85,7 @@ const DoctorAssessment = () => {
       setPrescription('');
       setTranscription('');
       setStructuredData(null);
+      setDocsGenerated(false);
       
     } catch (error) {
       console.error('Error saving assessment:', error);
@@ -92,6 +105,7 @@ const DoctorAssessment = () => {
   
   const handleProcessingStart = () => {
     setIsProcessing(true);
+    setDocsGenerated(false);
   };
   
   const handleProcessingComplete = (data: {
@@ -106,6 +120,7 @@ const DoctorAssessment = () => {
     if (data.structured_data) setStructuredData(data.structured_data);
     
     setIsProcessing(false);
+    setDocsGenerated(true);
     
     // If we got patient info from the structured data, use it
     if (data.structured_data?.paciente) {
@@ -120,6 +135,11 @@ const DoctorAssessment = () => {
     
     // Switch to form tab to show the results
     setCurrentTab('form');
+    
+    toast({
+      title: "Documentos gerados com sucesso",
+      description: "Os documentos clínicos foram gerados e inseridos nos campos do formulário."
+    });
   };
   
   return (
@@ -133,8 +153,21 @@ const DoctorAssessment = () => {
       
       <Tabs value={currentTab} onValueChange={setCurrentTab} className="max-w-2xl">
         <TabsList className="grid grid-cols-2 mb-6">
-          <TabsTrigger value="form">Formulário</TabsTrigger>
-          <TabsTrigger value="audio">Gravação de Áudio</TabsTrigger>
+          <TabsTrigger value="form" className="relative">
+            Formulário
+            {docsGenerated && (
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="audio">
+            Gravação de Áudio
+            {isProcessing && (
+              <Loader2 className="h-3 w-3 ml-2 animate-spin" />
+            )}
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="audio" className="space-y-4">

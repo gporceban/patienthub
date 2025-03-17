@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Mic, Square, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import AudioRecorderStatus from './AudioRecorderStatus';
 
 interface AudioRecorderProps {
   onTranscriptionComplete: (transcription: string) => void;
@@ -21,14 +22,23 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   onProcessingStart,
   onProcessingComplete
 }) => {
+  // Recording states
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  
+  // Processing states
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [transcriptionComplete, setTranscriptionComplete] = useState(false);
+  const [processingComplete, setProcessingComplete] = useState(false);
+  
+  // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
 
+  // Cleanup on component unmount
   useEffect(() => {
     return () => {
       if (mediaRecorderRef.current && isRecording) {
@@ -38,7 +48,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   }, [isRecording]);
 
   const startRecording = async () => {
+    // Reset all states
+    setHasError(false);
+    setTranscriptionComplete(false);
+    setProcessingComplete(false);
     audioChunksRef.current = [];
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -66,6 +81,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       });
     } catch (error) {
       console.error('Erro ao acessar o microfone:', error);
+      setHasError(true);
       toast({
         variant: "destructive",
         title: "Erro ao acessar o microfone",
@@ -96,6 +112,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
 
     setIsTranscribing(true);
+    setHasError(false);
     
     try {
       // Convert blob to base64
@@ -118,6 +135,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
         
         if (data?.text) {
+          setTranscriptionComplete(true);
           toast({
             title: "Transcrição completa",
             description: "O áudio foi transcrito com sucesso."
@@ -133,6 +151,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       };
     } catch (error) {
       console.error('Erro ao transcrever áudio:', error);
+      setHasError(true);
       toast({
         variant: "destructive",
         title: "Erro na transcrição",
@@ -146,6 +165,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const processTranscription = async (transcription: string) => {
     onProcessingStart();
     setIsProcessing(true);
+    setHasError(false);
     
     try {
       // Process the transcription with OpenAI to generate clinical documents
@@ -161,7 +181,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         throw error;
       }
       
-      // Now get the summary
+      // Get the summary
       const { data: summaryData, error: summaryError } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -174,7 +194,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         throw summaryError;
       }
       
-      // Now get the prescription
+      // Get the prescription
       const { data: prescriptionData, error: prescriptionError } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -187,7 +207,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         throw prescriptionError;
       }
       
-      // Now get structured data
+      // Get structured data
       const { data: structuredData, error: structuredError } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -200,6 +220,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         throw structuredError;
       }
       
+      setProcessingComplete(true);
       toast({
         title: "Documentos gerados",
         description: "Nota clínica, prescrição e resumo foram gerados com sucesso."
@@ -213,6 +234,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       });
     } catch (error) {
       console.error('Erro ao processar transcrição:', error);
+      setHasError(true);
       toast({
         variant: "destructive",
         title: "Erro no processamento",
@@ -271,14 +293,14 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           )}
         </div>
         
-        {(isTranscribing || isProcessing) && (
-          <div className="flex flex-col items-center">
-            <Loader2 className="h-6 w-6 animate-spin mb-2" />
-            <p className="text-sm text-gray-400">
-              {isTranscribing ? 'Transcrevendo áudio...' : 'Gerando documentos...'}
-            </p>
-          </div>
-        )}
+        <AudioRecorderStatus 
+          isRecording={isRecording}
+          isTranscribing={isTranscribing}
+          isProcessing={isProcessing}
+          hasError={hasError}
+          transcriptionComplete={transcriptionComplete}
+          processingComplete={processingComplete}
+        />
       </div>
     </div>
   );
