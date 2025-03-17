@@ -17,7 +17,7 @@ const Index = () => {
       
       <div className="w-full max-w-md space-y-6 relative z-10">
         <div className="text-center mb-4">
-          <Logo size="medium" />
+          <Logo size="large" />
           <p className="mt-2 text-gray-400">
             Plataforma de acompanhamento ortopédico do Dr. Guilherme Porceban
           </p>
