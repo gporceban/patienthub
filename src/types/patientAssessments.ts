@@ -15,6 +15,9 @@ export type PatientAssessment = {
   structured_data: any | null;
   created_at: string;
   updated_at: string;
+  // Additional fields for the UI
+  status?: 'completed' | 'scheduled' | 'canceled';
+  appointment_date?: string;
 };
 
 // Type-safe query helper for patient_assessments
@@ -39,6 +42,20 @@ export const fromPatientAssessments = (supabase: any) => {
     },
     update: (values: Partial<Omit<PatientAssessment, 'id' | 'created_at' | 'updated_at'>>, id: string) => {
       return supabase.from('patient_assessments').update(values as any).eq('id', id) as any;
+    },
+    getByPatientEmail: (email: string) => {
+      return supabase
+        .from('patient_assessments')
+        .select('*')
+        .eq('patient_email', email)
+        .order('created_at', { ascending: false }) as any;
+    },
+    getByDoctorId: (doctorId: string) => {
+      return supabase
+        .from('patient_assessments')
+        .select('*')
+        .eq('doctor_id', doctorId)
+        .order('created_at', { ascending: false }) as any;
     }
   };
 };

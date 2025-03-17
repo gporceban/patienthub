@@ -1,53 +1,59 @@
-
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import { Toaster } from "@/components/ui/toaster";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import Index from './pages/Index';
 import PatientDashboard from './pages/PatientDashboard';
-import DoctorDashboard from './pages/DoctorDashboard';
-import DoctorAssessment from './pages/DoctorAssessment';
-import DoctorPatients from './pages/DoctorPatients';
-import DoctorDocuments from './pages/DoctorDocuments';
-import NotFound from './pages/NotFound';
+import PatientCalendar from './pages/PatientCalendar';
 import PatientAssessmentsList from './pages/PatientAssessmentsList';
-import PatientAssessment from './pages/PatientAssessment';
 import PatientAssessmentDetails from './pages/PatientAssessmentDetails';
+import PatientRecords from './pages/PatientRecords';
 import PatientProgress from './pages/PatientProgress';
 import PatientAchievements from './pages/PatientAchievements';
-import PatientCalendar from './pages/PatientCalendar';
-import DoctorProfile from './pages/DoctorProfile';
-import StarBackground from './components/StarBackground';
+import DoctorDashboard from './pages/DoctorDashboard';
+import DoctorPatients from './pages/DoctorPatients';
+import DoctorAssessment from './pages/DoctorAssessment';
+import DoctorDocuments from './pages/DoctorDocuments';
 import DoctorCreateTestPatient from './pages/DoctorCreateTestPatient';
-import CalComCallback from './components/CalComCallback';
+import DoctorProfile from './pages/DoctorProfile';
+import CalComCallback from './pages/CalComCallback';
+import NotFound from './pages/NotFound';
+import { Toaster } from "@/components/ui/toaster"
+import DoctorCalendar from './pages/DoctorCalendar';
 
 function App() {
   return (
-    <Router>
+    <BrowserRouter>
       <AuthProvider>
-        <div className="min-h-screen bg-darkblue-950 text-gray-100">
-          <StarBackground />
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/paciente" element={<PatientDashboard />} />
-            <Route path="/paciente/avaliacoes" element={<PatientAssessmentsList />} />
-            <Route path="/paciente/avaliacoes/:id" element={<PatientAssessmentDetails />} />
-            <Route path="/paciente/progresso" element={<PatientProgress />} />
-            <Route path="/paciente/conquistas" element={<PatientAchievements />} />
-            <Route path="/paciente/calendario" element={<PatientCalendar />} />
-            <Route path="/medico" element={<DoctorDashboard />} />
-            <Route path="/medico/avaliacao" element={<DoctorAssessment />} />
-            <Route path="/medico/pacientes" element={<DoctorPatients />} />
-            <Route path="/medico/documentos" element={<DoctorDocuments />} />
-            <Route path="/medico/perfil" element={<DoctorProfile />} />
-            <Route path="/medico/criar-teste" element={<DoctorCreateTestPatient />} />
-            <Route path="/calcom/callback" element={<CalComCallback />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-        </div>
+        <Toaster />
+        <Routes>
+          <Route path="/" element={<Index />} />
+          
+          {/* Patient routes */}
+          <Route path="/paciente" element={<PatientDashboard />} />
+          <Route path="/paciente/agenda" element={<PatientCalendar />} />
+          <Route path="/paciente/avaliacoes" element={<PatientAssessmentsList />} />
+          <Route path="/paciente/avaliacoes/:id" element={<PatientAssessmentDetails />} />
+          <Route path="/paciente/records" element={<PatientRecords />} />
+          <Route path="/paciente/progress" element={<PatientProgress />} />
+          <Route path="/paciente/achievements" element={<PatientAchievements />} />
+          
+          {/* Doctor routes */}
+          <Route path="/medico" element={<DoctorDashboard />} />
+          <Route path="/medico/pacientes" element={<DoctorPatients />} />
+          <Route path="/medico/agenda" element={<DoctorCalendar />} />
+          <Route path="/medico/avaliacao" element={<DoctorAssessment />} />
+          <Route path="/medico/documentos" element={<DoctorDocuments />} />
+          <Route path="/medico/criar-teste" element={<DoctorCreateTestPatient />} />
+          <Route path="/medico/perfil" element={<DoctorProfile />} />
+          
+          {/* Cal.com callback */}
+          <Route path="/calcom/callback" element={<CalComCallback />} />
+          
+          {/* 404 route */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </AuthProvider>
-    </Router>
+    </BrowserRouter>
   );
 }
 

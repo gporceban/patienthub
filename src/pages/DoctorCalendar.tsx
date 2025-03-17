@@ -9,16 +9,17 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { AuthContext } from '@/contexts/AuthContext';
-import { Calendar, Plus, ClipboardList, Link as LinkIcon } from 'lucide-react';
+import { Calendar, ClipboardList, Link as LinkIcon, FileText, Plus } from 'lucide-react';
 import { getCalComOAuthUrl, getCalComToken } from '@/services/calComService';
 import { supabase } from '@/integrations/supabase/client';
 import { fromAppointments } from '@/types/doctorProfile';
 import { PatientAssessment, fromPatientAssessments } from '@/types/patientAssessments';
 import AssessmentCard from '@/components/AssessmentCard';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Link } from 'react-router-dom';
 
-const PatientCalendar = () => {
-  const { user, profile } = useContext(AuthContext);
+const DoctorCalendar = () => {
+  const { user } = useContext(AuthContext);
   const { toast } = useToast();
   
   const [selected, setSelected] = useState<Date | undefined>(new Date());
@@ -44,7 +45,7 @@ const PatientCalendar = () => {
       
       try {
         const { data, error } = await fromAppointments(supabase)
-          .getByPatientId(user.id);
+          .getByDoctorId(user.id);
         
         if (error) {
           throw error;
@@ -64,11 +65,11 @@ const PatientCalendar = () => {
     };
     
     const fetchAssessments = async () => {
-      if (!profile) return;
+      if (!user) return;
       
       try {
         const { data, error } = await fromPatientAssessments(supabase)
-          .getByPatientEmail(profile.email);
+          .getByDoctorId(user.id);
         
         if (error) {
           throw error;
@@ -82,7 +83,7 @@ const PatientCalendar = () => {
         toast({
           variant: "destructive",
           title: "Erro ao carregar avaliações",
-          description: "Não foi possível carregar suas avaliações. Tente novamente mais tarde."
+          description: "Não foi possível carregar as avaliações. Tente novamente mais tarde."
         });
       } finally {
         setIsLoading(false);
@@ -92,7 +93,7 @@ const PatientCalendar = () => {
     checkCalComConnection();
     fetchAppointments();
     fetchAssessments();
-  }, [user, profile, toast]);
+  }, [user, toast]);
   
   const handleConnectCalCom = () => {
     const redirectUri = `${window.location.origin}/calcom/callback`;
@@ -119,11 +120,11 @@ const PatientCalendar = () => {
   };
   
   return (
-    <Layout userType="paciente">
+    <Layout userType="medico">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Meu Calendário</h1>
+        <h1 className="text-2xl font-bold mb-2">Agenda Médica</h1>
         <p className="text-gray-400">
-          Visualize e gerencie suas consultas e avaliações
+          Visualize e gerencie suas consultas e avaliações agendadas
         </p>
       </div>
       
@@ -149,7 +150,7 @@ const PatientCalendar = () => {
               <Card className="card-gradient p-6 text-center">
                 <h3 className="text-xl font-medium mb-4">Conecte seu Calendário</h3>
                 <p className="text-gray-400 mb-6">
-                  Conecte sua conta ao Cal.com para gerenciar suas consultas de forma mais eficiente.
+                  Conecte sua conta ao Cal.com para gerenciar sua agenda de forma mais eficiente.
                 </p>
                 <Button 
                   onClick={handleConnectCalCom} 
@@ -169,7 +170,7 @@ const PatientCalendar = () => {
                 </p>
                 <Button className="bg-gold-500 hover:bg-gold-600 text-black">
                   <Plus className="h-4 w-4 mr-2" />
-                  Agendar Consulta
+                  Nova Disponibilidade
                 </Button>
               </Card>
             ) : (
@@ -185,7 +186,8 @@ const PatientCalendar = () => {
                           {formatAppointmentDate(appointment.date_time)}
                         </span>
                       </div>
-                      <h3 className="font-semibold">{appointment.location}</h3>
+                      <h3 className="font-semibold">{appointment.patient_name}</h3>
+                      <p className="text-sm text-gray-400">Local: {appointment.location}</p>
                       {appointment.notes && (
                         <p className="text-sm text-gray-400 mt-1">{appointment.notes}</p>
                       )}
@@ -215,6 +217,15 @@ const PatientCalendar = () => {
         
         <TabsContent value="assessments" className="mt-6">
           <div className="space-y-4">
+            <div className="flex justify-end mb-4">
+              <Button asChild className="bg-gold-500 hover:bg-gold-600 text-black">
+                <Link to="/medico/avaliacao">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nova Avaliação
+                </Link>
+              </Button>
+            </div>
+            
             {isLoading ? (
               Array(3).fill(0).map((_, index) => (
                 <Card key={index} className="p-4">
@@ -244,7 +255,7 @@ const PatientCalendar = () => {
                   prontuarioId={assessment.prontuario_id}
                   createdAt={assessment.created_at}
                   summary={assessment.summary}
-                  userType="paciente"
+                  userType="medico"
                   status="completed"
                 />
               ))
@@ -272,4 +283,4 @@ const PatientCalendar = () => {
   );
 };
 
-export default PatientCalendar;
+export default DoctorCalendar;
