@@ -90,7 +90,7 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   }, [isRecording, analyser]);
   
   return (
-    <div className={`w-full h-20 rounded-md overflow-hidden ${isRecording ? 'bg-darkblue-800/80' : 'bg-darkblue-900/50'}`}>
+    <div className={`w-full h-20 rounded-md overflow-hidden ${isRecording ? 'bg-darkblue-800/80' : 'bg-darkblue-900/50'} relative`}>
       <canvas 
         ref={canvasRef} 
         className="w-full h-full" 

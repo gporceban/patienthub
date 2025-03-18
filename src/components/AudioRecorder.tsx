@@ -183,11 +183,20 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     audioChunksRef.current = [];
     
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log("Requesting microphone access...");
+      // Explicitly request audio with these constraints
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      console.log("Microphone access granted:", stream);
       streamRef.current = stream;
       
       // Create audio context and analyser for visualization
-      const context = new AudioContext();
+      const context = new (window.AudioContext || window.webkitAudioContext)();
       const analyserNode = context.createAnalyser();
       analyserNode.fftSize = 2048;
       
@@ -197,24 +206,43 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       setAudioContext(context);
       setAnalyser(analyserNode);
       
-      const mediaRecorder = new MediaRecorder(stream);
+      // Create media recorder with specific options
+      const options = { mimeType: 'audio/webm' };
+      const mediaRecorder = new MediaRecorder(stream, options);
+      console.log("MediaRecorder created:", mediaRecorder);
       mediaRecorderRef.current = mediaRecorder;
       
       mediaRecorder.ondataavailable = (event) => {
+        console.log("Data available:", event.data.size);
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
       
       mediaRecorder.onstop = () => {
+        console.log("MediaRecorder stopped, chunks:", audioChunksRef.current.length);
+        if (audioChunksRef.current.length === 0) {
+          setHasError(true);
+          setErrorMessage('Nenhum áudio capturado. Verifique se o microfone está funcionando corretamente.');
+          toast({
+            variant: "destructive",
+            title: "Erro na gravação",
+            description: "Nenhum áudio foi capturado. Verifique seu microfone."
+          });
+          return;
+        }
+        
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
+        console.log("Created audio blob:", audioBlob.size);
         setAudioBlob(audioBlob);
         
         // Stop all tracks to release the microphone
         stream.getTracks().forEach(track => track.stop());
       };
       
-      mediaRecorder.start();
+      // Start recording with timeslice to get frequent ondataavailable events
+      mediaRecorder.start(1000); // get data every second
+      console.log("MediaRecorder started");
       setIsRecording(true);
       toast({
         title: "Gravação iniciada",
@@ -223,7 +251,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     } catch (error) {
       console.error('Erro ao acessar o microfone:', error);
       setHasError(true);
-      setErrorMessage('Erro ao acessar o microfone. Verifique permissões.');
+      setErrorMessage('Erro ao acessar o microfone. Verifique permissões de navegador e hardware.');
       toast({
         variant: "destructive",
         title: "Erro ao acessar o microfone",
@@ -233,6 +261,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   };
 
   const stopRecording = () => {
+    console.log("Stopping recording...");
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -240,6 +269,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         title: "Gravação finalizada",
         description: "Áudio capturado com sucesso."
       });
+    } else {
+      console.warn("Attempted to stop recording, but mediaRecorder is not active");
     }
   };
 
@@ -258,6 +289,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     setErrorMessage('');
     
     try {
+      console.log("Starting transcription of audio blob:", audioBlob.size);
       // Convert blob to base64
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
@@ -268,15 +300,18 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           throw new Error('Falha ao converter áudio para base64');
         }
         
+        console.log("Sending audio to transcription API...");
         // Call Supabase Edge Function for transcription
         const { data, error } = await supabase.functions.invoke('transcribe-audio', {
           body: { audio: base64Audio }
         });
         
         if (error) {
+          console.error("Transcription API error:", error);
           throw error;
         }
         
+        console.log("Transcription API response:", data);
         if (data?.text) {
           setTranscriptionComplete(true);
           toast({
