@@ -13,6 +13,8 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
   userType: 'medico' | 'paciente' | null;
   refreshAuth: () => Promise<void>;
+  hasValidSession: boolean; // Added to track if session is valid
+  isInitialized: boolean;   // Added to track initialization state
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -25,6 +27,8 @@ export const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
   refreshProfile: async () => {},
   refreshAuth: async () => {},
+  hasValidSession: false,
+  isInitialized: false,
 });
 
 interface AuthProviderProps {
@@ -39,6 +43,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<Error | null>(null);
   const [userType, setUserType] = useState<'medico' | 'paciente' | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [hasValidSession, setHasValidSession] = useState(false);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -61,6 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Set user type based on the profile data
       if (profileData?.user_type) {
         setUserType(profileData.user_type as 'medico' | 'paciente');
+        console.log(`User type set to: ${profileData.user_type}`);
       }
     } catch (err: any) {
       console.error("Profile fetch error:", err.message);
@@ -83,6 +89,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (result.success && result.session) {
         setSession(result.session);
         setUser(result.session.user);
+        setHasValidSession(true);
         
         if (result.session.user) {
           await fetchProfile(result.session.user.id);
@@ -93,10 +100,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setProfile(null);
         setSession(null);
         setUserType(null);
+        setHasValidSession(false);
       }
     } catch (err: any) {
       console.error("Auth refresh error:", err.message);
       setError(err);
+      setHasValidSession(false);
     } finally {
       setIsLoading(false);
     }
@@ -132,6 +141,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setProfile(null);
       setSession(null);
       setUserType(null);
+      setHasValidSession(false);
     } catch (err: any) {
       console.error("Sign Out Error:", err.message);
       setError(err);
@@ -160,11 +170,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (initialSession?.user) {
           setSession(initialSession);
           setUser(initialSession.user);
+          setHasValidSession(true);
           await fetchProfile(initialSession.user.id);
         }
       } catch (err: any) {
         console.error("Session initialization error:", err.message);
         setError(err);
+        setHasValidSession(false);
       } finally {
         setIsLoading(false);
         setIsInitialized(true);
@@ -190,6 +202,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log("User signed in:", currentSession.user.id);
         setSession(currentSession);
         setUser(currentSession.user);
+        setHasValidSession(true);
         await fetchProfile(currentSession.user.id);
       } else if (event === 'SIGNED_OUT') {
         console.log("User signed out");
@@ -197,12 +210,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setProfile(null);
         setSession(null);
         setUserType(null);
+        setHasValidSession(false);
       } else if (event === 'TOKEN_REFRESHED' && currentSession) {
         console.log("Token refreshed for user:", currentSession.user.id);
         setSession(currentSession);
+        setHasValidSession(true);
       } else if (event === 'USER_UPDATED' && currentSession) {
         console.log("User updated:", currentSession.user.id);
         setUser(currentSession.user);
+        setHasValidSession(true);
         await fetchProfile(currentSession.user.id);
       }
     });
@@ -224,6 +240,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signOut,
     refreshProfile,
     refreshAuth,
+    hasValidSession,
+    isInitialized,
   };
 
   return (
@@ -232,3 +250,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+

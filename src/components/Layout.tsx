@@ -1,12 +1,13 @@
 
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
-import { useLocation, Navigate } from 'react-router-dom';
+import { useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Menu } from 'lucide-react';
 import { Button } from './ui/button';
+import { toast } from './ui/use-toast';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -20,33 +21,86 @@ const Layout: React.FC<LayoutProps> = ({
   userName
 }) => {
   const location = useLocation();
-  const { profile, userType: contextUserType, isLoading } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const { 
+    profile, 
+    userType: contextUserType, 
+    isLoading, 
+    hasValidSession, 
+    isInitialized 
+  } = useContext(AuthContext);
+  
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   
-  // Check if the current route matches the user's type from context
-  const currentPath = location.pathname.split('/')[1]; // 'medico' or 'paciente'
-  const effectiveUserType = userType || profile?.user_type;
+  // Get the current base path (medico or paciente)
+  const currentPathBase = location.pathname.split('/')[1]; 
   
-  // If user is logged in and trying to access the wrong module (doctor accessing patient or vice versa)
-  if (!isLoading && profile && contextUserType) {
-    // Check if userType is explicitly provided and doesn't match context
-    if (userType && contextUserType !== userType) {
-      console.warn(`User type mismatch: context=${contextUserType}, requested=${userType}`);
-      // Redirect to correct dashboard based on user type
-      const correctPath = contextUserType === 'medico' ? '/medico' : '/paciente';
-      return <Navigate to={correctPath} replace />;
+  // Determine if this is a protected route
+  const isProtectedRoute = currentPathBase === 'medico' || currentPathBase === 'paciente';
+  
+  // Check for user type mismatch (user tries to access the wrong module)
+  useEffect(() => {
+    if (isInitialized && !isLoading && hasValidSession && profile && contextUserType) {
+      // Explicitly provided userType takes precedence
+      const effectiveUserType = userType || contextUserType;
+      
+      // Only execute this if we're on a protected route
+      if (isProtectedRoute) {
+        // Check for a mismatch between URL path and user type
+        if (currentPathBase !== contextUserType) {
+          console.warn(
+            `User type mismatch: context=${contextUserType}, path=${currentPathBase}`,
+            "Redirecting to correct dashboard"
+          );
+          
+          // Prevent multiple redirects
+          if (!redirecting) {
+            setRedirecting(true);
+            
+            // Redirect to correct dashboard based on user type
+            const correctPath = contextUserType === 'medico' ? '/medico' : '/paciente';
+            
+            toast({
+              title: "Acesso não permitido",
+              description: `Redirecionando para sua área ${contextUserType === 'medico' ? 'do médico' : 'do paciente'}.`,
+              variant: "destructive"
+            });
+            
+            // Use setTimeout to allow the toast to be shown
+            setTimeout(() => {
+              navigate(correctPath, { replace: true });
+              setRedirecting(false);
+            }, 1000);
+          }
+          
+          // Return early to prevent rendering the wrong content
+          return;
+        }
+      }
     }
-    
-    // Check if URL path doesn't match the user's type
-    if (currentPath !== contextUserType && (currentPath === 'medico' || currentPath === 'paciente')) {
-      console.warn(`Path type mismatch: context=${contextUserType}, path=${currentPath}`);
-      // Redirect to correct dashboard based on user type
-      const correctPath = contextUserType === 'medico' ? '/medico' : '/paciente';
-      return <Navigate to={correctPath} replace />;
-    }
+  }, [
+    profile, 
+    contextUserType, 
+    currentPathBase, 
+    navigate, 
+    isLoading, 
+    userType, 
+    isProtectedRoute, 
+    hasValidSession,
+    isInitialized,
+    redirecting
+  ]);
+  
+  // If user is not authenticated and tries to access a protected route
+  if (isInitialized && !isLoading && !hasValidSession && isProtectedRoute) {
+    console.log("User not authenticated, redirecting to login page");
+    return <Navigate to="/" replace />;
   }
   
+  // Determine if we should show the sidebar
+  const effectiveUserType = userType || profile?.user_type;
   const showSidebar = effectiveUserType && location.pathname !== '/';
   
   return (

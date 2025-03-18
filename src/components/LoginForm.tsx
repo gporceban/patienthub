@@ -8,39 +8,38 @@ import { User, RefreshCcw } from 'lucide-react';
 import { supabase, clearAuthState } from '@/integrations/supabase/client';
 import { AuthContext } from '@/contexts/AuthContext';
 
-interface ExtendedAuthContext {
-  user: any | null;
-  profile: any | null;
-  loading?: boolean;
-  error: Error | null;
-  refreshProfile?: () => Promise<void>;
-  signOut?: () => Promise<void>;
-  isLoading: boolean;
-}
-
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const navigate = useNavigate();
-  const auth = useContext(AuthContext) as ExtendedAuthContext;
-  const { user, profile, isLoading: loading, error } = auth;
+  const { 
+    user, 
+    profile, 
+    isLoading: authLoading, 
+    error: authError, 
+    refreshProfile,
+    hasValidSession,
+    isInitialized 
+  } = useContext(AuthContext);
   
-  // Define a refreshProfile function if it doesn't exist in the context
-  const refreshProfile = auth.refreshProfile || (async () => {
-    console.log("Refresh profile function not provided in context");
-  });
-
   useEffect(() => {
-    console.log("LoginForm rendered. Auth state:", { user: !!user, profile, loading, error });
+    console.log("LoginForm rendered. Auth state:", { 
+      user: !!user, 
+      profile, 
+      loading: authLoading, 
+      error: authError,
+      hasValidSession,
+      isInitialized
+    });
     
-    // Only redirect if we have both user and profile with user_type
-    if (!loading && user && profile?.user_type) {
+    // Only redirect if we have both user and profile with user_type and not already redirecting
+    if (isInitialized && !authLoading && user && profile?.user_type && hasValidSession) {
       console.log("User already logged in with complete profile, redirecting to:", profile.user_type);
       redirectBasedOnUserType(profile.user_type);
     }
-  }, [user, profile, loading]);
+  }, [user, profile, authLoading, hasValidSession, isInitialized]);
 
   const redirectBasedOnUserType = (userType: string) => {
     console.log(`Attempting to redirect user to /${userType} page`);
@@ -142,7 +141,9 @@ const LoginForm: React.FC = () => {
         });
         
         // Force a refresh of the profile in the global context
-        await refreshProfile();
+        if (refreshProfile) {
+          await refreshProfile();
+        }
         
         // Then redirect based on the user type from the profile we just fetched
         redirectBasedOnUserType(userType);
@@ -187,13 +188,13 @@ const LoginForm: React.FC = () => {
   };
 
   // If there's an auth error, show it
-  if (error) {
+  if (authError) {
     return (
       <div className="text-center">
         <p className="text-red-400 text-lg font-semibold mb-4">
           Erro de autenticação
         </p>
-        <p className="text-red-300 mb-4">{error.message}</p>
+        <p className="text-red-300 mb-4">{authError.message}</p>
         <div className="flex flex-col space-y-3">
           <button 
             onClick={handleClearSession}
@@ -207,7 +208,7 @@ const LoginForm: React.FC = () => {
   }
 
   // If already logged in, show a message or redirect
-  if (!loading && user && profile) {
+  if (isInitialized && !authLoading && user && profile && hasValidSession) {
     return (
       <div className="text-center">
         <p className="text-amber-300/90 text-lg font-semibold mb-4">
@@ -273,9 +274,9 @@ const LoginForm: React.FC = () => {
         <button 
           className="button-gold-gradient w-full px-6 py-2 rounded-lg font-semibold transition-all"
           onClick={handleLogin}
-          disabled={isLoading}
+          disabled={isLoading || authLoading}
         >
-          {isLoading ? 'Processando...' : 'Entrar'}
+          {isLoading || authLoading ? 'Processando...' : 'Entrar'}
         </button>
       </div>
       
@@ -285,7 +286,7 @@ const LoginForm: React.FC = () => {
         </button>
       </div>
       
-      {(user || loading) && (
+      {(user || authLoading) && (
         <div className="mt-6 text-center">
           <button 
             onClick={handleClearSession}

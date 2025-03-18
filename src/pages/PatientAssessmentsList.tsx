@@ -20,7 +20,7 @@ interface PatientAssessment {
 }
 
 const PatientAssessmentsList = () => {
-  const { user, profile } = useContext(AuthContext);
+  const { user, profile, isLoading: authLoading } = useContext(AuthContext);
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,7 +31,7 @@ const PatientAssessmentsList = () => {
   // Fetch patient assessments
   useEffect(() => {
     const fetchPatientAssessments = async () => {
-      if (!profile) return;
+      if (!profile || authLoading) return;
       
       try {
         setIsLoading(true);
@@ -63,7 +63,7 @@ const PatientAssessmentsList = () => {
     };
     
     fetchPatientAssessments();
-  }, [profile, toast]);
+  }, [profile, toast, authLoading]);
   
   // Filter assessments based on search query
   useEffect(() => {
@@ -116,7 +116,7 @@ const PatientAssessmentsList = () => {
         </div>
       </div>
       
-      {isLoading ? (
+      {isLoading || authLoading ? (
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-gold-500" />
         </div>
