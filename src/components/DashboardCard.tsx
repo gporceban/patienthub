@@ -17,8 +17,8 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   color = 'darkblue' 
 }) => {
   const colorVariants = {
-    darkblue: 'from-darkblue-700/20 to-darkblue-900/40 border-darkblue-600/30',
-    gold: 'from-gold-700/20 to-gold-900/40 border-gold-600/30',
+    darkblue: 'from-darkblue-600/30 to-darkblue-800/50 border-darkblue-600/40',
+    gold: 'from-gold-500/30 to-gold-700/50 border-gold-500/40',
   };
 
   return (
@@ -26,10 +26,10 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
       <div className="p-6">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-sm text-gray-400 mb-1">{title}</p>
+            <p className="text-sm text-gray-300 mb-1 font-medium">{title}</p>
             <h3 className="text-2xl font-bold gold-text">{value}</h3>
           </div>
-          <div className="p-2 rounded-full bg-darkblue-800/50 border border-darkblue-700/50">
+          <div className="p-2 rounded-full bg-darkblue-700/60 border border-darkblue-600/50">
             <Icon size={20} className="text-gold-400" />
           </div>
         </div>

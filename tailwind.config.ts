@@ -63,32 +63,32 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Custom colors
+				// Enhanced custom colors with improved contrast
 				darkblue: {
-					50: '#e6f1ff',
-					100: '#cce3ff',
-					200: '#99c7ff',
-					300: '#66aaff',
-					400: '#338eff',
-					500: '#0072ff',
-					600: '#005bcc',
-					700: '#004499',
-					800: '#002e66',
-					900: '#001733',
-					950: '#000c1a',
+					50: '#e8f1ff',
+					100: '#d0e3ff',
+					200: '#aac7ff',
+					300: '#75a9ff',
+					400: '#4389ff',
+					500: '#0966ff', // Increased saturation for better visibility
+					600: '#0052d6', // Improved contrast
+					700: '#003da3', // Improved contrast
+					800: '#002c70', // Improved contrast
+					900: '#001a3d',
+					950: '#000d1f',
 				},
 				gold: {
-					50: '#fffbeb',
-					100: '#fef3c7',
-					200: '#fde68a',
-					300: '#fcd34d',
-					400: '#fbbf24',
-					500: '#f59e0b',
-					600: '#d97706',
-					700: '#b45309',
-					800: '#92400e',
-					900: '#78350f',
-					950: '#451a03',
+					50: '#fff9e6',
+					100: '#fff0c2',
+					200: '#ffe69b',
+					300: '#ffd865',
+					400: '#ffc933', // Improved contrast
+					500: '#f5b300', // More vivid gold
+					600: '#e29400', // Better contrast
+					700: '#bb7800', // Enhanced for visibility
+					800: '#9a6200',
+					900: '#7a4f00',
+					950: '#422b00',
 				},
 				teal: {
 					50: '#f0fdfa',
@@ -107,8 +107,8 @@ export default {
 					50: '#fffbeb',
 					100: '#fef3c7',
 					200: '#fde68a',
-					300: '#fcd34d',
-					400: '#fbbf24',
+					300: '#fbd34d',
+					400: '#fac520', // Improved contrast
 					500: '#f59e0b',
 					600: '#d97706',
 					700: '#b45309',
