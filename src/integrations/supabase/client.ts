@@ -17,7 +17,7 @@ export const supabase = createClient<Database>(
       persistSession: true,
       autoRefreshToken: true,
       storageKey: 'ortho-care-auth-token',
-      detectSessionInUrl: true,
+      detectSessionInUrl: false, // Changed from true to false to prevent automatic URL-based session changes
       flowType: 'pkce', // More secure flow type
     },
     global: {
@@ -28,22 +28,43 @@ export const supabase = createClient<Database>(
   }
 );
 
-// Add debug logging for auth state changes
+// Add debug logging for auth state changes with more detailed information
 supabase.auth.onAuthStateChange((event, session) => {
-  console.log('Supabase Auth State Changed:', event, session?.user?.id || 'No user');
+  console.log(`Supabase Auth State Changed: ${event}`, session ? session.user?.id : 'No user', {
+    event,
+    userId: session?.user?.id,
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// Helper function to clear Supabase session and local storage
+// Enhanced helper function to clear Supabase session and local storage
 export const clearAuthState = async () => {
   try {
-    // Sign out from Supabase
-    await supabase.auth.signOut({ scope: 'local' });
+    console.log('Attempting to clear auth state...');
+    
+    // Sign out from Supabase with explicit scope
+    const { error } = await supabase.auth.signOut({ scope: 'global' }); // Changed from 'local' to 'global' for complete signout
+    
+    if (error) {
+      throw error;
+    }
     
     // Clear the specific auth storage
     window.localStorage.removeItem('ortho-care-auth-token');
     
-    console.log('Auth state cleared successfully');
-    return { success: true };
+    // Clear any other auth-related items in local storage
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('supabase') || key.includes('auth') || key.includes('token'))) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    console.log('Auth state cleared successfully', { keysRemoved: keysToRemove });
+    return { success: true, keysRemoved: keysToRemove };
   } catch (error) {
     console.error('Error clearing auth state:', error);
     return { success: false, error };
