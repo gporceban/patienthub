@@ -65,9 +65,9 @@ serve(async (req) => {
     
     // Prepare form data
     const formData = new FormData();
-    // Use mp3 format which is more widely supported
-    const blob = new Blob([binaryAudio], { type: 'audio/mp3' });
-    formData.append('file', blob, 'audio.mp3');
+    // Use webm format which is what we're getting from MediaRecorder
+    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
+    formData.append('file', blob, 'audio.webm');
     formData.append('model', 'whisper-1');
     
     console.log('Sending request to OpenAI API...');

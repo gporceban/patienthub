@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, Square, Loader2, FileText, Volume2 } from 'lucide-react';
+import { Mic, Square, Loader2, FileText, Volume2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import AudioRecorderStatus from './AudioRecorderStatus';
@@ -214,7 +214,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           return;
         }
         
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         console.log("Created audio blob:", audioBlob.size);
         setAudioBlob(audioBlob);
         
@@ -479,6 +479,13 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           )}
         </div>
         
+        {hasError && (
+          <div className="flex items-center text-red-500 mt-1 mb-2">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            <span className="text-sm">{errorMessage}</span>
+          </div>
+        )}
+        
         <AudioRecorderStatus 
           isRecording={isRecording}
           isTranscribing={isTranscribing}
@@ -495,4 +502,3 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 };
 
 export default AudioRecorder;
-
