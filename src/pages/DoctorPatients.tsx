@@ -158,7 +158,7 @@ const DoctorPatients = () => {
                     size="sm"
                     asChild
                   >
-                    <Link to={`/paciente/avaliacoes/${assessment.id}`}>
+                    <Link to={`/medico/avaliacoes/${assessment.id}`}>
                       Ver Detalhes
                       <ArrowRight size={14} className="ml-2" />
                     </Link>

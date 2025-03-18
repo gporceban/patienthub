@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -42,6 +43,7 @@ function App() {
           <Route path="/medico/pacientes" element={<DoctorPatients />} />
           <Route path="/medico/agenda" element={<DoctorCalendar />} />
           <Route path="/medico/avaliacao" element={<DoctorAssessment />} />
+          <Route path="/medico/avaliacoes/:id" element={<PatientAssessmentDetails />} />
           <Route path="/medico/documentos" element={<DoctorDocuments />} />
           <Route path="/medico/criar-teste" element={<DoctorCreateTestPatient />} />
           <Route path="/medico/perfil" element={<DoctorProfile />} />

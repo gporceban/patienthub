@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useContext } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,6 +16,7 @@ const PatientAssessmentDetails = () => {
   const { id } = useParams<{ id: string }>();
   const { profile, userType } = useContext(AuthContext);
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [assessment, setAssessment] = useState<PatientAssessment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +37,7 @@ const PatientAssessmentDetails = () => {
           
         if (error) throw error;
         
-        const isPatientOwner = profile.email.toLowerCase() === data.patient_email.toLowerCase();
+        const isPatientOwner = userType === 'paciente' && profile.email.toLowerCase() === data.patient_email.toLowerCase();
         const isDoctorOwner = userType === 'medico' && profile.id === data.doctor_id;
         
         if (!isPatientOwner && !isDoctorOwner) {
@@ -44,7 +46,10 @@ const PatientAssessmentDetails = () => {
             title: "Acesso negado",
             description: "Você não tem permissão para visualizar esta avaliação."
           });
-          setIsLoading(false);
+          
+          // Redirect to appropriate dashboard based on user type
+          const redirectPath = userType === 'medico' ? '/medico/pacientes' : '/paciente/avaliacoes';
+          setTimeout(() => navigate(redirectPath), 1000);
           return;
         }
         
@@ -62,7 +67,7 @@ const PatientAssessmentDetails = () => {
     };
     
     fetchAssessmentDetails();
-  }, [id, profile, toast, userType]);
+  }, [id, profile, toast, userType, navigate]);
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -73,6 +78,11 @@ const PatientAssessmentDetails = () => {
       hour: '2-digit',
       minute: '2-digit'
     }).format(date);
+  };
+  
+  // Function to get the correct return path based on user type
+  const getReturnPath = () => {
+    return userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes";
   };
   
   if (isLoading) {
@@ -103,7 +113,7 @@ const PatientAssessmentDetails = () => {
       <Layout userType={userType || "paciente"}>
         <div className="flex items-center mb-6">
           <Button asChild variant="ghost" size="icon" className="mr-2">
-            <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
+            <Link to={getReturnPath()}>
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
@@ -116,7 +126,7 @@ const PatientAssessmentDetails = () => {
           <h2 className="text-xl font-semibold mb-2">Avaliação não disponível</h2>
           <p className="text-gray-400 mb-4">A avaliação solicitada não foi encontrada ou você não tem permissão para acessá-la.</p>
           <Button asChild>
-            <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
+            <Link to={getReturnPath()}>
               Voltar para lista de {userType === 'medico' ? 'pacientes' : 'avaliações'}
             </Link>
           </Button>
@@ -129,7 +139,7 @@ const PatientAssessmentDetails = () => {
     <Layout userType={userType || "paciente"}>
       <div className="flex items-center mb-6">
         <Button asChild variant="ghost" size="icon" className="mr-2">
-          <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
+          <Link to={getReturnPath()}>
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
@@ -264,7 +274,7 @@ const PatientAssessmentDetails = () => {
       
       <div className="flex justify-between mt-8">
         <Button asChild variant="outline">
-          <Link to={userType === 'medico' ? "/medico/pacientes" : "/paciente/avaliacoes"}>
+          <Link to={getReturnPath()}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar para lista
           </Link>
