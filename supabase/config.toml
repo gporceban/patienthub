@@ -29,7 +29,8 @@ jwt_expiry = 3600
 enable_signup = true
 
 [functions]
-port = 54321
+serve_port = 54321
 
-[[functions.serve]]
-handler = "supabase/functions"
+[[functions.http_options]]
+patterns = ["supabase/functions"]
+local_only = false
