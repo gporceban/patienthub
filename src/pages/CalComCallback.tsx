@@ -5,6 +5,7 @@ import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import { calComWrapper } from '@/services/calComWrapper';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/use-toast';
 
 const CalComCallback = () => {
   const location = useLocation();
@@ -32,6 +33,8 @@ const CalComCallback = () => {
           return;
         }
 
+        console.log("Authorization code obtained, processing...");
+
         // Exchange code for token using our wrapper
         const redirectUri = `${window.location.origin}/calcom/callback`;
         const tokenData = await calComWrapper.exchangeCodeForToken(code, redirectUri);
@@ -42,6 +45,8 @@ const CalComCallback = () => {
           return;
         }
 
+        console.log("Token obtained, storing in database...");
+
         // Store the tokens in Supabase
         const success = await calComWrapper.storeTokens(user.id, tokenData);
         
@@ -51,13 +56,30 @@ const CalComCallback = () => {
           return;
         }
 
-        // Redirect to calendar page
+        console.log("Cal.com integration successful!");
+        toast({
+          title: "Conexão bem-sucedida",
+          description: "Sua conta Cal.com foi conectada com sucesso.",
+          variant: "default"
+        });
+
+        // Redirect based on user type
+        const redirectPath = user.user_metadata?.user_type === 'medico' 
+          ? '/medico/calendario' 
+          : '/paciente/calendario';
+
         setIsLoading(false);
-        navigate('/paciente/calendario');
+        navigate(redirectPath);
       } catch (err) {
+        console.error("Cal.com OAuth error:", err);
         setError("Erro ao processar autenticação Cal.com");
         setIsLoading(false);
-        console.error("Cal.com OAuth error:", err);
+        
+        toast({
+          title: "Erro de conexão",
+          description: "Ocorreu um erro ao conectar com o Cal.com. Por favor, tente novamente.",
+          variant: "destructive"
+        });
       }
     };
 
@@ -85,8 +107,8 @@ const CalComCallback = () => {
           <h1 className="text-2xl font-bold mb-4 text-center">Erro de Conexão</h1>
           <p className="text-red-500 text-center mb-6">{error}</p>
           <div className="flex justify-center">
-            <Button onClick={() => navigate('/paciente/calendario')}>
-              Voltar para Calendário
+            <Button onClick={() => navigate(-1)}>
+              Voltar
             </Button>
           </div>
         </div>
@@ -102,8 +124,8 @@ const CalComCallback = () => {
           Sua conta Cal.com foi conectada com sucesso. Agora você pode gerenciar suas consultas diretamente pelo OrthoCareMosaic.
         </p>
         <div className="flex justify-center">
-          <Button onClick={() => navigate('/paciente/calendario')}>
-            Ir para Calendário
+          <Button onClick={() => navigate(-1)}>
+            Continuar
           </Button>
         </div>
       </div>

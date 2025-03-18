@@ -9,8 +9,8 @@ const corsHeaders = {
 };
 
 const CAL_COM_API_URL = "https://api.cal.com/v2";
-const CAL_COM_CLIENT_ID = "cm8cfb46t00dtp81l5a5yre86"; // Updated with provided client ID
-const CAL_COM_CLIENT_SECRET = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcmVEZWZhdWx0RXZlbnRUeXBlc0VuYWJsZWQiOmZhbHNlLCJuYW1lIjoiRHIuIFBvcmNlYmFuIiwicGVybWlzc2lvbnMiOjEwMjMsInJlZGlyZWN0VXJpcyI6WyJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8iXSwiYm9va2luZ1JlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvIiwiYm9va2luZ0NhbmNlbFJlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvL2NhbmNlbCIsImJvb2tpbmdSZXNjaGVkdWxlUmVkaXJlY3RVcmkiOiJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8vYXNzZXNzbWVudCIsImFyZUVtYWlsc0VuYWJsZWQiOnRydWUsImlhdCI6MTc0MjE3NzE3NX0.ruccBtCPGcDWwuuDBkBYOdraCPNHnvdCrr6OPZQw0KU"; // Updated with provided client secret
+const CAL_COM_CLIENT_ID = "cm8cfb46t00dtp81l5a5yre86";
+const CAL_COM_CLIENT_SECRET = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcmVEZWZhdWx0RXZlbnRUeXBlc0VuYWJsZWQiOmZhbHNlLCJuYW1lIjoiRHIuIFBvcmNlYmFuIiwicGVybWlzc2lvbnMiOjEwMjMsInJlZGlyZWN0VXJpcyI6WyJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8iXSwiYm9va2luZ1JlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvIiwiYm9va2luZ0NhbmNlbFJlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvL2NhbmNlbCIsImJvb2tpbmdSZXNjaGVkdWxlUmVkaXJlY3RVcmkiOiJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8vYXNzZXNzbWVudCIsImFyZUVtYWlsc0VuYWJsZWQiOnRydWUsImlhdCI6MTc0MjE3NzE3NX0.ruccBtCPGcDWwuuDBkBYOdraCPNHnvdCrr6OPZQw0KU";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -24,40 +24,17 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Extract the access token from the request
-    const authHeader = req.headers.get('Authorization') || '';
-    const accessToken = authHeader.replace('Bearer ', '');
+    // Get the request body
+    const { refreshToken } = await req.json();
 
-    if (!accessToken) {
+    if (!refreshToken) {
       return new Response(
-        JSON.stringify({ error: 'Access token is required' }),
+        JSON.stringify({ error: 'Refresh token is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Find the user with this access token
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, cal_com_refresh_token')
-      .eq('cal_com_token', accessToken)
-      .maybeSingle();
-
-    if (error || !data) {
-      console.error("Error finding user:", error || "No user found");
-      return new Response(
-        JSON.stringify({ error: 'Failed to find user with this access token' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const refreshToken = data.cal_com_refresh_token;
-    if (!refreshToken) {
-      console.error("Refresh token not found for user:", data.id);
-      return new Response(
-        JSON.stringify({ error: 'Refresh token not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    console.log("Refreshing Cal.com token with refresh token");
 
     // Get a new token from Cal.com
     const response = await fetch(`${CAL_COM_API_URL}/oauth/${CAL_COM_CLIENT_ID}/refresh`, {
@@ -73,40 +50,27 @@ serve(async (req) => {
       const errorData = await response.json();
       console.error("Error refreshing token:", errorData);
       return new Response(
-        JSON.stringify({ error: 'Failed to refresh token' }),
+        JSON.stringify({ error: 'Failed to refresh token', details: errorData }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const tokens = await response.json();
+    console.log("Successfully refreshed Cal.com token");
 
-    // Update the tokens in the database
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        cal_com_token: tokens.accessToken,
-        cal_com_refresh_token: tokens.refreshToken
-      })
-      .eq('id', data.id);
-
-    if (updateError) {
-      console.error("Error updating tokens:", updateError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to update tokens in database' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Return the new access token
+    // Return the new tokens
     return new Response(
-      JSON.stringify({ accessToken: tokens.accessToken }),
+      JSON.stringify({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error("Unexpected error:", error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

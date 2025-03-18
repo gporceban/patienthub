@@ -22,6 +22,7 @@ type CalComUserResponse = {
 /**
  * Cal.com integration wrapper class
  * Provides a simplified interface for interacting with Cal.com API
+ * and integrates with Supabase database
  */
 class CalComWrapper {
   private clientId = 'cm8cfb46t00dtp81l5a5yre86';
@@ -43,6 +44,8 @@ class CalComWrapper {
     redirectUri: string
   ): Promise<CalComTokenResponse | null> {
     try {
+      console.log('Exchanging code for token with redirect URI:', redirectUri);
+      
       const response = await fetch('https://api.cal.com/v2/oauth/token', {
         method: 'POST',
         headers: {
@@ -63,7 +66,9 @@ class CalComWrapper {
         return null;
       }
 
-      return await response.json();
+      const tokenData = await response.json();
+      console.log('Successfully obtained token data');
+      return tokenData;
     } catch (error) {
       console.error('Failed to exchange code for token:', error);
       return null;
@@ -75,6 +80,8 @@ class CalComWrapper {
    */
   public async storeTokens(userId: string, tokens: CalComTokenResponse): Promise<boolean> {
     try {
+      console.log('Storing Cal.com tokens for user:', userId);
+      
       const { error } = await supabase
         .from('profiles')
         .update({ 
@@ -88,6 +95,7 @@ class CalComWrapper {
         return false;
       }
       
+      console.log('Successfully stored Cal.com tokens');
       return true;
     } catch (error) {
       console.error('Error storing Cal.com token:', error);
@@ -107,6 +115,9 @@ class CalComWrapper {
         .maybeSingle();
 
       if (error || !data || !data.cal_com_token) {
+        if (error) {
+          console.error('Error fetching Cal.com token:', error);
+        }
         return null;
       }
 
@@ -122,6 +133,8 @@ class CalComWrapper {
    */
   public async refreshToken(userId: string): Promise<string | null> {
     try {
+      console.log('Attempting to refresh token for user:', userId);
+      
       // Get user refresh token
       const { data, error } = await supabase
         .from('profiles')
@@ -135,21 +148,37 @@ class CalComWrapper {
       }
 
       // Call the edge function to refresh the token
-      const response = await fetch('/api/cal-com-refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${data.cal_com_refresh_token}`,
-        },
+      const response = await supabase.functions.invoke('cal-com-refresh', {
+        body: { refreshToken: data.cal_com_refresh_token }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error refreshing token:', errorData);
+      if (response.error) {
+        console.error('Error invoking cal-com-refresh function:', response.error);
         return null;
       }
 
-      const newTokenData = await response.json();
+      const newTokenData = response.data;
+      
+      if (!newTokenData || !newTokenData.accessToken) {
+        console.error('Invalid response from cal-com-refresh function:', newTokenData);
+        return null;
+      }
+
+      // Update stored tokens
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          cal_com_token: newTokenData.accessToken,
+          cal_com_refresh_token: newTokenData.refreshToken
+        })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('Error updating tokens after refresh:', updateError);
+        return null;
+      }
+
+      console.log('Successfully refreshed Cal.com token');
       return newTokenData.accessToken;
     } catch (error) {
       console.error('Failed to refresh Cal.com token:', error);
@@ -171,6 +200,8 @@ class CalComWrapper {
     }
   ): Promise<CalComUserResponse> {
     try {
+      console.log('Creating Cal.com managed user for user:', userId);
+      
       const response = await supabase.functions.invoke('cal-com-create-user', {
         body: {
           userId,
@@ -178,11 +209,12 @@ class CalComWrapper {
         },
       });
 
-      if (!response.data) {
-        console.error('Error creating Cal.com user:', response.error);
+      if (response.error || !response.data) {
+        console.error('Error creating Cal.com user:', response.error || 'No data returned');
         return { success: false, error: response.error?.message || 'Unknown error' };
       }
 
+      console.log('Successfully created Cal.com managed user:', response.data);
       return { 
         success: true, 
         calComUserId: response.data.calComUser?.id 
@@ -197,8 +229,54 @@ class CalComWrapper {
    * Check if user has a Cal.com connection
    */
   public async isConnected(userId: string): Promise<boolean> {
+    console.log('Checking Cal.com connection for user:', userId);
     const token = await this.getToken(userId);
     return !!token;
+  }
+
+  /**
+   * Get available events for a user
+   */
+  public async getEvents(userId: string): Promise<any[] | null> {
+    try {
+      const token = await this.getToken(userId);
+      
+      if (!token) {
+        const refreshed = await this.refreshToken(userId);
+        if (!refreshed) {
+          console.error('No valid token available for user:', userId);
+          return null;
+        }
+      }
+      
+      // Get the refreshed token
+      const currentToken = await this.getToken(userId);
+      
+      if (!currentToken) {
+        console.error('Failed to get token even after refresh for user:', userId);
+        return null;
+      }
+      
+      const response = await fetch('https://api.cal.com/v2/availability', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Error fetching Cal.com events:', error);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data.events || [];
+    } catch (error) {
+      console.error('Failed to fetch Cal.com events:', error);
+      return null;
+    }
   }
 }
 
