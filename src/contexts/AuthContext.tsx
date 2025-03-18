@@ -1,7 +1,7 @@
 
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User, AuthChangeEvent } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, refreshSession } from '@/integrations/supabase/client';
 
 interface AuthContextType {
   user: User | null;
@@ -12,6 +12,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   userType: 'medico' | 'paciente' | null;
+  refreshAuth: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -23,6 +24,7 @@ export const AuthContext = createContext<AuthContextType>({
   userType: null,
   signOut: async () => {},
   refreshProfile: async () => {},
+  refreshAuth: async () => {},
 });
 
 interface AuthProviderProps {
@@ -70,6 +72,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshProfile = async () => {
     if (!user) return;
     await fetchProfile(user.id);
+  };
+
+  // Function to manually refresh authentication state
+  const refreshAuth = async () => {
+    setIsLoading(true);
+    try {
+      const result = await refreshSession();
+      
+      if (result.success && result.session) {
+        setSession(result.session);
+        setUser(result.session.user);
+        
+        if (result.session.user) {
+          await fetchProfile(result.session.user.id);
+        }
+      } else {
+        // If refresh failed, clear state
+        setUser(null);
+        setProfile(null);
+        setSession(null);
+        setUserType(null);
+      }
+    } catch (err: any) {
+      console.error("Auth refresh error:", err.message);
+      setError(err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const signOut = async () => {
@@ -193,6 +223,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     userType,
     signOut,
     refreshProfile,
+    refreshAuth,
   };
 
   return (

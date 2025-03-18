@@ -6,6 +6,8 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://tokybrabdqqahhbxxpzj.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRva3licmFiZHFxYWhoYnh4cHpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIwODQ0OTMsImV4cCI6MjA1NzY2MDQ5M30.VEUZyulxKhMS3JLtCPnzWaFo8ouJzvMoU5HLneq0Dos";
 
+const STORAGE_KEY = 'ortho-care-auth-token';
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
@@ -16,8 +18,8 @@ export const supabase = createClient<Database>(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      storageKey: 'ortho-care-auth-token',
-      detectSessionInUrl: false, // Changed from true to false to prevent automatic URL-based session changes
+      storageKey: STORAGE_KEY,
+      detectSessionInUrl: false, // Disabled to prevent automatic URL-based session changes
       flowType: 'pkce', // More secure flow type
     },
     global: {
@@ -28,29 +30,33 @@ export const supabase = createClient<Database>(
   }
 );
 
-// Add debug logging for auth state changes with more detailed information
+// Enhanced debug logging for auth state changes with more detailed information
 supabase.auth.onAuthStateChange((event, session) => {
-  console.log(`Supabase Auth State Changed: ${event}`, session ? session.user?.id : 'No user', {
+  console.log(`Supabase Auth State Changed: ${event}`, {
     event,
-    userId: session?.user?.id,
+    userId: session?.user?.id || 'No user',
     timestamp: new Date().toISOString(),
+    sessionExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'N/A',
   });
 });
 
-// Enhanced helper function to clear Supabase session and local storage
+/**
+ * Enhanced helper function to clear Supabase session and local storage
+ * This ensures a complete logout with no lingering session data
+ */
 export const clearAuthState = async () => {
   try {
     console.log('Attempting to clear auth state...');
     
-    // Sign out from Supabase with explicit scope
-    const { error } = await supabase.auth.signOut({ scope: 'global' }); // Changed from 'local' to 'global' for complete signout
+    // Sign out from Supabase with explicit global scope for complete signout
+    const { error } = await supabase.auth.signOut({ scope: 'global' });
     
     if (error) {
       throw error;
     }
     
     // Clear the specific auth storage
-    window.localStorage.removeItem('ortho-care-auth-token');
+    window.localStorage.removeItem(STORAGE_KEY);
     
     // Clear any other auth-related items in local storage
     const keysToRemove = [];
@@ -71,7 +77,34 @@ export const clearAuthState = async () => {
   }
 };
 
-// Helper for checking DB connection status
+/**
+ * Helper function to refresh the current session
+ * Useful when session state might be out of sync
+ */
+export const refreshSession = async () => {
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    
+    if (error) {
+      console.error('Session refresh error:', error);
+      return { success: false, error };
+    }
+    
+    console.log('Session refreshed successfully', { 
+      userId: data.session?.user?.id,
+      expiresAt: data.session?.expires_at 
+    });
+    
+    return { success: true, session: data.session };
+  } catch (error) {
+    console.error('Unexpected error refreshing session:', error);
+    return { success: false, error };
+  }
+};
+
+/**
+ * Helper for checking DB connection status
+ */
 export const checkSupabaseConnection = async () => {
   try {
     const { data, error } = await supabase.from('doctors').select('count(id)', { count: 'exact', head: true });

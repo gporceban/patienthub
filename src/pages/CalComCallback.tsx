@@ -3,9 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
-import { exchangeCodeForToken, storeCalComToken } from '@/services/calComService';
+import { calComWrapper } from '@/services/calComWrapper';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 
 const CalComCallback = () => {
   const location = useLocation();
@@ -33,9 +32,9 @@ const CalComCallback = () => {
           return;
         }
 
-        // Exchange code for token
+        // Exchange code for token using our wrapper
         const redirectUri = `${window.location.origin}/calcom/callback`;
-        const tokenData = await exchangeCodeForToken(code, redirectUri);
+        const tokenData = await calComWrapper.exchangeCodeForToken(code, redirectUri);
 
         if (!tokenData || !tokenData.access_token) {
           setError("Falha ao obter token de acesso");
@@ -43,21 +42,13 @@ const CalComCallback = () => {
           return;
         }
 
-        // Store the token in Supabase
-        await storeCalComToken(user.id, tokenData.access_token);
-
-        // Update profile fields for refresh token if it exists
-        if (tokenData.refresh_token) {
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ 
-              cal_com_refresh_token: tokenData.refresh_token 
-            })
-            .eq('id', user.id);
-            
-          if (updateError) {
-            console.error("Error storing refresh token:", updateError);
-          }
+        // Store the tokens in Supabase
+        const success = await calComWrapper.storeTokens(user.id, tokenData);
+        
+        if (!success) {
+          setError("Falha ao armazenar token de acesso");
+          setIsLoading(false);
+          return;
         }
 
         // Redirect to calendar page
