@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Loader2, FileText, Volume2 } from 'lucide-react';
@@ -6,6 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import AudioRecorderStatus from './AudioRecorderStatus';
 import WaveformVisualizer from './WaveformVisualizer';
+
+const getAudioContext = (): AudioContext => {
+  return new (window.AudioContext)();
+};
 
 interface AudioRecorderProps {
   onTranscriptionComplete: (transcription: string) => void;
@@ -28,11 +31,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   onProcessingComplete,
   patientInfo
 }) => {
-  // Recording states
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   
-  // Processing states
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -40,13 +41,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const [transcriptionComplete, setTranscriptionComplete] = useState(false);
   const [processingComplete, setProcessingComplete] = useState(false);
   
-  // Audio visualization states
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
   const audioLevelRef = useRef<number>(0);
   
-  // Agent progress tracking
   const [agentProgress, setAgentProgress] = useState({
     patientInfo: false,
     symptoms: false,
@@ -56,22 +55,18 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     orchestration: false
   });
   
-  // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Simulate agent progress updates for better UX
   useEffect(() => {
     if (isProcessing && !processingComplete) {
-      // Clear any existing timer
       if (progressTimerRef.current) {
         clearTimeout(progressTimerRef.current);
       }
       
-      // Reset progress
       setAgentProgress({
         patientInfo: false,
         symptoms: false,
@@ -81,27 +76,21 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         orchestration: false
       });
       
-      // Patient info extraction (fast)
       progressTimerRef.current = setTimeout(() => {
         setAgentProgress(prev => ({ ...prev, patientInfo: true }));
         
-        // Symptoms extraction
         progressTimerRef.current = setTimeout(() => {
           setAgentProgress(prev => ({ ...prev, symptoms: true }));
           
-          // Exam findings extraction
           progressTimerRef.current = setTimeout(() => {
             setAgentProgress(prev => ({ ...prev, examFindings: true }));
             
-            // Diagnosis extraction
             progressTimerRef.current = setTimeout(() => {
               setAgentProgress(prev => ({ ...prev, diagnosis: true }));
               
-              // Treatment extraction
               progressTimerRef.current = setTimeout(() => {
                 setAgentProgress(prev => ({ ...prev, treatment: true }));
                 
-                // Final orchestration
                 progressTimerRef.current = setTimeout(() => {
                   setAgentProgress(prev => ({ ...prev, orchestration: true }));
                 }, 3000);
@@ -119,7 +108,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     };
   }, [isProcessing, processingComplete]);
 
-  // Cleanup on component unmount
   useEffect(() => {
     return () => {
       if (mediaRecorderRef.current && isRecording) {
@@ -137,7 +125,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     };
   }, [isRecording, audioContext]);
 
-  // Audio level monitoring
   useEffect(() => {
     if (!isRecording || !analyser) return;
     
@@ -148,14 +135,13 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       
       analyser.getByteFrequencyData(dataArray);
       
-      // Calculate audio level
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) {
         sum += dataArray[i];
       }
       
       const avg = sum / dataArray.length;
-      const level = Math.min(1, avg / 128); // Normalize to 0-1
+      const level = Math.min(1, avg / 128);
       
       audioLevelRef.current = level;
       setAudioLevel(level);
@@ -167,7 +153,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   }, [isRecording, analyser]);
 
   const startRecording = async () => {
-    // Reset all states
     setHasError(false);
     setErrorMessage('');
     setTranscriptionComplete(false);
@@ -184,7 +169,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     
     try {
       console.log("Requesting microphone access...");
-      // Explicitly request audio with these constraints
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -195,8 +179,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       console.log("Microphone access granted:", stream);
       streamRef.current = stream;
       
-      // Create audio context and analyser for visualization
-      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const context = getAudioContext();
       const analyserNode = context.createAnalyser();
       analyserNode.fftSize = 2048;
       
@@ -206,7 +189,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       setAudioContext(context);
       setAnalyser(analyserNode);
       
-      // Create media recorder with specific options
       const options = { mimeType: 'audio/webm' };
       const mediaRecorder = new MediaRecorder(stream, options);
       console.log("MediaRecorder created:", mediaRecorder);
@@ -236,12 +218,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         console.log("Created audio blob:", audioBlob.size);
         setAudioBlob(audioBlob);
         
-        // Stop all tracks to release the microphone
         stream.getTracks().forEach(track => track.stop());
       };
       
-      // Start recording with timeslice to get frequent ondataavailable events
-      mediaRecorder.start(1000); // get data every second
+      mediaRecorder.start(1000);
       console.log("MediaRecorder started");
       setIsRecording(true);
       toast({
@@ -290,7 +270,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     
     try {
       console.log("Starting transcription of audio blob:", audioBlob.size);
-      // Convert blob to base64
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
       reader.onloadend = async () => {
@@ -301,7 +280,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
         
         console.log("Sending audio to transcription API...");
-        // Call Supabase Edge Function for transcription
         const { data, error } = await supabase.functions.invoke('transcribe-audio', {
           body: { audio: base64Audio }
         });
@@ -321,7 +299,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           
           onTranscriptionComplete(data.text);
           
-          // Now process the transcription with OpenAI to generate documents
           processTranscription(data.text);
         } else {
           throw new Error('Nenhum texto recebido da transcrição');
@@ -348,13 +325,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     setErrorMessage('');
     
     try {
-      // Include patient history in the request if available
       const patientHistoryParam = patientInfo ? {
         prontuarioId: patientInfo.prontuarioId,
         email: patientInfo.email
       } : null;
       
-      // Process the transcription with OpenAI's agentic system to generate clinical documents
       const { data, error } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -368,7 +343,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         throw error;
       }
       
-      // Get the summary
       const { data: summaryData, error: summaryError } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -382,7 +356,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         throw summaryError;
       }
       
-      // Get the prescription
       const { data: prescriptionData, error: prescriptionError } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -396,7 +369,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         throw prescriptionError;
       }
       
-      // Get structured data
       const { data: structuredData, error: structuredError } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -446,7 +418,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           {patientInfo ? "Grave a consulta para gerar documentos integrados com o histórico do paciente" : "Grave a consulta para gerar documentos automaticamente utilizando Agentes IA especializados"}
         </p>
         
-        {/* Audio waveform visualization */}
         <div className="w-full relative mb-4">
           <WaveformVisualizer 
             isRecording={isRecording} 
@@ -524,3 +495,4 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 };
 
 export default AudioRecorder;
+
