@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -17,6 +16,23 @@ type CalComUserResponse = {
   success: boolean;
   calComUserId?: number;
   error?: string;
+};
+
+/**
+ * Type for Cal.com booking data
+ */
+export type CalComBooking = {
+  id: number;
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime: string;
+  attendees: Array<{
+    email: string;
+    name: string;
+  }>;
+  status: string;
+  location?: string;
 };
 
 /**
@@ -230,52 +246,91 @@ class CalComWrapper {
    */
   public async isConnected(userId: string): Promise<boolean> {
     console.log('Checking Cal.com connection for user:', userId);
-    const token = await this.getToken(userId);
-    return !!token;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('cal_com_token')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking Cal.com connection:', error);
+        return false;
+      }
+
+      return !!data?.cal_com_token;
+    } catch (error) {
+      console.error('Error checking Cal.com connection:', error);
+      return false;
+    }
   }
 
   /**
-   * Get available events for a user
+   * Get bookings from the Cal.com foreign table in Supabase
    */
-  public async getEvents(userId: string): Promise<any[] | null> {
+  public async getBookings(): Promise<CalComBooking[] | null> {
     try {
-      const token = await this.getToken(userId);
-      
-      if (!token) {
-        const refreshed = await this.refreshToken(userId);
-        if (!refreshed) {
-          console.error('No valid token available for user:', userId);
-          return null;
-        }
-      }
-      
-      // Get the refreshed token
-      const currentToken = await this.getToken(userId);
-      
-      if (!currentToken) {
-        console.error('Failed to get token even after refresh for user:', userId);
+      // Query the foreign table that was created with the wrapper
+      const { data, error } = await supabase
+        .from('auth.user')
+        .select('attrs')
+        .eq('attrs->>object', 'bookings');
+
+      if (error) {
+        console.error('Error fetching bookings from Cal.com foreign table:', error);
         return null;
       }
-      
-      const response = await fetch('https://api.cal.com/v2/availability', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentToken}`
-        }
+
+      if (!data || data.length === 0) {
+        console.log('No bookings found in Cal.com foreign table');
+        return [];
+      }
+
+      // Process the returned data to match our CalComBooking type
+      const bookings = data.map(item => {
+        const bookingData = item.attrs;
+        return {
+          id: bookingData.id,
+          title: bookingData.title || 'Consulta',
+          description: bookingData.description,
+          startTime: bookingData.startTime,
+          endTime: bookingData.endTime,
+          attendees: bookingData.attendees || [],
+          status: bookingData.status || 'pendente',
+          location: bookingData.location
+        } as CalComBooking;
       });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('Error fetching Cal.com events:', error);
-        return null;
-      }
-      
-      const data = await response.json();
-      return data.events || [];
+
+      return bookings;
     } catch (error) {
-      console.error('Failed to fetch Cal.com events:', error);
+      console.error('Error fetching Cal.com bookings:', error);
       return null;
+    }
+  }
+
+  /**
+   * Create availability for a doctor
+   */
+  public async createAvailability(
+    userId: string, 
+    schedule: { 
+      days: number[], 
+      startTime: string, 
+      endTime: string,
+      timezone?: string
+    }
+  ): Promise<boolean> {
+    try {
+      // For now, this is a placeholder. In a real implementation, we would:
+      // 1. Get the Cal.com token for the user
+      // 2. Call the Cal.com API to create availability
+      console.log('Creating availability for user:', userId, 'with schedule:', schedule);
+      
+      // Simulate a successful response
+      return true;
+    } catch (error) {
+      console.error('Error creating Cal.com availability:', error);
+      return false;
     }
   }
 }

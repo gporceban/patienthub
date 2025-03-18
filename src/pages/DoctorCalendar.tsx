@@ -2,18 +2,21 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { pt } from 'date-fns/locale';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { AuthContext } from '@/contexts/AuthContext';
-import { Calendar, ClipboardList, Link as LinkIcon, FileText, Plus } from 'lucide-react';
-import { getCalComOAuthUrl, getCalComToken } from '@/services/calComService';
+import { Calendar, ClipboardList, Link as LinkIcon, FileText, Plus, Clock } from 'lucide-react';
+import { calComWrapper, CalComBooking } from '@/services/calComWrapper';
 import { supabase } from '@/integrations/supabase/client';
-import { fromAppointments } from '@/types/doctorProfile';
-import { PatientAssessment, fromPatientAssessments } from '@/types/patientAssessments';
+import { fromPatientAssessments } from '@/types/patientAssessments';
 import AssessmentCard from '@/components/AssessmentCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
@@ -23,36 +26,40 @@ const DoctorCalendar = () => {
   const { toast } = useToast();
   
   const [selected, setSelected] = useState<Date | undefined>(new Date());
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [assessments, setAssessments] = useState<PatientAssessment[]>([]);
+  const [appointments, setAppointments] = useState<CalComBooking[]>([]);
+  const [assessments, setAssessments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCalComConnected, setIsCalComConnected] = useState(false);
+  const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
+  
+  // State for the availability form
+  const [availabilityForm, setAvailabilityForm] = useState({
+    days: [] as string[],
+    startTime: '09:00',
+    endTime: '17:00',
+    timezone: 'America/Sao_Paulo'
+  });
   
   useEffect(() => {
     const checkCalComConnection = async () => {
       if (!user) return;
       
       try {
-        const token = await getCalComToken(user.id);
-        setIsCalComConnected(!!token);
+        const connected = await calComWrapper.isConnected(user.id);
+        setIsCalComConnected(connected);
       } catch (error) {
         console.error('Error checking Cal.com connection:', error);
       }
     };
     
-    const fetchAppointments = async () => {
+    const fetchBookings = async () => {
       if (!user) return;
       
       try {
-        const { data, error } = await fromAppointments(supabase)
-          .getByDoctorId(user.id);
+        const bookings = await calComWrapper.getBookings();
         
-        if (error) {
-          throw error;
-        }
-        
-        if (data) {
-          setAppointments(data);
+        if (bookings) {
+          setAppointments(bookings);
         }
       } catch (error) {
         console.error('Error fetching appointments:', error);
@@ -91,32 +98,95 @@ const DoctorCalendar = () => {
     };
     
     checkCalComConnection();
-    fetchAppointments();
+    fetchBookings();
     fetchAssessments();
   }, [user, toast]);
   
   const handleConnectCalCom = () => {
     const redirectUri = `${window.location.origin}/calcom/callback`;
-    const authUrl = getCalComOAuthUrl(redirectUri);
+    const authUrl = calComWrapper.getOAuthUrl(redirectUri);
     window.location.href = authUrl;
   };
   
+  const handleCreateAvailability = async () => {
+    if (!user) return;
+    
+    try {
+      // Convert the array of day strings to numbers
+      const dayNumbers = availabilityForm.days.map(day => {
+        switch (day) {
+          case 'monday': return 1;
+          case 'tuesday': return 2;
+          case 'wednesday': return 3;
+          case 'thursday': return 4;
+          case 'friday': return 5;
+          case 'saturday': return 6;
+          case 'sunday': return 0;
+          default: return 1;
+        }
+      });
+      
+      const success = await calComWrapper.createAvailability(user.id, {
+        days: dayNumbers,
+        startTime: availabilityForm.startTime,
+        endTime: availabilityForm.endTime,
+        timezone: availabilityForm.timezone
+      });
+      
+      if (success) {
+        toast({
+          title: "Disponibilidade criada",
+          description: "Sua disponibilidade foi configurada com sucesso.",
+        });
+        setIsAvailabilityDialogOpen(false);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível configurar sua disponibilidade. Tente novamente."
+        });
+      }
+    } catch (error) {
+      console.error('Error creating availability:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Ocorreu um erro ao configurar sua disponibilidade."
+      });
+    }
+  };
+  
   const formatAppointmentDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: pt });
+    try {
+      const date = parseISO(dateString);
+      return format(date, "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: pt });
+    } catch (error) {
+      console.error("Error parsing date:", error);
+      return dateString;
+    }
   };
   
   const getStatusBadgeClass = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
       case 'confirmado':
         return 'bg-green-500/20 text-green-500';
+      case 'pending':
       case 'pendente':
         return 'bg-yellow-500/20 text-yellow-500';
+      case 'cancelled':
       case 'cancelado':
         return 'bg-red-500/20 text-red-500';
       default:
         return 'bg-gray-500/20 text-gray-500';
     }
+  };
+  
+  const handleDayChange = (days: string[]) => {
+    setAvailabilityForm(prev => ({
+      ...prev,
+      days
+    }));
   };
   
   return (
@@ -162,16 +232,111 @@ const DoctorCalendar = () => {
               </Card>
             )}
             
+            {isCalComConnected && (
+              <div className="flex justify-end mb-4">
+                <Dialog open={isAvailabilityDialogOpen} onOpenChange={setIsAvailabilityDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-gold-500 hover:bg-gold-600 text-black">
+                      <Clock className="h-4 w-4 mr-2" />
+                      Definir Disponibilidade
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px] card-gradient">
+                    <DialogHeader>
+                      <DialogTitle>Configurar Disponibilidade</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="days">Dias da Semana</Label>
+                        <Select
+                          onValueChange={(value) => handleDayChange([...availabilityForm.days, value])}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione os dias" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monday">Segunda-feira</SelectItem>
+                            <SelectItem value="tuesday">Terça-feira</SelectItem>
+                            <SelectItem value="wednesday">Quarta-feira</SelectItem>
+                            <SelectItem value="thursday">Quinta-feira</SelectItem>
+                            <SelectItem value="friday">Sexta-feira</SelectItem>
+                            <SelectItem value="saturday">Sábado</SelectItem>
+                            <SelectItem value="sunday">Domingo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {availabilityForm.days.map((day, index) => (
+                            <div key={index} className="bg-darkblue-700 px-2 py-1 rounded-md text-xs flex items-center">
+                              {day === 'monday' && 'Segunda-feira'}
+                              {day === 'tuesday' && 'Terça-feira'}
+                              {day === 'wednesday' && 'Quarta-feira'}
+                              {day === 'thursday' && 'Quinta-feira'}
+                              {day === 'friday' && 'Sexta-feira'}
+                              {day === 'saturday' && 'Sábado'}
+                              {day === 'sunday' && 'Domingo'}
+                              <button 
+                                className="ml-2 text-red-400"
+                                onClick={() => setAvailabilityForm(prev => ({
+                                  ...prev, 
+                                  days: prev.days.filter((_, i) => i !== index)
+                                }))}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="startTime">Hora Início</Label>
+                          <Input
+                            id="startTime"
+                            type="time"
+                            value={availabilityForm.startTime}
+                            onChange={(e) => setAvailabilityForm({...availabilityForm, startTime: e.target.value})}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="endTime">Hora Fim</Label>
+                          <Input
+                            id="endTime"
+                            type="time"
+                            value={availabilityForm.endTime}
+                            onChange={(e) => setAvailabilityForm({...availabilityForm, endTime: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button 
+                        className="bg-gold-500 hover:bg-gold-600 text-black" 
+                        onClick={handleCreateAvailability}
+                        disabled={availabilityForm.days.length === 0}
+                      >
+                        Salvar Disponibilidade
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
+            
             {appointments.length === 0 ? (
               <Card className="card-gradient p-6 text-center">
                 <h3 className="text-xl font-medium mb-2">Nenhuma Consulta Agendada</h3>
                 <p className="text-gray-400 mb-6">
                   Você ainda não possui consultas agendadas. 
                 </p>
-                <Button className="bg-gold-500 hover:bg-gold-600 text-black">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Disponibilidade
-                </Button>
+                {isCalComConnected && (
+                  <Button 
+                    onClick={() => setIsAvailabilityDialogOpen(true)}
+                    className="bg-gold-500 hover:bg-gold-600 text-black"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Disponibilidade
+                  </Button>
+                )}
               </Card>
             ) : (
               appointments.map((appointment) => (
@@ -183,13 +348,18 @@ const DoctorCalendar = () => {
                           {appointment.status}
                         </span>
                         <span className="text-gold-500 font-medium">
-                          {formatAppointmentDate(appointment.date_time)}
+                          {formatAppointmentDate(appointment.startTime)}
                         </span>
                       </div>
-                      <h3 className="font-semibold">{appointment.patient_name}</h3>
-                      <p className="text-sm text-gray-400">Local: {appointment.location}</p>
-                      {appointment.notes && (
-                        <p className="text-sm text-gray-400 mt-1">{appointment.notes}</p>
+                      <h3 className="font-semibold">{appointment.title}</h3>
+                      <p className="text-sm text-gray-400">
+                        Paciente: {appointment.attendees?.[0]?.name || 'Não especificado'}
+                      </p>
+                      {appointment.location && (
+                        <p className="text-sm text-gray-400">Local: {appointment.location}</p>
+                      )}
+                      {appointment.description && (
+                        <p className="text-sm text-gray-400 mt-1">{appointment.description}</p>
                       )}
                     </div>
                     

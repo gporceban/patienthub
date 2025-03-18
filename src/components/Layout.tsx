@@ -39,10 +39,14 @@ const Layout: React.FC<LayoutProps> = ({
   
   // Determine if this is a protected route
   const isProtectedRoute = currentPathBase === 'medico' || currentPathBase === 'paciente';
+  const isSpecialRoute = currentPathBase === 'calcom';
+  
+  // Skip auth check for special routes like calcom callback
+  const shouldCheckAuth = isProtectedRoute && !isSpecialRoute;
   
   // Check for user type mismatch (user tries to access the wrong module)
   useEffect(() => {
-    if (isInitialized && !isLoading && hasValidSession && profile && contextUserType) {
+    if (isInitialized && !isLoading && hasValidSession && profile && contextUserType && shouldCheckAuth) {
       // Explicitly provided userType takes precedence
       const effectiveUserType = userType || contextUserType;
       
@@ -90,11 +94,13 @@ const Layout: React.FC<LayoutProps> = ({
     isProtectedRoute, 
     hasValidSession,
     isInitialized,
-    redirecting
+    redirecting,
+    shouldCheckAuth
   ]);
   
   // If user is not authenticated and tries to access a protected route
-  if (isInitialized && !isLoading && !hasValidSession && isProtectedRoute) {
+  // Skip this check for special routes like calcom callback
+  if (isInitialized && !isLoading && !hasValidSession && isProtectedRoute && !isSpecialRoute) {
     console.log("User not authenticated, redirecting to login page");
     return <Navigate to="/" replace />;
   }

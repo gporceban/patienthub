@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { pt } from 'date-fns/locale';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { AuthContext } from '@/contexts/AuthContext';
 import { Calendar, Plus, ClipboardList, Link as LinkIcon, FileText } from 'lucide-react';
-import { getCalComOAuthUrl, getCalComToken } from '@/services/calComService';
+import { calComWrapper, CalComBooking } from '@/services/calComWrapper';
 import { supabase } from '@/integrations/supabase/client';
-import { fromAppointments } from '@/types/doctorProfile';
 import { PatientAssessment, fromPatientAssessments } from '@/types/patientAssessments';
 import AssessmentCard from '@/components/AssessmentCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,7 +21,7 @@ const PatientCalendar = () => {
   const { toast } = useToast();
   
   const [selected, setSelected] = useState<Date | undefined>(new Date());
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<CalComBooking[]>([]);
   const [assessments, setAssessments] = useState<PatientAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCalComConnected, setIsCalComConnected] = useState(false);
@@ -32,26 +31,29 @@ const PatientCalendar = () => {
       if (!user) return;
       
       try {
-        const token = await getCalComToken(user.id);
-        setIsCalComConnected(!!token);
+        const connected = await calComWrapper.isConnected(user.id);
+        setIsCalComConnected(connected);
       } catch (error) {
         console.error('Error checking Cal.com connection:', error);
       }
     };
     
-    const fetchAppointments = async () => {
+    const fetchBookings = async () => {
       if (!user) return;
       
       try {
-        const { data, error } = await fromAppointments(supabase)
-          .getByPatientId(user.id);
+        const bookings = await calComWrapper.getBookings();
         
-        if (error) {
-          throw error;
-        }
-        
-        if (data) {
-          setAppointments(data);
+        if (bookings) {
+          // Filter bookings to show only those for the current patient
+          // This assumes that the attendee email matches the patient's email
+          const patientEmail = profile?.email;
+          if (patientEmail) {
+            const patientBookings = bookings.filter(booking => 
+              booking.attendees?.some(attendee => attendee.email === patientEmail)
+            );
+            setAppointments(patientBookings);
+          }
         }
       } catch (error) {
         console.error('Error fetching appointments:', error);
@@ -90,27 +92,35 @@ const PatientCalendar = () => {
     };
     
     checkCalComConnection();
-    fetchAppointments();
+    fetchBookings();
     fetchAssessments();
   }, [user, profile, toast]);
   
   const handleConnectCalCom = () => {
     const redirectUri = `${window.location.origin}/calcom/callback`;
-    const authUrl = getCalComOAuthUrl(redirectUri);
+    const authUrl = calComWrapper.getOAuthUrl(redirectUri);
     window.location.href = authUrl;
   };
   
   const formatAppointmentDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: pt });
+    try {
+      const date = parseISO(dateString);
+      return format(date, "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: pt });
+    } catch (error) {
+      console.error("Error parsing date:", error);
+      return dateString;
+    }
   };
   
   const getStatusBadgeClass = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
       case 'confirmado':
         return 'bg-green-500/20 text-green-500';
+      case 'pending':
       case 'pendente':
         return 'bg-yellow-500/20 text-yellow-500';
+      case 'cancelled':
       case 'cancelado':
         return 'bg-red-500/20 text-red-500';
       default:
@@ -182,12 +192,15 @@ const PatientCalendar = () => {
                           {appointment.status}
                         </span>
                         <span className="text-gold-500 font-medium">
-                          {formatAppointmentDate(appointment.date_time)}
+                          {formatAppointmentDate(appointment.startTime)}
                         </span>
                       </div>
-                      <h3 className="font-semibold">{appointment.location}</h3>
-                      {appointment.notes && (
-                        <p className="text-sm text-gray-400 mt-1">{appointment.notes}</p>
+                      <h3 className="font-semibold">{appointment.title}</h3>
+                      {appointment.location && (
+                        <p className="text-sm text-gray-400">Local: {appointment.location}</p>
+                      )}
+                      {appointment.description && (
+                        <p className="text-sm text-gray-400 mt-1">{appointment.description}</p>
                       )}
                     </div>
                     
