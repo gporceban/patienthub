@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, Square, Loader2, FileText } from 'lucide-react';
+import { Mic, Square, Loader2, FileText, Volume2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import AudioRecorderStatus from './AudioRecorderStatus';
+import WaveformVisualizer from './WaveformVisualizer';
 
 interface AudioRecorderProps {
   onTranscriptionComplete: (transcription: string) => void;
@@ -39,6 +40,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const [transcriptionComplete, setTranscriptionComplete] = useState(false);
   const [processingComplete, setProcessingComplete] = useState(false);
   
+  // Audio visualization states
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const audioLevelRef = useRef<number>(0);
+  
   // Agent progress tracking
   const [agentProgress, setAgentProgress] = useState({
     patientInfo: false,
@@ -52,6 +59,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -120,8 +128,43 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       if (progressTimerRef.current) {
         clearTimeout(progressTimerRef.current);
       }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
     };
-  }, [isRecording]);
+  }, [isRecording, audioContext]);
+
+  // Audio level monitoring
+  useEffect(() => {
+    if (!isRecording || !analyser) return;
+    
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    
+    const checkAudioLevel = () => {
+      if (!isRecording) return;
+      
+      analyser.getByteFrequencyData(dataArray);
+      
+      // Calculate audio level
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+      }
+      
+      const avg = sum / dataArray.length;
+      const level = Math.min(1, avg / 128); // Normalize to 0-1
+      
+      audioLevelRef.current = level;
+      setAudioLevel(level);
+      
+      requestAnimationFrame(checkAudioLevel);
+    };
+    
+    checkAudioLevel();
+  }, [isRecording, analyser]);
 
   const startRecording = async () => {
     // Reset all states
@@ -141,6 +184,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      
+      // Create audio context and analyser for visualization
+      const context = new AudioContext();
+      const analyserNode = context.createAnalyser();
+      analyserNode.fftSize = 2048;
+      
+      const source = context.createMediaStreamSource(stream);
+      source.connect(analyserNode);
+      
+      setAudioContext(context);
+      setAnalyser(analyserNode);
+      
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       
@@ -354,6 +410,27 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         <p className="text-sm text-gray-400 mb-4">
           {patientInfo ? "Grave a consulta para gerar documentos integrados com o histórico do paciente" : "Grave a consulta para gerar documentos automaticamente utilizando Agentes IA especializados"}
         </p>
+        
+        {/* Audio waveform visualization */}
+        <div className="w-full relative mb-4">
+          <WaveformVisualizer 
+            isRecording={isRecording} 
+            audioContext={audioContext || undefined}
+            analyser={analyser || undefined}
+          />
+          
+          {isRecording && (
+            <div className="absolute right-2 bottom-2 flex items-center gap-1 bg-darkblue-800/80 px-2 py-1 rounded-full">
+              <Volume2 className="h-3 w-3 text-gold-500" />
+              <div className="bg-darkblue-700 rounded-full h-2 w-16">
+                <div 
+                  className="bg-gold-500 h-2 rounded-full" 
+                  style={{ width: `${audioLevel * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
         
         <div className="flex gap-4 mb-4">
           {!isRecording ? (
