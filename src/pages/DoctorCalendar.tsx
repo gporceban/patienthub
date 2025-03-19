@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useContext } from 'react';
-import { format, parseISO, startOfDay, endOfDay, isSameDay } from 'date-fns';
+import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
@@ -34,6 +33,7 @@ const DoctorCalendar = () => {
   const [isCalComConnected, setIsCalComConnected] = useState(false);
   const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
   const [isEventTypeDialogOpen, setIsEventTypeDialogOpen] = useState(false);
+  const [calComUrl, setCalComUrl] = useState('https://cal.com/porceban');
   
   // State for the availability form
   const [availabilityForm, setAvailabilityForm] = useState({
@@ -88,6 +88,28 @@ const DoctorCalendar = () => {
     setFilteredAppointments(filtered);
   };
   
+  // Function to fetch user's Cal.com URL from profile
+  const fetchCalComUrl = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('cal_com_user_id')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data && data.cal_com_user_id) {
+        // Store URL in state
+        setCalComUrl(`https://cal.com/porceban`);
+      }
+    } catch (error) {
+      console.error('Error fetching Cal.com URL:', error);
+    }
+  };
+  
   useEffect(() => {
     const checkCalComConnection = async () => {
       if (!user) return;
@@ -98,6 +120,7 @@ const DoctorCalendar = () => {
         
         if (connected) {
           fetchAppointments();
+          fetchCalComUrl();
         }
       } catch (error) {
         console.error('Error checking Cal.com connection:', error);
@@ -259,6 +282,24 @@ const DoctorCalendar = () => {
     }
   };
   
+  // Render Cal.com embed calendar if connected
+  const renderCalComEmbed = () => {
+    if (!isCalComConnected) return null;
+    
+    return (
+      <div className="mt-6 rounded-md overflow-hidden border border-darkblue-700 bg-darkblue-800">
+        <iframe
+          src={`${calComUrl}?embed=true&hideBranding=true&hideEventTypeDetails=false&hideDescription=false&theme=dark`}
+          width="100%"
+          height="800px"
+          frameBorder="0"
+          title="Calendário de Agendamentos"
+          className="w-full"
+        />
+      </div>
+    );
+  };
+  
   return (
     <Layout userType="medico">
       <div className="mb-6">
@@ -268,7 +309,7 @@ const DoctorCalendar = () => {
         </p>
       </div>
       
-      <Tabs defaultValue="appointments" className="w-full">
+      <Tabs defaultValue="calendar" className="w-full">
         <TabsList className="bg-darkblue-800">
           <TabsTrigger value="appointments" className="data-[state=active]:bg-darkblue-700">
             <ClipboardList className="h-4 w-4 mr-2" />
@@ -644,60 +685,35 @@ const DoctorCalendar = () => {
         </TabsContent>
         
         <TabsContent value="calendar" className="mt-6">
-          <CalendarDatePicker
-            selected={selected}
-            onSelect={handleDateSelect}
-            showNavigation={true}
-          />
-          
-          <Card className="card-gradient p-6 mt-6">
-            <h3 className="text-xl font-medium mb-4 flex items-center">
-              <Clock className="mr-2 h-5 w-5 text-gold-500" />
-              Agenda do dia {format(selected, "dd 'de' MMMM", { locale: pt })}
-            </h3>
-            
-            {isLoadingAppointments ? (
-              <div className="space-y-4">
-                {Array(3).fill(0).map((_, index) => (
-                  <div key={index} className="border-b border-gray-700 pb-3">
-                    <div className="flex gap-2">
-                      <Skeleton className="h-6 w-16" />
-                      <Skeleton className="h-6 w-32" />
-                    </div>
-                    <Skeleton className="h-4 w-48 mt-2" />
-                  </div>
-                ))}
-              </div>
-            ) : filteredAppointments.length === 0 ? (
-              <p className="text-gray-400 text-center py-8">
-                Nenhuma consulta agendada para esta data.
+          {!isCalComConnected ? (
+            <Card className="card-gradient p-6 text-center">
+              <h3 className="text-xl font-medium mb-4">Conecte seu Calendário</h3>
+              <p className="text-gray-400 mb-6">
+                Conecte sua conta ao Cal.com para gerenciar sua agenda de forma mais eficiente.
               </p>
-            ) : (
-              <div className="space-y-4">
-                {filteredAppointments.map((appointment) => (
-                  <div key={appointment.id} className="border-b border-gray-700 pb-3 last:border-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-gold-500 font-medium">
-                        {format(parseISO(appointment.startTime), "HH:mm", { locale: pt })}
-                        {" - "}
-                        {format(parseISO(appointment.endTime), "HH:mm", { locale: pt })}
-                      </span>
-                      <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadgeClass(appointment.status)}`}>
-                        {appointment.status}
-                      </span>
-                    </div>
-                    <h4 className="font-medium">{appointment.title}</h4>
-                    <p className="text-sm text-gray-400">
-                      Paciente: {appointment.attendees?.[0]?.name || 'Não especificado'}
-                    </p>
-                    {appointment.location && (
-                      <p className="text-sm text-gray-400 mt-1">Local: {appointment.location}</p>
-                    )}
-                  </div>
-                ))}
+              <Button 
+                onClick={handleConnectCalCom} 
+                className="bg-gold-500 hover:bg-gold-600 text-black"
+              >
+                <LinkIcon className="h-4 w-4 mr-2" />
+                Conectar ao Cal.com
+              </Button>
+            </Card>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-4 justify-end mb-4">
+                <Button 
+                  className="bg-gold-500 hover:bg-gold-600 text-black"
+                  onClick={() => window.open(calComUrl, '_blank')}
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Abrir Calendário Completo
+                </Button>
               </div>
-            )}
-          </Card>
+              
+              {renderCalComEmbed()}
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </Layout>
