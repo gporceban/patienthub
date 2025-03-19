@@ -1,3 +1,4 @@
+
 import React, { useContext } from 'react';
 import {
   BrowserRouter as Router,
@@ -5,25 +6,27 @@ import {
   Routes,
   Navigate
 } from 'react-router-dom';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
+import { AuthContext } from './contexts/AuthContext';
+import NotFound from './pages/NotFound';
+import Index from './pages/Index';
 import DoctorCalendar from './pages/DoctorCalendar';
 import PatientCalendar from './pages/PatientCalendar';
-import { AuthContext } from './contexts/AuthContext';
-import LandingPage from './pages/LandingPage';
-import DoctorRegisterPage from './pages/DoctorRegisterPage';
-import PatientRegisterPage from './pages/PatientRegisterPage';
-import ProfilePage from './pages/ProfilePage';
-import PatientAssessments from './pages/PatientAssessments';
-import DoctorAssessments from './pages/DoctorAssessments';
-import AssessmentForm from './pages/AssessmentForm';
+import DoctorDashboard from './pages/DoctorDashboard';
+import PatientDashboard from './pages/PatientDashboard';
+import DoctorPatients from './pages/DoctorPatients';
+import PatientProgress from './pages/PatientProgress';
+import DoctorProfile from './pages/DoctorProfile';
+import PatientRecords from './pages/PatientRecords';
+import PatientAssessment from './pages/PatientAssessment';
+import DoctorAssessment from './pages/DoctorAssessment';
+import PatientAssessmentDetails from './pages/PatientAssessmentDetails';
 import CalComCallback from './pages/CalComCallback';
 
 function App() {
   const { user } = useContext(AuthContext);
 
   const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-    return user ? <>{children}</> : <Navigate to="/login" />;
+    return user ? <>{children}</> : <Navigate to="/" />;
   };
 
   const PublicRoute = ({ children }: { children: React.ReactNode }) => {
@@ -33,23 +36,30 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<Index />} />
 
         {/* Public Routes */}
-        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
-        <Route path="/register/doctor" element={<PublicRoute><DoctorRegisterPage /></PublicRoute>} />
-        <Route path="/register/patient" element={<PublicRoute><PatientRegisterPage /></PublicRoute>} />
+        <Route path="/login" element={<PublicRoute><Index /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><Index /></PublicRoute>} />
+        <Route path="/register/doctor" element={<PublicRoute><Index /></PublicRoute>} />
+        <Route path="/register/patient" element={<PublicRoute><Index /></PublicRoute>} />
 
         {/* Private Routes */}
         <Route path="/medico/calendario" element={<PrivateRoute><DoctorCalendar /></PrivateRoute>} />
         <Route path="/paciente/calendario" element={<PrivateRoute><PatientCalendar /></PrivateRoute>} />
-        <Route path="/perfil" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
-        <Route path="/paciente/avaliacao" element={<PrivateRoute><PatientAssessments /></PrivateRoute>} />
-        <Route path="/medico/avaliacao" element={<PrivateRoute><DoctorAssessments /></PrivateRoute>} />
-        <Route path="/medico/avaliacao/:prontuarioId" element={<PrivateRoute><AssessmentForm /></PrivateRoute>} />
+        <Route path="/medico/dashboard" element={<PrivateRoute><DoctorDashboard /></PrivateRoute>} />
+        <Route path="/paciente/dashboard" element={<PrivateRoute><PatientDashboard /></PrivateRoute>} />
+        <Route path="/medico/pacientes" element={<PrivateRoute><DoctorPatients /></PrivateRoute>} />
+        <Route path="/paciente/progresso" element={<PrivateRoute><PatientProgress /></PrivateRoute>} />
+        <Route path="/medico/perfil" element={<PrivateRoute><DoctorProfile /></PrivateRoute>} />
+        <Route path="/paciente/prontuario" element={<PrivateRoute><PatientRecords /></PrivateRoute>} />
+        <Route path="/paciente/avaliacao" element={<PrivateRoute><PatientAssessment /></PrivateRoute>} />
+        <Route path="/medico/avaliacao" element={<PrivateRoute><DoctorAssessment /></PrivateRoute>} />
+        <Route path="/paciente/avaliacao/:id" element={<PrivateRoute><PatientAssessmentDetails /></PrivateRoute>} />
         <Route path="/calcom/callback" element={<CalComCallback />} />
-
+        
+        {/* Catch-all route for 404 */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
   );
