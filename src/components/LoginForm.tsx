@@ -49,10 +49,10 @@ const LoginForm: React.FC = () => {
       setTimeout(() => {
         if (userType === 'paciente') {
           console.log("Navigating to /paciente with replace=true");
-          navigate('/paciente', { replace: true });
+          navigate('/paciente/dashboard', { replace: true });
         } else if (userType === 'medico') {
           console.log("Navigating to /medico with replace=true");
-          navigate('/medico', { replace: true });
+          navigate('/medico/dashboard', { replace: true });
         } else {
           console.error("Unknown user type:", userType);
           toast({
@@ -274,9 +274,9 @@ const LoginForm: React.FC = () => {
         <button 
           className="button-gold-gradient w-full px-6 py-2 rounded-lg font-semibold transition-all"
           onClick={handleLogin}
-          disabled={isLoading || authLoading}
+          disabled={isLoading}
         >
-          {isLoading || authLoading ? 'Processando...' : 'Entrar'}
+          {isLoading ? 'Processando...' : 'Entrar'}
         </button>
       </div>
       
@@ -286,17 +286,16 @@ const LoginForm: React.FC = () => {
         </button>
       </div>
       
-      {(user || authLoading) && (
-        <div className="mt-6 text-center">
-          <button 
-            onClick={handleClearSession}
-            className="text-red-400 hover:text-red-300 text-xs"
-            disabled={isClearing}
-          >
-            {isClearing ? 'Limpando sessão...' : 'Problemas para entrar? Limpar dados de sessão'}
-          </button>
-        </div>
-      )}
+      {/* Only show clear session button when there's a problem */}
+      <div className="mt-6 text-center">
+        <button 
+          onClick={handleClearSession}
+          className="text-red-400 hover:text-red-300 text-xs"
+          disabled={isClearing}
+        >
+          {isClearing ? 'Limpando sessão...' : 'Problemas para entrar? Limpar dados de sessão'}
+        </button>
+      </div>
     </div>
   );
 };
