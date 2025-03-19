@@ -53,25 +53,34 @@ export const exchangeCodeForToken = async (
 };
 
 /**
+ * Check if a specific column exists in a table
+ */
+async function checkColumnExists(tableName: string, columnName: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('get_columns_for_table', { table_name: tableName });
+    
+    if (error) {
+      console.error('Error checking column existence:', error);
+      return false;
+    }
+    
+    return data?.some(column => column.column_name === columnName) || false;
+  } catch (error) {
+    console.error('Error in checkColumnExists:', error);
+    return false;
+  }
+}
+
+/**
  * Store Cal.com token in Supabase
  */
 export const storeCalComToken = async (userId: string, tokenData: CalComTokenResponse): Promise<void> => {
   try {
     console.log("Storing Cal.com token for user:", userId);
     
-    // Check if the cal_com_token_expires_at column exists using a direct query
-    const { data: columns, error: columnsError } = await supabase
-      .from('information_schema.columns')
-      .select('column_name')
-      .eq('table_schema', 'public')
-      .eq('table_name', 'profiles')
-      .eq('column_name', 'cal_com_token_expires_at');
+    // Check if the cal_com_token_expires_at column exists
+    const hasExpiresAtColumn = await checkColumnExists('profiles', 'cal_com_token_expires_at');
     
-    if (columnsError) {
-      console.error('Error checking columns:', columnsError);
-      throw columnsError;
-    }
-
     // Create a base update object with the columns we know exist
     const updateData: Record<string, any> = { 
       cal_com_token: tokenData.access_token,
@@ -79,8 +88,6 @@ export const storeCalComToken = async (userId: string, tokenData: CalComTokenRes
     };
     
     // Only add the expires_at field if the column exists
-    const hasExpiresAtColumn = columns && columns.length > 0;
-    
     if (hasExpiresAtColumn) {
       updateData.cal_com_token_expires_at = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
     }
@@ -108,29 +115,16 @@ export const storeCalComToken = async (userId: string, tokenData: CalComTokenRes
 export const getCalComToken = async (userId: string): Promise<string | null> => {
   try {
     // Check if the cal_com_token_expires_at column exists
-    const { data: columns, error: columnsError } = await supabase
-      .from('information_schema.columns')
-      .select('column_name')
-      .eq('table_schema', 'public')
-      .eq('table_name', 'profiles')
-      .eq('column_name', 'cal_com_token_expires_at');
+    const hasExpiresAtColumn = await checkColumnExists('profiles', 'cal_com_token_expires_at');
     
-    if (columnsError) {
-      console.error('Error checking columns:', columnsError);
-    }
-    
-    const hasExpiresAtColumn = columns && columns.length > 0;
-    
-    // Select fields based on what columns exist
-    const selectFields = hasExpiresAtColumn ? 
-      'cal_com_token, cal_com_token_expires_at' : 
-      'cal_com_token';
-    
-    const { data, error } = await supabase
+    // Select only the necessary fields
+    const query = supabase
       .from('profiles')
-      .select(selectFields)
+      .select(hasExpiresAtColumn ? 'cal_com_token, cal_com_token_expires_at' : 'cal_com_token')
       .eq('id', userId)
       .maybeSingle();
+    
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error getting Cal.com token:', error);
@@ -190,18 +184,7 @@ export const refreshCalComToken = async (userId: string): Promise<string | null>
     console.log("Received new access token from refresh");
     
     // Check if the cal_com_token_expires_at column exists
-    const { data: columns, error: columnsError } = await supabase
-      .from('information_schema.columns')
-      .select('column_name')
-      .eq('table_schema', 'public')
-      .eq('table_name', 'profiles')
-      .eq('column_name', 'cal_com_token_expires_at');
-    
-    if (columnsError) {
-      console.error('Error checking columns:', columnsError);
-    }
-    
-    const hasExpiresAtColumn = columns && columns.length > 0;
+    const hasExpiresAtColumn = await checkColumnExists('profiles', 'cal_com_token_expires_at');
     
     // Create update object based on available columns
     const updateData: Record<string, any> = {
