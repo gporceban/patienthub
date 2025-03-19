@@ -1,61 +1,57 @@
-
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import Index from './pages/Index';
-import PatientDashboard from './pages/PatientDashboard';
-import PatientCalendar from './pages/PatientCalendar';
-import PatientAssessmentsList from './pages/PatientAssessmentsList';
-import PatientAssessmentDetails from './pages/PatientAssessmentDetails';
-import PatientRecords from './pages/PatientRecords';
-import PatientProgress from './pages/PatientProgress';
-import PatientAchievements from './pages/PatientAchievements';
-import DoctorDashboard from './pages/DoctorDashboard';
-import DoctorPatients from './pages/DoctorPatients';
-import DoctorAssessment from './pages/DoctorAssessment';
-import DoctorDocuments from './pages/DoctorDocuments';
-import DoctorCreateTestPatient from './pages/DoctorCreateTestPatient';
-import DoctorProfile from './pages/DoctorProfile';
-import CalComCallback from './pages/CalComCallback';
-import NotFound from './pages/NotFound';
-import { Toaster } from "@/components/ui/toaster"
+import React, { useContext } from 'react';
+import {
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Navigate
+} from 'react-router-dom';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import DoctorCalendar from './pages/DoctorCalendar';
+import PatientCalendar from './pages/PatientCalendar';
+import { AuthContext } from './contexts/AuthContext';
+import LandingPage from './pages/LandingPage';
+import DoctorRegisterPage from './pages/DoctorRegisterPage';
+import PatientRegisterPage from './pages/PatientRegisterPage';
+import ProfilePage from './pages/ProfilePage';
+import PatientAssessments from './pages/PatientAssessments';
+import DoctorAssessments from './pages/DoctorAssessments';
+import AssessmentForm from './pages/AssessmentForm';
+import CalComCallback from './pages/CalComCallback';
 
 function App() {
+  const { user } = useContext(AuthContext);
+
+  const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
+    return user ? <>{children}</> : <Navigate to="/login" />;
+  };
+
+  const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+    return !user ? <>{children}</> : <Navigate to={user.user_metadata?.user_type === 'medico' ? '/medico/calendario' : '/paciente/calendario'} />;
+  };
+
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Toaster />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          
-          {/* Patient routes */}
-          <Route path="/paciente" element={<PatientDashboard />} />
-          <Route path="/paciente/agenda" element={<PatientCalendar />} />
-          <Route path="/paciente/avaliacoes" element={<PatientAssessmentsList />} />
-          <Route path="/paciente/avaliacoes/:id" element={<PatientAssessmentDetails />} />
-          <Route path="/paciente/records" element={<PatientRecords />} />
-          <Route path="/paciente/progress" element={<PatientProgress />} />
-          <Route path="/paciente/achievements" element={<PatientAchievements />} />
-          
-          {/* Doctor routes */}
-          <Route path="/medico" element={<DoctorDashboard />} />
-          <Route path="/medico/pacientes" element={<DoctorPatients />} />
-          <Route path="/medico/agenda" element={<DoctorCalendar />} />
-          <Route path="/medico/avaliacao" element={<DoctorAssessment />} />
-          <Route path="/medico/avaliacoes/:id" element={<PatientAssessmentDetails />} />
-          <Route path="/medico/documentos" element={<DoctorDocuments />} />
-          <Route path="/medico/criar-teste" element={<DoctorCreateTestPatient />} />
-          <Route path="/medico/perfil" element={<DoctorProfile />} />
-          
-          {/* Cal.com callback */}
-          <Route path="/calcom/callback" element={<CalComCallback />} />
-          
-          {/* 404 route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+
+        {/* Public Routes */}
+        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+        <Route path="/register/doctor" element={<PublicRoute><DoctorRegisterPage /></PublicRoute>} />
+        <Route path="/register/patient" element={<PublicRoute><PatientRegisterPage /></PublicRoute>} />
+
+        {/* Private Routes */}
+        <Route path="/medico/calendario" element={<PrivateRoute><DoctorCalendar /></PrivateRoute>} />
+        <Route path="/paciente/calendario" element={<PrivateRoute><PatientCalendar /></PrivateRoute>} />
+        <Route path="/perfil" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+        <Route path="/paciente/avaliacao" element={<PrivateRoute><PatientAssessments /></PrivateRoute>} />
+        <Route path="/medico/avaliacao" element={<PrivateRoute><DoctorAssessments /></PrivateRoute>} />
+        <Route path="/medico/avaliacao/:prontuarioId" element={<PrivateRoute><AssessmentForm /></PrivateRoute>} />
+        <Route path="/calcom/callback" element={<CalComCallback />} />
+
+      </Routes>
+    </Router>
   );
 }
 

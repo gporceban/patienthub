@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -76,7 +75,16 @@ class CalComWrapper {
    * Generate Cal.com OAuth URL
    */
   public getOAuthUrl(redirectUri: string): string {
-    return `https://api.cal.com/oauth/authorize?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${this.scope}&response_type=code`;
+    console.log('Generating Cal.com OAuth URL with redirect URI:', redirectUri);
+    
+    // Make sure the redirectUri is properly encoded
+    const encodedRedirectUri = encodeURIComponent(redirectUri);
+    
+    // Create and return the OAuth URL
+    const oauthUrl = `https://cal.com/auth/oauth?client_id=${this.clientId}&redirect_uri=${encodedRedirectUri}&scope=${this.scope}&response_type=code`;
+    
+    console.log('Generated OAuth URL:', oauthUrl);
+    return oauthUrl;
   }
 
   /**

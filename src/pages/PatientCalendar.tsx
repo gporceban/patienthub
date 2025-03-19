@@ -97,8 +97,13 @@ const PatientCalendar = () => {
   }, [user, profile, toast]);
   
   const handleConnectCalCom = () => {
+    // Use the current window origin for the redirect
     const redirectUri = `${window.location.origin}/calcom/callback`;
+    console.log("Using redirect URI:", redirectUri);
+    
+    // Get OAuth URL and redirect
     const authUrl = calComWrapper.getOAuthUrl(redirectUri);
+    console.log("Redirecting to Cal.com auth URL:", authUrl);
     window.location.href = authUrl;
   };
   

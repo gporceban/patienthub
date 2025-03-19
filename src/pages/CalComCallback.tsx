@@ -1,16 +1,16 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import { calComWrapper } from '@/services/calComWrapper';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 
 const CalComCallback = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,10 +33,12 @@ const CalComCallback = () => {
           return;
         }
 
-        console.log("Authorization code obtained, processing...");
+        console.log("Authorization code obtained:", code);
 
         // Exchange code for token using our wrapper
         const redirectUri = `${window.location.origin}/calcom/callback`;
+        console.log("Using redirect URI for token exchange:", redirectUri);
+        
         const tokenData = await calComWrapper.exchangeCodeForToken(code, redirectUri);
 
         if (!tokenData || !tokenData.access_token) {
@@ -84,7 +86,7 @@ const CalComCallback = () => {
     };
 
     processOAuthCallback();
-  }, [location, navigate, user]);
+  }, [location, navigate, user, toast]);
 
   if (isLoading) {
     return (
