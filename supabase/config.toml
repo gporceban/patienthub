@@ -1,4 +1,6 @@
 
+# This is your Supabase project configuration
+
 project_id = "tokybrabdqqahhbxxpzj"
 
 [api]
@@ -28,8 +30,14 @@ additional_redirect_urls = ["https://localhost:3000"]
 jwt_expiry = 3600
 enable_signup = true
 
+# Correctly formatted functions configuration
 [functions]
+# Define the port as an integer directly (not nested)
 port = 54321
 
-[functions.http]
-cors = { patterns = ["supabase/functions"], local_only = false }
+# Correctly define CORS as its own section
+[functions.http.cors]
+allowedOrigins = ["*"]
+allowedMethods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+allowedHeaders = ["authorization", "x-client-info", "apikey", "content-type"]
+exposedHeaders = ["authorization", "x-client-info", "apikey", "content-type"]

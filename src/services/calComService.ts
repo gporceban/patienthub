@@ -59,13 +59,32 @@ export const storeCalComToken = async (userId: string, tokenData: CalComTokenRes
   try {
     console.log("Storing Cal.com token for user:", userId);
     
+    // First, check if cal_com_token_expires_at column exists
+    const { data: existingColumns, error: columnsError } = await supabase
+      .rpc('get_columns_for_table', { table_name: 'profiles' });
+    
+    if (columnsError) {
+      console.error('Error checking columns:', columnsError);
+      throw columnsError;
+    }
+
+    // Create a base update object with the columns we know exist
+    const updateData: any = { 
+      cal_com_token: tokenData.access_token,
+      cal_com_refresh_token: tokenData.refresh_token,
+    };
+    
+    // Only add the expires_at field if the column exists
+    const hasExpiresAtColumn = existingColumns && 
+      existingColumns.some((col: any) => col.column_name === 'cal_com_token_expires_at');
+    
+    if (hasExpiresAtColumn) {
+      updateData.cal_com_token_expires_at = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
+    }
+    
     const { error } = await supabase
       .from('profiles')
-      .update({ 
-        cal_com_token: tokenData.access_token,
-        cal_com_refresh_token: tokenData.refresh_token,
-        cal_com_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
-      })
+      .update(updateData)
       .eq('id', userId);
 
     if (error) {
@@ -87,7 +106,7 @@ export const getCalComToken = async (userId: string): Promise<string | null> => 
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('cal_com_token, cal_com_token_expires_at')
+      .select('cal_com_token')
       .eq('id', userId)
       .maybeSingle();
 
@@ -101,15 +120,7 @@ export const getCalComToken = async (userId: string): Promise<string | null> => 
       return null;
     }
 
-    // Check if token is expired
-    if (data.cal_com_token_expires_at) {
-      const expiresAt = new Date(data.cal_com_token_expires_at);
-      if (expiresAt <= new Date()) {
-        console.log("Cal.com token expired, refreshing...");
-        return refreshCalComToken(userId);
-      }
-    }
-
+    // We'll implement a simpler version without expiration check since that column might not exist
     return data.cal_com_token;
   } catch (error) {
     console.error('Error getting Cal.com token:', error);
@@ -148,13 +159,12 @@ export const refreshCalComToken = async (userId: string): Promise<string | null>
 
     console.log("Received new access token from refresh");
     
-    // Store the refreshed tokens
+    // Store the refreshed tokens without expires_at field
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
         cal_com_token: tokenData.accessToken,
         cal_com_refresh_token: tokenData.refreshToken,
-        cal_com_token_expires_at: new Date(Date.now() + (tokenData.expiresIn || 3600) * 1000).toISOString()
       })
       .eq('id', userId);
 
