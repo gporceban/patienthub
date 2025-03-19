@@ -28,6 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Use context user type as fallback if not explicitly provided
   const effectiveUserType = userType || contextUserType || 'paciente';
   
+  // Unified doctor links with consistent paths
   const doctorLinks = [
     { name: 'Dashboard', path: '/medico/dashboard', icon: Home },
     { name: 'Pacientes', path: '/medico/pacientes', icon: Users },
@@ -37,6 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Meu Perfil', path: '/medico/perfil', icon: User }
   ];
   
+  // Unified patient links with consistent paths
   const patientLinks = [
     { name: 'Dashboard', path: '/paciente/dashboard', icon: Home },
     { name: 'Agenda', path: '/paciente/agenda', icon: Calendar },

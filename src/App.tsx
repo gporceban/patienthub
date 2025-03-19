@@ -21,6 +21,7 @@ import PatientAssessment from './pages/PatientAssessment';
 import DoctorAssessment from './pages/DoctorAssessment';
 import PatientAssessmentDetails from './pages/PatientAssessmentDetails';
 import CalComCallback from './pages/CalComCallback';
+import DoctorDocuments from './pages/DoctorDocuments';
 
 function App() {
   const { user, userType, isLoading, hasValidSession } = useContext(AuthContext);
@@ -67,23 +68,29 @@ function App() {
         <Route path="/login" element={<PublicRoute><Index /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Index /></PublicRoute>} />
 
-        {/* Doctor Routes - removing duplicate /medico route */}
+        {/* Doctor Routes */}
         <Route path="/medico/dashboard" element={<PrivateRoute requiredUserType="medico"><DoctorDashboard /></PrivateRoute>} />
+        
+        {/* Unify calendar routes - both /calendario and /agenda point to the same component */}
         <Route path="/medico/calendario" element={<PrivateRoute requiredUserType="medico"><DoctorCalendar /></PrivateRoute>} />
-        <Route path="/medico/agenda" element={<PrivateRoute requiredUserType="medico"><DoctorCalendar /></PrivateRoute>} />
+        <Route path="/medico/agenda" element={<Navigate to="/medico/calendario" replace />} />
+        
         <Route path="/medico/pacientes" element={<PrivateRoute requiredUserType="medico"><DoctorPatients /></PrivateRoute>} />
         <Route path="/medico/perfil" element={<PrivateRoute requiredUserType="medico"><DoctorProfile /></PrivateRoute>} />
         <Route path="/medico/avaliacao" element={<PrivateRoute requiredUserType="medico"><DoctorAssessment /></PrivateRoute>} />
-        <Route path="/medico/documentos" element={<PrivateRoute requiredUserType="medico"><DoctorDashboard /></PrivateRoute>} />
+        <Route path="/medico/documentos" element={<PrivateRoute requiredUserType="medico"><DoctorDocuments /></PrivateRoute>} />
 
-        {/* Patient Routes - removing duplicate /paciente route */}
+        {/* Patient Routes */}
         <Route path="/paciente/dashboard" element={<PrivateRoute requiredUserType="paciente"><PatientDashboard /></PrivateRoute>} />
+        
+        {/* Unify patient calendar routes */}
         <Route path="/paciente/calendario" element={<PrivateRoute requiredUserType="paciente"><PatientCalendar /></PrivateRoute>} />
-        <Route path="/paciente/agenda" element={<PrivateRoute requiredUserType="paciente"><PatientCalendar /></PrivateRoute>} />
+        <Route path="/paciente/agenda" element={<Navigate to="/paciente/calendario" replace />} />
+        
         <Route path="/paciente/progresso" element={<PrivateRoute requiredUserType="paciente"><PatientProgress /></PrivateRoute>} />
         <Route path="/paciente/prontuario" element={<PrivateRoute requiredUserType="paciente"><PatientRecords /></PrivateRoute>} />
         <Route path="/paciente/avaliacao" element={<PrivateRoute requiredUserType="paciente"><PatientAssessment /></PrivateRoute>} />
-        <Route path="/paciente/avaliacoes" element={<PrivateRoute requiredUserType="paciente"><PatientAssessment /></PrivateRoute>} />
+        <Route path="/paciente/avaliacoes" element={<Navigate to="/paciente/avaliacao" replace />} />
         <Route path="/paciente/avaliacao/:id" element={<PrivateRoute requiredUserType="paciente"><PatientAssessmentDetails /></PrivateRoute>} />
         
         {/* Redirect root doctor/patient paths to their dashboards */}
