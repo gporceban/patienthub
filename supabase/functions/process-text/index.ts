@@ -62,7 +62,7 @@ const specializedAgents = {
 
 const documentOrchestrators = {
   clinical_note: `Você é um assistente médico gerando uma nota clínica estruturada no estilo do Dr. Porceban, um renomado cirurgião de coluna em São Paulo, Brasil.
-  Usando as informações extraídas, compile uma nota clínica COMPLETA em português brasileiro com estas seções:
+  Usando as informações extraídas, compile uma nota clínica COMPLETA em português brasileiro, num formato apropriado para ser colado em editor tipo QUILL que não aceita html, com estas seções:
   1. INFORMAÇÕES DO PACIENTE: Nome, número do prontuário, data e dados demográficos
   2. HPMA: História do paciente, queixas e sintomas
   3. EXAME FÍSICO: Achados do exame físico, sinais vitais e resultados de testes
