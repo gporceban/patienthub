@@ -46,11 +46,14 @@ export const exchangeCodeForToken = async (
 /**
  * Store Cal.com token in Supabase
  */
-export const storeCalComToken = async (userId: string, token: string): Promise<void> => {
+export const storeCalComToken = async (userId: string, tokenData: CalComTokenResponse): Promise<void> => {
   try {
     const { error } = await supabase
       .from('profiles')
-      .update({ cal_com_token: token })
+      .update({ 
+        cal_com_token: tokenData.access_token,
+        cal_com_refresh_token: tokenData.refresh_token
+      })
       .eq('id', userId);
 
     if (error) {
@@ -102,22 +105,30 @@ export const refreshCalComToken = async (userId: string): Promise<string | null>
     }
 
     // Call the edge function to refresh the token
-    const response = await fetch('/api/cal-com-refresh', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${data.cal_com_refresh_token}`, // Fixed: using cal_com_refresh_token instead of non-existent cal_com_token
-      },
+    const { data: tokenData, error: functionError } = await supabase.functions.invoke('cal-com-refresh', {
+      body: { refreshToken: data.cal_com_refresh_token }
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Error refreshing token:', errorData);
+    if (functionError || !tokenData || !tokenData.accessToken) {
+      console.error('Error refreshing token:', functionError || 'Invalid response');
       return null;
     }
 
-    const newTokenData = await response.json();
-    return newTokenData.accessToken;
+    // Store the refreshed tokens
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        cal_com_token: tokenData.accessToken,
+        cal_com_refresh_token: tokenData.refreshToken
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('Error updating tokens:', updateError);
+      return null;
+    }
+
+    return tokenData.accessToken;
   } catch (error) {
     console.error('Failed to refresh Cal.com token:', error);
     return null;
@@ -138,25 +149,18 @@ export const createCalComManagedUser = async (
   }
 ): Promise<{ success: boolean; calComUserId?: number }> => {
   try {
-    const response = await fetch('/functions/v1/cal-com-create-user', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabase.auth.getSession()}`,
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('cal-com-create-user', {
+      body: {
         userId,
         userData,
-      }),
+      },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Error creating Cal.com user:', errorData);
+    if (error || !data) {
+      console.error('Error creating Cal.com user:', error || 'No data returned');
       return { success: false };
     }
 
-    const data = await response.json();
     return { 
       success: true, 
       calComUserId: data.calComUser?.id 
@@ -175,4 +179,129 @@ export const getCalComOAuthUrl = (redirectUri: string): string => {
   const scope = 'availability calendar bookings profile'; // Adjust scopes as needed
   
   return `https://api.cal.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+};
+
+/**
+ * Check if user has an active Cal.com connection
+ */
+export const hasCalComConnection = async (userId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('cal_com_token, cal_com_refresh_token')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return false;
+    }
+
+    return !!data.cal_com_token && !!data.cal_com_refresh_token;
+  } catch (error) {
+    console.error('Error checking Cal.com connection:', error);
+    return false;
+  }
+};
+
+/**
+ * Get Cal.com bookings for a user
+ * Makes an API call to fetch bookings from Cal.com
+ */
+export const getCalComBookings = async (token: string): Promise<any[] | null> => {
+  try {
+    const response = await fetch('https://api.cal.com/v2/bookings', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error fetching Cal.com bookings:', errorData);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.bookings || [];
+  } catch (error) {
+    console.error('Failed to fetch Cal.com bookings:', error);
+    return null;
+  }
+};
+
+/**
+ * Create a new event type in Cal.com
+ */
+export const createCalComEventType = async (
+  token: string,
+  eventType: {
+    title: string;
+    slug: string;
+    length: number; // in minutes
+    description?: string;
+    locations?: Array<{type: string}>;
+  }
+): Promise<any | null> => {
+  try {
+    const response = await fetch('https://api.cal.com/v2/event-types', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(eventType)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error creating Cal.com event type:', errorData);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to create Cal.com event type:', error);
+    return null;
+  }
+};
+
+/**
+ * Update availability for a Cal.com user
+ */
+export const updateCalComAvailability = async (
+  token: string,
+  scheduleId: number,
+  availability: {
+    name: string;
+    timeZone: string;
+    schedule: Array<{
+      days: number[];
+      startTime: string; // format: HH:MM
+      endTime: string;   // format: HH:MM
+    }>
+  }
+): Promise<any | null> => {
+  try {
+    const response = await fetch(`https://api.cal.com/v2/schedules/${scheduleId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(availability)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error updating Cal.com availability:', errorData);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to update Cal.com availability:', error);
+    return null;
+  }
 };

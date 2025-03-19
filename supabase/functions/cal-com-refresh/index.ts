@@ -61,8 +61,9 @@ serve(async (req) => {
     // Return the new tokens
     return new Response(
       JSON.stringify({
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken
+        accessToken: tokens.accessToken || tokens.access_token,
+        refreshToken: tokens.refreshToken || tokens.refresh_token,
+        expiresIn: tokens.expiresIn || tokens.expires_in,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

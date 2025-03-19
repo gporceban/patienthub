@@ -37,21 +37,29 @@ export type CalComBooking = {
 };
 
 /**
- * Type for the mock booking data structure
+ * Type for Cal.com event type
  */
-type BookingResponseData = {
+export type CalComEventType = {
   id: number;
   title: string;
+  slug: string;
+  length: number;
   description?: string;
-  startTime: string;
-  endTime: string;
-  attendees: Array<{
-    email: string;
-    name: string;
+  locations?: Array<{type: string}>;
+};
+
+/**
+ * Type for Cal.com schedule/availability
+ */
+export type CalComSchedule = {
+  id: number;
+  name: string;
+  timeZone: string;
+  availability: Array<{
+    days: number[];
+    startTime: string;
+    endTime: string;
   }>;
-  status: string;
-  location?: string;
-  object?: string;
 };
 
 /**
@@ -286,69 +294,142 @@ class CalComWrapper {
 
   /**
    * Get bookings from Cal.com 
-   * Note: This method uses the Supabase REST API to query bookings
-   * due to the auth.user table not being directly accessible via the default client
    */
-  public async getBookings(): Promise<CalComBooking[] | null> {
+  public async getBookings(userId?: string): Promise<CalComBooking[] | null> {
     try {
       console.log('Fetching Cal.com bookings');
       
-      // Instead of querying the auth.user table directly (which isn't available in types),
-      // let's fetch bookings using a custom RPC function or emulate with a mock response
-      
-      // For development purposes, return mock data until proper integration is established
-      // In production, this should be replaced with actual API calls or RPC functions
-      
-      // Sample mock data that matches the CalComBooking type
-      const mockBookings: CalComBooking[] = [
-        {
-          id: 1001,
-          title: 'Consulta Ortopédica',
-          startTime: new Date(Date.now() + 86400000).toISOString(), // tomorrow
-          endTime: new Date(Date.now() + 86400000 + 3600000).toISOString(), // tomorrow + 1 hour
-          attendees: [
-            { email: 'paciente@example.com', name: 'João Silva' }
-          ],
-          status: 'confirmado',
-          location: 'Consultório 3',
-          description: 'Avaliação inicial de dor no joelho'
-        },
-        {
-          id: 1002,
-          title: 'Acompanhamento Pós-Cirúrgico',
-          startTime: new Date(Date.now() + 172800000).toISOString(), // day after tomorrow
-          endTime: new Date(Date.now() + 172800000 + 1800000).toISOString(), // day after tomorrow + 30 min
-          attendees: [
-            { email: 'maria@example.com', name: 'Maria Oliveira' }
-          ],
-          status: 'pendente',
-          location: 'Consultório 2',
-          description: 'Verificação de pontos e avaliação de recuperação'
-        }
-      ];
+      // If no userId is provided, use the current mock data
+      if (!userId) {
+        // Mock data for development purposes
+        const mockBookings: CalComBooking[] = [
+          {
+            id: 1001,
+            title: 'Consulta Ortopédica',
+            startTime: new Date(Date.now() + 86400000).toISOString(), // tomorrow
+            endTime: new Date(Date.now() + 86400000 + 3600000).toISOString(), // tomorrow + 1 hour
+            attendees: [
+              { email: 'paciente@example.com', name: 'João Silva' }
+            ],
+            status: 'confirmado',
+            location: 'Consultório 3',
+            description: 'Avaliação inicial de dor no joelho'
+          },
+          {
+            id: 1002,
+            title: 'Acompanhamento Pós-Cirúrgico',
+            startTime: new Date(Date.now() + 172800000).toISOString(), // day after tomorrow
+            endTime: new Date(Date.now() + 172800000 + 1800000).toISOString(), // day after tomorrow + 30 min
+            attendees: [
+              { email: 'maria@example.com', name: 'Maria Oliveira' }
+            ],
+            status: 'pendente',
+            location: 'Consultório 2',
+            description: 'Verificação de pontos e avaliação de recuperação'
+          }
+        ];
 
-      console.log('Successfully fetched mock Cal.com bookings');
-      return mockBookings;
+        console.log('Successfully fetched mock Cal.com bookings');
+        return mockBookings;
+      }
       
-      // In a real implementation, we would use an RPC function or edge function
-      // that has the necessary permissions to query the foreign table
-      /*
-      const { data, error } = await supabase.rpc('get_calcom_bookings');
+      // If userId is provided, use the bookings edge function
+      const response = await supabase.functions.invoke('cal-com-bookings', {
+        body: { action: 'get-bookings' },
+        query: { userId }
+      });
       
-      if (error) {
-        console.error('Error fetching bookings from Cal.com:', error);
+      if (response.error) {
+        console.error('Error fetching bookings from Cal.com:', response.error);
         return null;
       }
       
-      if (!data || data.length === 0) {
+      if (!response.data || !response.data.bookings) {
         console.log('No bookings found in Cal.com');
         return [];
       }
       
-      return data;
-      */
+      // Transform the response to match the CalComBooking type
+      const bookings: CalComBooking[] = response.data.bookings.map((booking: any) => ({
+        id: booking.id,
+        title: booking.title || booking.eventType?.title || 'Consulta',
+        description: booking.description,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        attendees: booking.attendees || [],
+        status: booking.status,
+        location: booking.location || 'Consultório'
+      }));
+      
+      return bookings;
     } catch (error) {
       console.error('Error fetching Cal.com bookings:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get event types from Cal.com
+   */
+  public async getEventTypes(userId: string): Promise<CalComEventType[] | null> {
+    try {
+      console.log('Fetching Cal.com event types for user:', userId);
+      
+      const response = await supabase.functions.invoke('cal-com-bookings', {
+        body: { action: 'get-event-types' },
+        query: { userId }
+      });
+      
+      if (response.error) {
+        console.error('Error fetching event types from Cal.com:', response.error);
+        return null;
+      }
+      
+      if (!response.data || !response.data.eventTypes) {
+        console.log('No event types found in Cal.com');
+        return [];
+      }
+      
+      return response.data.eventTypes;
+    } catch (error) {
+      console.error('Error fetching Cal.com event types:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create a new event type in Cal.com
+   */
+  public async createEventType(
+    userId: string,
+    eventType: {
+      title: string;
+      slug: string;
+      length: number;
+      description?: string;
+      locations?: Array<{type: string}>;
+    }
+  ): Promise<CalComEventType | null> {
+    try {
+      console.log('Creating Cal.com event type for user:', userId);
+      
+      const response = await supabase.functions.invoke('cal-com-bookings', {
+        body: { 
+          action: 'create-event-type',
+          ...eventType
+        },
+        query: { userId }
+      });
+      
+      if (response.error) {
+        console.error('Error creating event type in Cal.com:', response.error);
+        return null;
+      }
+      
+      console.log('Successfully created Cal.com event type:', response.data);
+      return response.data.eventType;
+    } catch (error) {
+      console.error('Error creating Cal.com event type:', error);
       return null;
     }
   }
@@ -368,16 +449,95 @@ class CalComWrapper {
     try {
       console.log('Creating availability for user:', userId, 'with schedule:', schedule);
       
-      // For now, this is a placeholder. In a real implementation, we would:
-      // 1. Get the Cal.com token for the user
-      // 2. Call the Cal.com API to create availability
+      // Call the edge function to set availability
+      const response = await supabase.functions.invoke('cal-com-bookings', {
+        body: { 
+          action: 'create-schedule',
+          name: 'Default Schedule',
+          timeZone: schedule.timezone || 'America/Sao_Paulo',
+          availability: [{
+            days: schedule.days,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime
+          }]
+        },
+        query: { userId }
+      });
       
-      // Simulate a successful response
-      // In production, this should call an actual API or edge function
-      console.log('Successfully created mock availability for doctor');
+      if (response.error) {
+        console.error('Error creating availability in Cal.com:', response.error);
+        return false;
+      }
+      
+      console.log('Successfully created Cal.com availability:', response.data);
       return true;
     } catch (error) {
       console.error('Error creating Cal.com availability:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Cancel a booking in Cal.com
+   */
+  public async cancelBooking(userId: string, bookingId: number): Promise<boolean> {
+    try {
+      console.log('Cancelling booking:', bookingId, 'for user:', userId);
+      
+      const response = await supabase.functions.invoke('cal-com-bookings', {
+        body: { 
+          action: 'cancel-booking',
+          bookingId
+        },
+        query: { userId }
+      });
+      
+      if (response.error) {
+        console.error('Error cancelling booking in Cal.com:', response.error);
+        return false;
+      }
+      
+      console.log('Successfully cancelled Cal.com booking:', response.data);
+      return true;
+    } catch (error) {
+      console.error('Error cancelling Cal.com booking:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Reschedule a booking in Cal.com
+   */
+  public async rescheduleBooking(
+    userId: string, 
+    bookingId: number,
+    newTime: {
+      startTime: string;
+      endTime: string;
+    }
+  ): Promise<boolean> {
+    try {
+      console.log('Rescheduling booking:', bookingId, 'for user:', userId);
+      
+      const response = await supabase.functions.invoke('cal-com-bookings', {
+        body: { 
+          action: 'reschedule-booking',
+          bookingId,
+          startTime: newTime.startTime,
+          endTime: newTime.endTime
+        },
+        query: { userId }
+      });
+      
+      if (response.error) {
+        console.error('Error rescheduling booking in Cal.com:', response.error);
+        return false;
+      }
+      
+      console.log('Successfully rescheduled Cal.com booking:', response.data);
+      return true;
+    } catch (error) {
+      console.error('Error rescheduling Cal.com booking:', error);
       return false;
     }
   }
