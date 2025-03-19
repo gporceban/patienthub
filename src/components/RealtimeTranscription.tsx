@@ -14,10 +14,11 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   isTranscribing
 }) => {
   return (
-    <div className={`w-full h-20 rounded-md overflow-hidden ${isRecording ? 'bg-darkblue-800/80' : 'bg-darkblue-900/50'} relative`}>
+    <div className={`w-full h-20 rounded-md overflow-hidden ${isRecording ? 'bg-darkblue-800/80' : 'bg-darkblue-900/50'} relative border border-darkblue-700`}>
       {isRecording && !transcription && !isTranscribing && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <p className="text-gray-400 text-sm">Gravando áudio... Começe a falar.</p>
+          <p className="text-gray-300 text-sm">Gravando áudio... Começe a falar.</p>
+          <span className="ml-2 h-2 w-2 bg-red-500 rounded-full animate-pulse"></span>
         </div>
       )}
       
@@ -32,10 +33,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         <div className="absolute inset-0 p-3 overflow-y-auto">
           <p className="text-white text-sm font-medium">
             {transcription}
+            {isRecording && (
+              <span className="inline-block w-2 h-4 ml-1 bg-gold-500 animate-pulse"></span>
+            )}
           </p>
-          {isRecording && (
-            <span className="inline-block w-2 h-4 ml-1 bg-gold-500 animate-pulse"></span>
-          )}
         </div>
       )}
       

@@ -57,6 +57,14 @@ serve(async (req) => {
       throw new Error('No audio data provided');
     }
 
+    if (audio.length < 1000) {  // Simple check to catch empty or very short recordings
+      console.log('Audio data too short, likely no speech detected');
+      return new Response(
+        JSON.stringify({ error: 'Audio recording too short or empty', text: '' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log('Received audio data, processing...');
     
     // Process audio in chunks
