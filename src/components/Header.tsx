@@ -44,7 +44,7 @@ const Header: React.FC<HeaderProps> = ({
   if (location.pathname === '/') {
     return null;
   }
-  return <header className="w-full py-4 px-6 backdrop-blur-md border-b border-darkblue-700/50 sticky top-0 z-10 bg-slate-900 bg-[1b3341]">
+  return <header className="w-full py-4 backdrop-blur-md border-b border-darkblue-700/50 sticky top-0 z-10 bg-slate-900 bg-[1b3341] px-[16px]">
       <div className="container mx-auto flex justify-between items-center">
         <Logo size="small" />
         
