@@ -165,6 +165,36 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_notifications: {
+        Row: {
+          created_at: string
+          icon_type: string
+          id: string
+          message: string
+          patient_id: string
+          read: boolean
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          icon_type: string
+          id?: string
+          message: string
+          patient_id: string
+          read?: boolean
+          title: string
+        }
+        Update: {
+          created_at?: string
+          icon_type?: string
+          id?: string
+          message?: string
+          patient_id?: string
+          read?: boolean
+          title?: string
+        }
+        Relationships: []
+      }
       patients: {
         Row: {
           allergies: string | null

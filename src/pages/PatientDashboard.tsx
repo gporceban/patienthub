@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import NotificationList from '@/components/NotificationList';
 
 interface PatientAssessment {
   id: string;
@@ -141,6 +142,17 @@ const PatientDashboard = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
+          {/* Notifications Section */}
+          {profile?.id && (
+            <div className="mb-8">
+              <NotificationList 
+                userId={profile.id} 
+                userType="paciente" 
+                limit={3} 
+              />
+            </div>
+          )}
+
           <h2 className="text-xl font-semibold mb-4">Últimas Avaliações</h2>
           
           {isLoading ? (
