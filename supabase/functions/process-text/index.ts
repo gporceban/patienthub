@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -58,6 +57,30 @@ const specializedAgents = {
   - Histórico social
   - Histórico de medicação
   Formate em um formato estruturado usando terminologia médica profissional em português brasileiro.`,
+
+  toolAgent: `Você é uma IA especializada em utilizar ferramentas para aprimorar análises médicas em contexto ambulatorial brasileiro.
+  
+  FERRAMENTAS DISPONÍVEIS:
+  
+  1. Pesquisa de Medicamentos: Obtenha informações atualizadas sobre medicamentos, incluindo interações, dosagens recomendadas e contraindicações.
+     Uso: medicamento_info(nome: str) -> dict
+  
+  2. Pesquisa de Diretrizes Clínicas: Acesse diretrizes e protocolos clínicos atualizados para diferentes condições ortopédicas.
+     Uso: diretriz_clinica(condicao: str) -> str
+  
+  3. Cálculo de Risco: Calcule escores de risco para diferentes condições ortopédicas com base em parâmetros do paciente.
+     Uso: calculo_risco(tipo: str, parametros: dict) -> dict
+  
+  4. Busca em Literatura Médica: Pesquise estudos recentes e evidências científicas sobre condições e tratamentos ortopédicos.
+     Uso: literatura_medica(termo: str, max_resultados: int = 3) -> list
+  
+  Seu objetivo é analisar o texto médico e utilizar essas ferramentas quando apropriado para enriquecer a análise com:
+  - Informações complementares sobre medicamentos prescritos
+  - Conformidade com diretrizes clínicas atuais
+  - Avaliações de risco relevantes
+  - Evidências científicas recentes para diagnósticos e tratamentos
+  
+  Formate sua resposta usando terminologia médica profissional em português brasileiro, destacando claramente quando estiver utilizando informações obtidas através das ferramentas.`
 }
 
 const documentOrchestrators = {
@@ -166,7 +189,22 @@ const documentOrchestrators = {
   - Formate o documento para ser visualmente atraente, com seções claras e espaçamento adequado
   - Certifique-se que o conteúdo seja motivador e empoderante para o paciente
   
-  O documento deve ser acolhedor, fácil de entender e fazer o paciente se sentir apoiado.`
+  O documento deve ser acolhedor, fácil de entender e fazer o paciente se sentir apoiado.`,
+
+  enhanced_analysis: `Você é um assistente médico especializado em análise aprimorada por ferramentas, trabalhando no estilo do Dr. Porceban, renomado cirurgião de coluna em São Paulo, Brasil.
+  
+  Usando tanto as informações extraídas QUANTO dados adicionais obtidos através de ferramentas especializadas, compile uma análise médica ABRANGENTE em português brasileiro com:
+  
+  1. RESUMO CLÍNICO: Condensação dos achados principais, diagnósticos e plano
+  2. CONTEXTO FARMACOLÓGICO: Informações complementares sobre medicamentos prescritos, incluindo interações potenciais e considerações especiais
+  3. CONFORMIDADE COM DIRETRIZES: Análise da aderência do diagnóstico e tratamento às diretrizes clínicas atuais
+  4. AVALIAÇÃO DE RISCO: Escores de risco relevantes para a condição do paciente
+  5. EVIDÊNCIA CIENTÍFICA: Resumo de estudos recentes relacionados ao caso
+  6. RECOMENDAÇÕES BASEADAS EM EVIDÊNCIAS: Sugestões adicionais fundamentadas na literatura médica atual
+  
+  A análise deve integrar perfeitamente as informações clínicas básicas com os dados obtidos através das ferramentas especializadas.
+  Mantenha o estilo profissional e conciso do Dr. Porceban, priorizando relevância clínica.
+  Destaque claramente quando estiver apresentando informações obtidas através de ferramentas, diferenciando-as dos dados extraídos diretamente da consulta.`
 }
 
 async function runAgentBasedProcessing(text: string, mode: string, patientHistory: any = null, humanInstructions: string = "") {
@@ -211,6 +249,9 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
       break;
     case 'medical_report':
       extractors.push('patientInfoExtractor', 'symptomExtractor', 'examExtractor', 'diagnosisExtractor', 'treatmentExtractor', 'historyExtractor');
+      break;
+    case 'enhanced_analysis':
+      extractors.push('patientInfoExtractor', 'symptomExtractor', 'examExtractor', 'diagnosisExtractor', 'treatmentExtractor', 'historyExtractor', 'toolAgent');
       break;
     case 'patient_friendly':
       // For patient-friendly mode, we don't need extractors as we're just transforming existing medical content
@@ -284,7 +325,7 @@ async function runAgentBasedProcessing(text: string, mode: string, patientHistor
     }
     
     var compiledExtractions = extractionResults.reduce((acc, result) => {
-      const extractorName = result.extractor.replace('Extractor', '').toUpperCase();
+      const extractorName = result.extractor.replace('Extractor', '').replace('Agent', '').toUpperCase();
       return acc + `\n\n### ${extractorName} INFORMATION:\n${result.content}`;
     }, '');
   }
@@ -428,8 +469,8 @@ serve(async (req) => {
       throw new Error('No text provided');
     }
 
-    if (!mode || !['clinical_note', 'prescription', 'summary', 'structured_data', 'evolution', 'medical_report', 'patient_friendly'].includes(mode)) {
-      throw new Error('Invalid or missing mode. Must be one of: clinical_note, prescription, summary, structured_data, evolution, medical_report, patient_friendly');
+    if (!mode || !['clinical_note', 'prescription', 'summary', 'structured_data', 'evolution', 'medical_report', 'patient_friendly', 'enhanced_analysis'].includes(mode)) {
+      throw new Error('Invalid or missing mode. Must be one of: clinical_note, prescription, summary, structured_data, evolution, medical_report, patient_friendly, enhanced_analysis');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
