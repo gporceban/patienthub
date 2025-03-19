@@ -12,7 +12,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Notification, fromNotifications } from '@/types/notifications';
-
 interface Appointment {
   id: string;
   patient_id: string;
@@ -21,16 +20,19 @@ interface Appointment {
   status: string;
   patient_name?: string;
 }
-
 interface AppointmentStats {
   total: number;
   today: number;
   active_patients: number;
 }
-
 const DoctorDashboard = () => {
-  const { user, profile } = useContext(AuthContext);
-  const { toast } = useToast();
+  const {
+    user,
+    profile
+  } = useContext(AuthContext);
+  const {
+    toast
+  } = useToast();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
@@ -42,77 +44,58 @@ const DoctorDashboard = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
   const today = new Date().toISOString().split('T')[0];
-  
   useEffect(() => {
     const fetchAppointmentsAndStats = async () => {
       if (!user) return;
-      
       try {
         setIsLoading(true);
         setError(null);
         console.log("Fetching appointments for doctor:", user.id);
-        
-        const { data: appointmentsData, error: appointmentsError } = await supabase
-          .from('appointments')
-          .select(`
+        const {
+          data: appointmentsData,
+          error: appointmentsError
+        } = await supabase.from('appointments').select(`
             id,
             patient_id,
             date_time,
             location,
             status
-          `)
-          .eq('doctor_id', user.id)
-          .order('date_time', { ascending: true });
-          
+          `).eq('doctor_id', user.id).order('date_time', {
+          ascending: true
+        });
         if (appointmentsError) {
           console.error("Error fetching appointments:", appointmentsError);
           throw appointmentsError;
         }
-        
         console.log("Appointments data received:", appointmentsData);
-        
         if (appointmentsData && appointmentsData.length > 0) {
-          const appointmentsWithNames = await Promise.all(
-            appointmentsData.map(async (appointment) => {
-              if (!appointment || !appointment.patient_id) {
-                return { ...appointment, patient_name: 'Desconhecido' };
-              }
-              
-              try {
-                const { data: profileData } = await supabase
-                  .from('profiles')
-                  .select('full_name')
-                  .eq('id', appointment.patient_id)
-                  .single();
-                  
-                return {
-                  ...appointment,
-                  patient_name: profileData?.full_name || 'Paciente'
-                };
-              } catch (error) {
-                console.error("Error fetching patient name:", error);
-                return {
-                  ...appointment,
-                  patient_name: 'Paciente'
-                };
-              }
-            })
-          );
-          
+          const appointmentsWithNames = await Promise.all(appointmentsData.map(async appointment => {
+            if (!appointment || !appointment.patient_id) {
+              return {
+                ...appointment,
+                patient_name: 'Desconhecido'
+              };
+            }
+            try {
+              const {
+                data: profileData
+              } = await supabase.from('profiles').select('full_name').eq('id', appointment.patient_id).single();
+              return {
+                ...appointment,
+                patient_name: profileData?.full_name || 'Paciente'
+              };
+            } catch (error) {
+              console.error("Error fetching patient name:", error);
+              return {
+                ...appointment,
+                patient_name: 'Paciente'
+              };
+            }
+          }));
           setAppointments(appointmentsWithNames as Appointment[]);
-          
-          const todayAppointments = appointmentsWithNames.filter(
-            app => app?.date_time?.startsWith(today)
-          ).length;
-          
-          const uniquePatients = new Set(
-            appointmentsWithNames
-              .filter(app => app && app.patient_id)
-              .map(app => app.patient_id)
-          ).size;
-          
+          const todayAppointments = appointmentsWithNames.filter(app => app?.date_time?.startsWith(today)).length;
+          const uniquePatients = new Set(appointmentsWithNames.filter(app => app && app.patient_id).map(app => app.patient_id)).size;
           setStats({
             total: appointmentsWithNames.length,
             today: todayAppointments,
@@ -127,13 +110,14 @@ const DoctorDashboard = () => {
             active_patients: 0
           });
         }
-        
         try {
-          const { count: assessmentCount, error: assessmentError } = await supabase
-            .from('patient_assessments')
-            .select('id', { count: 'exact', head: true })
-            .eq('doctor_id', user.id);
-            
+          const {
+            count: assessmentCount,
+            error: assessmentError
+          } = await supabase.from('patient_assessments').select('id', {
+            count: 'exact',
+            head: true
+          }).eq('doctor_id', user.id);
           if (!assessmentError && assessmentCount !== null) {
             setStats(prev => ({
               ...prev,
@@ -143,7 +127,6 @@ const DoctorDashboard = () => {
         } catch (assessmentError) {
           console.error("Error fetching assessments:", assessmentError);
         }
-        
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         setError("Erro ao carregar dados. Verifique sua conexão com a internet e tente novamente.");
@@ -156,23 +139,20 @@ const DoctorDashboard = () => {
         setIsLoading(false);
       }
     };
-    
     fetchAppointmentsAndStats();
   }, [user, today, toast]);
-  
   useEffect(() => {
     const fetchNotifications = async () => {
       if (!user) return;
-      
       try {
         setNotificationsLoading(true);
-        
-        const { data, error } = await fromNotifications(supabase).getByDoctorId(user.id);
-        
+        const {
+          data,
+          error
+        } = await fromNotifications(supabase).getByDoctorId(user.id);
         if (error) {
           throw error;
         }
-        
         if (data) {
           setNotifications(data as Notification[]);
         }
@@ -187,50 +167,38 @@ const DoctorDashboard = () => {
         setNotificationsLoading(false);
       }
     };
-    
     fetchNotifications();
   }, [user, toast]);
-  
   const filteredAppointments = appointments.filter(appointment => {
     if (!searchQuery.trim()) return true;
-    
     const query = searchQuery.toLowerCase();
-    return (
-      appointment.patient_name?.toLowerCase().includes(query) ||
-      appointment.location.toLowerCase().includes(query)
-    );
+    return appointment.patient_name?.toLowerCase().includes(query) || appointment.location.toLowerCase().includes(query);
   });
-  
-  const todaysAppointments = appointments.filter(
-    appointment => appointment.date_time.startsWith(today)
-  );
-  
+  const todaysAppointments = appointments.filter(appointment => appointment.date_time.startsWith(today));
   const formatAppointmentTime = (dateTimeString: string) => {
     const date = new Date(dateTimeString);
-    return date.toLocaleTimeString('pt-BR', { 
-      hour: '2-digit', 
+    return date.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
       minute: '2-digit',
       hour12: false
     });
   };
-  
   const formatAppointmentDate = (dateTimeString: string) => {
     const date = new Date(dateTimeString);
-    return date.toLocaleDateString('pt-BR', { 
-      day: '2-digit', 
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     });
   };
-  
   const formatNotificationTime = (dateTimeString: string) => {
     const now = new Date();
     const date = new Date(dateTimeString);
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
     if (diffInMinutes < 60) {
       return `Há ${diffInMinutes} minuto${diffInMinutes !== 1 ? 's' : ''}`;
-    } else if (diffInMinutes < 1440) { // less than a day
+    } else if (diffInMinutes < 1440) {
+      // less than a day
       const hours = Math.floor(diffInMinutes / 60);
       return `Há ${hours} hora${hours !== 1 ? 's' : ''}`;
     } else {
@@ -239,7 +207,6 @@ const DoctorDashboard = () => {
       return `Há ${days} dias`;
     }
   };
-  
   const getIconForNotification = (iconType: string) => {
     switch (iconType) {
       case 'calendar':
@@ -250,7 +217,6 @@ const DoctorDashboard = () => {
         return <Bell className="h-4 w-4 text-amber-400" />;
     }
   };
-  
   const getIconBgForNotification = (iconType: string) => {
     switch (iconType) {
       case 'calendar':
@@ -261,52 +227,28 @@ const DoctorDashboard = () => {
         return 'bg-amber-950';
     }
   };
-  
   const doctorName = profile?.full_name || "Dr. Paulo Oliveira";
-  
   const renderDashboardCards = () => {
     if (isLoading) {
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {[1, 2, 3].map((index) => (
-            <Card key={index} className="card-gradient p-6">
+      return <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {[1, 2, 3].map(index => <Card key={index} className="card-gradient p-6">
               <Skeleton className="h-6 w-1/3 mb-3" />
               <Skeleton className="h-8 w-1/4" />
-            </Card>
-          ))}
-        </div>
-      );
+            </Card>)}
+        </div>;
     }
-    
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <DashboardCard
-          title="Pacientes Ativos"
-          value={stats.active_patients.toString()}
-          icon={Users}
-        />
+    return <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <DashboardCard title="Pacientes Ativos" value={stats.active_patients.toString()} icon={Users} />
         
-        <DashboardCard
-          title="Consultas Hoje"
-          value={stats.today.toString()}
-          icon={Calendar}
-        />
+        <DashboardCard title="Consultas Hoje" value={stats.today.toString()} icon={Calendar} />
         
-        <DashboardCard
-          title="Total de Atendimentos"
-          value={stats.total.toString()}
-          icon={FileText}
-        />
-      </div>
-    );
+        <DashboardCard title="Total de Atendimentos" value={stats.total.toString()} icon={FileText} />
+      </div>;
   };
-  
   const renderRecentPatients = () => {
     if (isLoading) {
-      return (
-        <div className="space-y-3">
-          {[1, 2, 3].map((index) => (
-            <div key={index} className="flex items-center justify-between">
+      return <div className="space-y-3">
+          {[1, 2, 3].map(index => <div key={index} className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-9 w-9 rounded-full" />
                 <div>
@@ -314,15 +256,11 @@ const DoctorDashboard = () => {
                   <Skeleton className="h-3 w-24" />
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      );
+            </div>)}
+        </div>;
     }
-    
     if (filteredAppointments.length === 0) {
-      return (
-        <div className="text-center py-6 border border-dashed border-darkblue-700 rounded-lg">
+      return <div className="text-center py-6 border border-dashed border-darkblue-700 rounded-lg">
           <Users className="h-10 w-10 mx-auto text-gray-400 mb-2" />
           <h3 className="text-lg font-medium mb-1">Nenhum paciente cadastrado</h3>
           <p className="text-gray-400 mb-4">Você ainda não possui pacientes cadastrados no sistema.</p>
@@ -332,14 +270,10 @@ const DoctorDashboard = () => {
               Adicionar Paciente
             </Link>
           </Button>
-        </div>
-      );
+        </div>;
     }
-    
-    return (
-      <div className="space-y-3">
-        {filteredAppointments.slice(0, 3).map((appointment) => (
-          <div key={appointment.id} className="flex items-center justify-between">
+    return <div className="space-y-3">
+        {filteredAppointments.slice(0, 3).map(appointment => <div key={appointment.id} className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-darkblue-800 rounded-full h-9 w-9 flex items-center justify-center text-sm font-medium text-gold-400">
                 {appointment.patient_name?.split(' ').map(name => name[0]).join('').substring(0, 2).toUpperCase()}
@@ -349,24 +283,19 @@ const DoctorDashboard = () => {
                 <p className="text-xs text-gray-400">Consulta: {formatAppointmentDate(appointment.date_time)}, {formatAppointmentTime(appointment.date_time)}</p>
               </div>
             </div>
-          </div>
-        ))}
+          </div>)}
         
         <Button asChild variant="link" className="mt-2 text-gold-400">
           <Link to="/medico/pacientes">
             Ver Todos os Pacientes
           </Link>
         </Button>
-      </div>
-    );
+      </div>;
   };
-  
   const renderNotifications = () => {
     if (notificationsLoading) {
-      return (
-        <div className="space-y-4">
-          {[1, 2, 3].map((index) => (
-            <div key={index} className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+      return <div className="space-y-4">
+          {[1, 2, 3].map(index => <div key={index} className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
               <div className="flex items-start gap-3">
                 <Skeleton className="h-8 w-8 rounded-full" />
                 <div>
@@ -374,26 +303,18 @@ const DoctorDashboard = () => {
                   <Skeleton className="h-3 w-20" />
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      );
+            </div>)}
+        </div>;
     }
-    
     if (notifications.length === 0) {
-      return (
-        <div className="text-center py-6 border border-dashed border-darkblue-700 rounded-lg">
+      return <div className="text-center py-6 border border-dashed border-darkblue-700 rounded-lg">
           <Bell className="h-10 w-10 mx-auto text-gray-400 mb-2" />
           <h3 className="text-lg font-medium mb-1">Sem notificações</h3>
           <p className="text-gray-400">Você não tem novas notificações no momento.</p>
-        </div>
-      );
+        </div>;
     }
-    
-    return (
-      <div className="space-y-4">
-        {notifications.map((notification) => (
-          <div key={notification.id} className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+    return <div className="space-y-4">
+        {notifications.map(notification => <div key={notification.id} className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
             <div className="flex items-start gap-3">
               <div className={`${getIconBgForNotification(notification.icon_type)} rounded-full p-2 mt-1`}>
                 {getIconForNotification(notification.icon_type)}
@@ -403,14 +324,10 @@ const DoctorDashboard = () => {
                 <p className="text-xs text-gray-400 mt-1">{formatNotificationTime(notification.created_at)}</p>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-    );
+          </div>)}
+      </div>;
   };
-  
-  return (
-    <Layout userType="medico" userName={profile?.full_name || "Dr. Paulo Oliveira"}>
+  return <Layout userType="medico" userName={profile?.full_name || "Dr. Paulo Oliveira"}>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white mb-2">
           Bem-vindo, <span className="text-gold-400">{profile?.full_name || "Dr. Paulo Oliveira"}</span>
@@ -422,18 +339,12 @@ const DoctorDashboard = () => {
       
       {renderDashboardCards()}
       
-      {error && (
-        <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 mb-6 text-red-200">
+      {error && <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 mb-6 text-red-200">
           <p>{error}</p>
-          <Button 
-            variant="outline" 
-            className="mt-2 border-red-800 hover:bg-red-900/30"
-            onClick={() => window.location.reload()}
-          >
+          <Button variant="outline" className="mt-2 border-red-800 hover:bg-red-900/30" onClick={() => window.location.reload()}>
             Tentar novamente
           </Button>
-        </div>
-      )}
+        </div>}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -452,20 +363,12 @@ const DoctorDashboard = () => {
             <div className="mb-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <Input
-                  type="search"
-                  placeholder="Buscar paciente..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-darkblue-800/50 border-darkblue-700"
-                />
+                <Input type="search" placeholder="Buscar paciente..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 bg-darkblue-800/50 border-darkblue-700" />
               </div>
             </div>
             
-            {isLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((index) => (
-                  <div key={index} className="p-4 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+            {isLoading ? <div className="space-y-4">
+                {[1, 2, 3].map(index => <div key={index} className="p-4 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -482,11 +385,8 @@ const DoctorDashboard = () => {
                         <Skeleton className="h-9 w-20" />
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : todaysAppointments.length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-darkblue-700 rounded-lg">
+                  </div>)}
+              </div> : todaysAppointments.length === 0 ? <div className="text-center py-10 border border-dashed border-darkblue-700 rounded-lg">
                 <Calendar className="h-10 w-10 mx-auto text-gray-400 mb-2" />
                 <h3 className="text-lg font-medium mb-1">Sem consultas hoje</h3>
                 <p className="text-gray-400 mb-4">Você não tem consultas agendadas para hoje.</p>
@@ -496,28 +396,13 @@ const DoctorDashboard = () => {
                     Agendar Consulta
                   </Link>
                 </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredAppointments.map((appointment) => (
-                  <div 
-                    key={appointment.id} 
-                    className="p-4 border border-darkblue-700 rounded-lg bg-darkblue-800/40 hover:bg-darkblue-800/60 transition-colors"
-                  >
+              </div> : <div className="space-y-4">
+                {filteredAppointments.map(appointment => <div key={appointment.id} className="p-4 border border-darkblue-700 rounded-lg bg-darkblue-800/40 hover:bg-darkblue-800/60 transition-colors">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge 
-                            className={
-                              appointment.status === 'agendada' 
-                                ? "bg-emerald-900/70 text-emerald-300 hover:bg-emerald-900" 
-                                : appointment.status === 'concluída'
-                                ? "bg-blue-900/70 text-blue-300 hover:bg-blue-900"
-                                : "bg-orange-900/70 text-orange-300 hover:bg-orange-900"
-                            }
-                          >
-                            {appointment.status === 'agendada' ? 'Agendada' :
-                             appointment.status === 'concluída' ? 'Concluída' : 'Pendente'}
+                          <Badge className={appointment.status === 'agendada' ? "bg-emerald-900/70 text-emerald-300 hover:bg-emerald-900" : appointment.status === 'concluída' ? "bg-blue-900/70 text-blue-300 hover:bg-blue-900" : "bg-orange-900/70 text-orange-300 hover:bg-orange-900"}>
+                            {appointment.status === 'agendada' ? 'Agendada' : appointment.status === 'concluída' ? 'Concluída' : 'Pendente'}
                           </Badge>
                           <span className="text-gold-400 font-semibold">{appointment.patient_name}</span>
                         </div>
@@ -543,48 +428,41 @@ const DoctorDashboard = () => {
                         </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  </div>)}
+              </div>}
           </Card>
         </div>
         
         <div>
-          <Card className="card-gradient p-6 mb-6">
+          <Card className="card-gradient p-6 mb-6 bg-gray-700">
             <h2 className="text-xl font-semibold mb-4">Notificações</h2>
             
             {renderNotifications()}
             
-            <Button 
-              variant="link" 
-              className="w-full mt-3 text-gold-400"
-              onClick={async () => {
-                if (notifications.length === 0) return;
-                
-                try {
-                  const { error } = await fromNotifications(supabase).markAsRead(user?.id || '');
-                  
-                  if (error) throw error;
-                    
-                  toast({
-                    title: "Notificações marcadas como lidas",
-                    description: "Todas as notificações foram marcadas como lidas."
-                  });
-                  
-                  setNotifications(prevNotifications => 
-                    prevNotifications.map(notif => ({ ...notif, read: true }))
-                  );
-                } catch (error) {
-                  console.error('Error marking notifications as read:', error);
-                  toast({
-                    variant: "destructive",
-                    title: "Erro",
-                    description: "Não foi possível marcar as notificações como lidas."
-                  });
-                }
-              }}
-            >
+            <Button variant="link" className="w-full mt-3 text-gold-400" onClick={async () => {
+            if (notifications.length === 0) return;
+            try {
+              const {
+                error
+              } = await fromNotifications(supabase).markAsRead(user?.id || '');
+              if (error) throw error;
+              toast({
+                title: "Notificações marcadas como lidas",
+                description: "Todas as notificações foram marcadas como lidas."
+              });
+              setNotifications(prevNotifications => prevNotifications.map(notif => ({
+                ...notif,
+                read: true
+              })));
+            } catch (error) {
+              console.error('Error marking notifications as read:', error);
+              toast({
+                variant: "destructive",
+                title: "Erro",
+                description: "Não foi possível marcar as notificações como lidas."
+              });
+            }
+          }}>
               Marcar Todas Como Lidas
             </Button>
           </Card>
@@ -596,8 +474,6 @@ const DoctorDashboard = () => {
           </Card>
         </div>
       </div>
-    </Layout>
-  );
+    </Layout>;
 };
-
 export default DoctorDashboard;
