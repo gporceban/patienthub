@@ -117,27 +117,42 @@ export const getCalComToken = async (userId: string): Promise<string | null> => 
     // Check if the cal_com_token_expires_at column exists
     const hasExpiresAtColumn = await checkColumnExists('profiles', 'cal_com_token_expires_at');
     
-    // Select only the necessary fields
-    const query = supabase
+    // Define the type for our query result based on what columns we're selecting
+    type ProfileData = hasExpiresAtColumn extends true 
+      ? { cal_com_token: string | null; cal_com_token_expires_at: string | null }
+      : { cal_com_token: string | null };
+    
+    // Execute the query
+    const { data, error } = await supabase
       .from('profiles')
       .select(hasExpiresAtColumn ? 'cal_com_token, cal_com_token_expires_at' : 'cal_com_token')
       .eq('id', userId)
       .maybeSingle();
-    
-    const { data, error } = await query;
 
     if (error) {
       console.error('Error getting Cal.com token:', error);
       return null;
     }
     
-    if (!data || !data.cal_com_token) {
+    if (!data) {
       console.log("No Cal.com token found for user:", userId);
       return null;
     }
 
+    // Type guard to check if data has the expected properties
+    const hasCalComToken = (obj: any): obj is { cal_com_token: string | null } => 
+      typeof obj === 'object' && obj !== null && 'cal_com_token' in obj;
+    
+    const hasExpiresAtProperty = (obj: any): obj is { cal_com_token_expires_at: string | null } => 
+      typeof obj === 'object' && obj !== null && 'cal_com_token_expires_at' in obj;
+
+    // Safely check if token exists
+    if (!hasCalComToken(data) || !data.cal_com_token) {
+      return null;
+    }
+
     // Check if token is expired (if we have expiration data)
-    if (hasExpiresAtColumn && data.cal_com_token_expires_at) {
+    if (hasExpiresAtColumn && hasExpiresAtProperty(data) && data.cal_com_token_expires_at) {
       const expiresAt = new Date(data.cal_com_token_expires_at);
       if (expiresAt <= new Date()) {
         console.log("Cal.com token expired, refreshing...");
