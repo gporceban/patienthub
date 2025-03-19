@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 // Type for OAuth token response
@@ -117,15 +116,15 @@ export const getCalComToken = async (userId: string): Promise<string | null> => 
     // Check if the cal_com_token_expires_at column exists
     const hasExpiresAtColumn = await checkColumnExists('profiles', 'cal_com_token_expires_at');
     
-    // Define the type for our query result based on what columns we're selecting
-    type ProfileData = hasExpiresAtColumn extends true 
-      ? { cal_com_token: string | null; cal_com_token_expires_at: string | null }
-      : { cal_com_token: string | null };
-    
+    // Define the query based on column existence
+    const selectQuery = hasExpiresAtColumn 
+      ? 'cal_com_token, cal_com_token_expires_at' 
+      : 'cal_com_token';
+      
     // Execute the query
     const { data, error } = await supabase
       .from('profiles')
-      .select(hasExpiresAtColumn ? 'cal_com_token, cal_com_token_expires_at' : 'cal_com_token')
+      .select(selectQuery)
       .eq('id', userId)
       .maybeSingle();
 
