@@ -11,7 +11,7 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Notification, fromNotifications } from '@/types/notifications';
+import { Notification, getNotifications, fromDoctorNotifications } from '@/types/notifications';
 interface Appointment {
   id: string;
   patient_id: string;
@@ -26,13 +26,8 @@ interface AppointmentStats {
   active_patients: number;
 }
 const DoctorDashboard = () => {
-  const {
-    user,
-    profile
-  } = useContext(AuthContext);
-  const {
-    toast
-  } = useToast();
+  const { user, profile, userType } = useContext(AuthContext);
+  const { toast } = useToast();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
@@ -143,16 +138,16 @@ const DoctorDashboard = () => {
   }, [user, today, toast]);
   useEffect(() => {
     const fetchNotifications = async () => {
-      if (!user) return;
+      if (!user || !userType) return;
+      
       try {
         setNotificationsLoading(true);
-        const {
-          data,
-          error
-        } = await fromNotifications(supabase).getByDoctorId(user.id);
+        const { data, error } = await getNotifications(supabase, userType, user.id);
+        
         if (error) {
           throw error;
         }
+        
         if (data) {
           setNotifications(data as Notification[]);
         }
@@ -167,8 +162,26 @@ const DoctorDashboard = () => {
         setNotificationsLoading(false);
       }
     };
+    
     fetchNotifications();
-  }, [user, toast]);
+  }, [user, userType, toast]);
+  const markNotificationAsRead = async (notificationId: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await fromDoctorNotifications(supabase).markAsRead(user.id, notificationId);
+      
+      if (error) throw error;
+      
+      setNotifications(prevNotifications => 
+        prevNotifications.map(notif => 
+          notif.id === notificationId ? { ...notif, read: true } : notif
+        )
+      );
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
   const filteredAppointments = appointments.filter(appointment => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
@@ -198,7 +211,6 @@ const DoctorDashboard = () => {
     if (diffInMinutes < 60) {
       return `Há ${diffInMinutes} minuto${diffInMinutes !== 1 ? 's' : ''}`;
     } else if (diffInMinutes < 1440) {
-      // less than a day
       const hours = Math.floor(diffInMinutes / 60);
       return `Há ${hours} hora${hours !== 1 ? 's' : ''}`;
     } else {
@@ -306,6 +318,7 @@ const DoctorDashboard = () => {
             </div>)}
         </div>;
     }
+    
     if (notifications.length === 0) {
       return <div className="text-center py-6 border border-dashed border-darkblue-700 rounded-lg">
           <Bell className="h-10 w-10 mx-auto text-gray-400 mb-2" />
@@ -313,21 +326,34 @@ const DoctorDashboard = () => {
           <p className="text-gray-400">Você não tem novas notificações no momento.</p>
         </div>;
     }
+    
     return <div className="space-y-4">
-        {notifications.map(notification => <div key={notification.id} className="p-3 border border-darkblue-700 rounded-lg bg-darkblue-800/40">
+        {notifications.map(notification => (
+          <div 
+            key={notification.id} 
+            className={`p-3 border ${notification.read ? 'border-darkblue-700' : 'border-gold-700'} rounded-lg bg-darkblue-800/40 hover:bg-darkblue-800/60 transition-colors`}
+            onClick={() => markNotificationAsRead(notification.id)}
+          >
             <div className="flex items-start gap-3">
               <div className={`${getIconBgForNotification(notification.icon_type)} rounded-full p-2 mt-1`}>
                 {getIconForNotification(notification.icon_type)}
               </div>
-              <div>
-                <p className="font-medium text-sm">{notification.message}</p>
+              <div className="flex-1">
+                <div className="flex justify-between items-start">
+                  <p className="font-medium text-sm">{notification.message}</p>
+                  {!notification.read && (
+                    <Badge className="bg-gold-600 text-xs">Nova</Badge>
+                  )}
+                </div>
                 <p className="text-xs text-gray-400 mt-1">{formatNotificationTime(notification.created_at)}</p>
               </div>
             </div>
-          </div>)}
+          </div>
+        ))}
       </div>;
   };
-  return <Layout userType="medico" userName={profile?.full_name || "Dr. Paulo Oliveira"}>
+  return (
+    <Layout userType="medico" userName={profile?.full_name || "Dr. Paulo Oliveira"}>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white mb-2">
           Bem-vindo, <span className="text-gold-400">{profile?.full_name || "Dr. Paulo Oliveira"}</span>
@@ -434,35 +460,48 @@ const DoctorDashboard = () => {
         </div>
         
         <div>
-          <Card className="card-gradient p-6 mb-6 bg-gray-700">
-            <h2 className="text-xl font-semibold mb-4">Notificações</h2>
+          <Card className="card-gradient p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Notificações</h2>
+              {notifications.filter(n => !n.read).length > 0 && (
+                <Badge className="bg-gold-600">
+                  {notifications.filter(n => !n.read).length} não lida{notifications.filter(n => !n.read).length !== 1 ? 's' : ''}
+                </Badge>
+              )}
+            </div>
             
             {renderNotifications()}
             
-            <Button variant="link" className="w-full mt-3 text-gold-400" onClick={async () => {
-            if (notifications.length === 0) return;
-            try {
-              const {
-                error
-              } = await fromNotifications(supabase).markAsRead(user?.id || '');
-              if (error) throw error;
-              toast({
-                title: "Notificações marcadas como lidas",
-                description: "Todas as notificações foram marcadas como lidas."
-              });
-              setNotifications(prevNotifications => prevNotifications.map(notif => ({
-                ...notif,
-                read: true
-              })));
-            } catch (error) {
-              console.error('Error marking notifications as read:', error);
-              toast({
-                variant: "destructive",
-                title: "Erro",
-                description: "Não foi possível marcar as notificações como lidas."
-              });
-            }
-          }}>
+            <Button 
+              variant="link" 
+              className="w-full mt-3 text-gold-400" 
+              onClick={async () => {
+                if (notifications.length === 0 || !notifications.some(n => !n.read)) return;
+                
+                try {
+                  const { error } = await fromDoctorNotifications(supabase).markAsRead(user?.id || '');
+                  
+                  if (error) throw error;
+                  
+                  toast({
+                    title: "Notificações marcadas como lidas",
+                    description: "Todas as notificações foram marcadas como lidas."
+                  });
+                  
+                  setNotifications(prevNotifications => 
+                    prevNotifications.map(notif => ({ ...notif, read: true }))
+                  );
+                } catch (error) {
+                  console.error('Error marking notifications as read:', error);
+                  toast({
+                    variant: "destructive",
+                    title: "Erro",
+                    description: "Não foi possível marcar as notificações como lidas."
+                  });
+                }
+              }}
+              disabled={notifications.length === 0 || !notifications.some(n => !n.read)}
+            >
               Marcar Todas Como Lidas
             </Button>
           </Card>
@@ -474,6 +513,7 @@ const DoctorDashboard = () => {
           </Card>
         </div>
       </div>
-    </Layout>;
+    </Layout>
+  );
 };
 export default DoctorDashboard;
