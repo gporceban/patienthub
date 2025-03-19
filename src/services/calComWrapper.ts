@@ -335,8 +335,7 @@ class CalComWrapper {
       
       // If userId is provided, use the bookings edge function
       const response = await supabase.functions.invoke('cal-com-bookings', {
-        body: { action: 'get-bookings' },
-        query: { userId }
+        body: { action: 'get-bookings', userId }
       });
       
       if (response.error) {
@@ -376,8 +375,10 @@ class CalComWrapper {
       console.log('Fetching Cal.com event types for user:', userId);
       
       const response = await supabase.functions.invoke('cal-com-bookings', {
-        body: { action: 'get-event-types' },
-        query: { userId }
+        body: { 
+          action: 'get-event-types',
+          userId
+        }
       });
       
       if (response.error) {
@@ -416,9 +417,9 @@ class CalComWrapper {
       const response = await supabase.functions.invoke('cal-com-bookings', {
         body: { 
           action: 'create-event-type',
-          ...eventType
-        },
-        query: { userId }
+          userId,
+          eventType
+        }
       });
       
       if (response.error) {
@@ -453,6 +454,7 @@ class CalComWrapper {
       const response = await supabase.functions.invoke('cal-com-bookings', {
         body: { 
           action: 'create-schedule',
+          userId,
           name: 'Default Schedule',
           timeZone: schedule.timezone || 'America/Sao_Paulo',
           availability: [{
@@ -460,8 +462,7 @@ class CalComWrapper {
             startTime: schedule.startTime,
             endTime: schedule.endTime
           }]
-        },
-        query: { userId }
+        }
       });
       
       if (response.error) {
@@ -487,9 +488,9 @@ class CalComWrapper {
       const response = await supabase.functions.invoke('cal-com-bookings', {
         body: { 
           action: 'cancel-booking',
+          userId,
           bookingId
-        },
-        query: { userId }
+        }
       });
       
       if (response.error) {
@@ -522,11 +523,11 @@ class CalComWrapper {
       const response = await supabase.functions.invoke('cal-com-bookings', {
         body: { 
           action: 'reschedule-booking',
+          userId,
           bookingId,
           startTime: newTime.startTime,
           endTime: newTime.endTime
-        },
-        query: { userId }
+        }
       });
       
       if (response.error) {
