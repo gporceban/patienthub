@@ -226,6 +226,7 @@ export type Database = {
         Row: {
           cal_com_refresh_token: string | null
           cal_com_token: string | null
+          cal_com_token_expires_at: string | null
           cal_com_user_id: number | null
           created_at: string
           email: string
@@ -237,6 +238,7 @@ export type Database = {
         Insert: {
           cal_com_refresh_token?: string | null
           cal_com_token?: string | null
+          cal_com_token_expires_at?: string | null
           cal_com_user_id?: number | null
           created_at?: string
           email: string
@@ -248,6 +250,7 @@ export type Database = {
         Update: {
           cal_com_refresh_token?: string | null
           cal_com_token?: string | null
+          cal_com_token_expires_at?: string | null
           cal_com_user_id?: number | null
           created_at?: string
           email?: string
@@ -263,6 +266,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_columns_for_table: {
+        Args: {
+          table_name: string
+        }
+        Returns: {
+          column_name: string
+          data_type: string
+          is_nullable: boolean
+        }[]
+      }
       is_doctor: {
         Args: {
           user_id: string
