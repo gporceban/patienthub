@@ -31,6 +31,6 @@ enable_signup = true
 [functions]
 serve_port = 54321
 
-[[functions.http_options]]
+[[functions.http.cors]]
 patterns = ["supabase/functions"]
 local_only = false
