@@ -64,7 +64,7 @@ const Layout: React.FC<LayoutProps> = ({
             setRedirecting(true);
             
             // Redirect to correct dashboard based on user type
-            const correctPath = contextUserType === 'medico' ? '/medico' : '/paciente';
+            const correctPath = contextUserType === 'medico' ? '/medico/dashboard' : '/paciente/dashboard';
             
             toast({
               title: "Acesso não permitido",

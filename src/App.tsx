@@ -67,22 +67,28 @@ function App() {
         <Route path="/login" element={<PublicRoute><Index /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Index /></PublicRoute>} />
 
-        {/* Doctor Routes */}
-        <Route path="/medico" element={<PrivateRoute requiredUserType="medico"><DoctorDashboard /></PrivateRoute>} />
+        {/* Doctor Routes - removing duplicate /medico route */}
         <Route path="/medico/dashboard" element={<PrivateRoute requiredUserType="medico"><DoctorDashboard /></PrivateRoute>} />
         <Route path="/medico/calendario" element={<PrivateRoute requiredUserType="medico"><DoctorCalendar /></PrivateRoute>} />
+        <Route path="/medico/agenda" element={<PrivateRoute requiredUserType="medico"><DoctorCalendar /></PrivateRoute>} />
         <Route path="/medico/pacientes" element={<PrivateRoute requiredUserType="medico"><DoctorPatients /></PrivateRoute>} />
         <Route path="/medico/perfil" element={<PrivateRoute requiredUserType="medico"><DoctorProfile /></PrivateRoute>} />
         <Route path="/medico/avaliacao" element={<PrivateRoute requiredUserType="medico"><DoctorAssessment /></PrivateRoute>} />
+        <Route path="/medico/documentos" element={<PrivateRoute requiredUserType="medico"><DoctorDashboard /></PrivateRoute>} />
 
-        {/* Patient Routes */}
-        <Route path="/paciente" element={<PrivateRoute requiredUserType="paciente"><PatientDashboard /></PrivateRoute>} />
+        {/* Patient Routes - removing duplicate /paciente route */}
         <Route path="/paciente/dashboard" element={<PrivateRoute requiredUserType="paciente"><PatientDashboard /></PrivateRoute>} />
         <Route path="/paciente/calendario" element={<PrivateRoute requiredUserType="paciente"><PatientCalendar /></PrivateRoute>} />
+        <Route path="/paciente/agenda" element={<PrivateRoute requiredUserType="paciente"><PatientCalendar /></PrivateRoute>} />
         <Route path="/paciente/progresso" element={<PrivateRoute requiredUserType="paciente"><PatientProgress /></PrivateRoute>} />
         <Route path="/paciente/prontuario" element={<PrivateRoute requiredUserType="paciente"><PatientRecords /></PrivateRoute>} />
         <Route path="/paciente/avaliacao" element={<PrivateRoute requiredUserType="paciente"><PatientAssessment /></PrivateRoute>} />
+        <Route path="/paciente/avaliacoes" element={<PrivateRoute requiredUserType="paciente"><PatientAssessment /></PrivateRoute>} />
         <Route path="/paciente/avaliacao/:id" element={<PrivateRoute requiredUserType="paciente"><PatientAssessmentDetails /></PrivateRoute>} />
+        
+        {/* Redirect root doctor/patient paths to their dashboards */}
+        <Route path="/medico" element={<Navigate to="/medico/dashboard" replace />} />
+        <Route path="/paciente" element={<Navigate to="/paciente/dashboard" replace />} />
         
         {/* Special Routes */}
         <Route path="/calcom/callback" element={<CalComCallback />} />

@@ -29,17 +29,20 @@ const Sidebar: React.FC<SidebarProps> = ({
   const effectiveUserType = userType || contextUserType || 'paciente';
   
   const doctorLinks = [
-    { name: 'Dashboard', path: '/medico', icon: Home },
+    { name: 'Dashboard', path: '/medico/dashboard', icon: Home },
     { name: 'Pacientes', path: '/medico/pacientes', icon: Users },
     { name: 'Agenda', path: '/medico/agenda', icon: Calendar },
+    { name: 'Avaliações', path: '/medico/avaliacao', icon: ClipboardCheck },
     { name: 'Documentos', path: '/medico/documentos', icon: FileText },
     { name: 'Meu Perfil', path: '/medico/perfil', icon: User }
   ];
   
   const patientLinks = [
-    { name: 'Dashboard', path: '/paciente', icon: Home },
+    { name: 'Dashboard', path: '/paciente/dashboard', icon: Home },
     { name: 'Agenda', path: '/paciente/agenda', icon: Calendar },
     { name: 'Avaliações', path: '/paciente/avaliacoes', icon: ClipboardCheck },
+    { name: 'Progresso', path: '/paciente/progresso', icon: FileText },
+    { name: 'Prontuário', path: '/paciente/prontuario', icon: User }
   ];
   
   const links = effectiveUserType === 'medico' ? doctorLinks : patientLinks;
@@ -50,7 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   // If there's a mismatch between the URL path and the user type, redirect
   React.useEffect(() => {
     if (contextUserType && currentPathBase !== contextUserType) {
-      const correctPath = contextUserType === 'medico' ? '/medico' : '/paciente';
+      const correctPath = contextUserType === 'medico' ? '/medico/dashboard' : '/paciente/dashboard';
       navigate(correctPath, { replace: true });
     }
   }, [contextUserType, currentPathBase, navigate]);
