@@ -22,6 +22,7 @@ import DoctorAssessment from './pages/DoctorAssessment';
 import PatientAssessmentDetails from './pages/PatientAssessmentDetails';
 import CalComCallback from './pages/CalComCallback';
 import DoctorDocuments from './pages/DoctorDocuments';
+import PatientDetail from './pages/PatientDetail';
 
 function App() {
   const { user, userType, isLoading, hasValidSession } = useContext(AuthContext);
@@ -76,6 +77,7 @@ function App() {
         <Route path="/medico/agenda" element={<Navigate to="/medico/calendario" replace />} />
         
         <Route path="/medico/pacientes" element={<PrivateRoute requiredUserType="medico"><DoctorPatients /></PrivateRoute>} />
+        <Route path="/medico/paciente/:prontuarioId" element={<PrivateRoute requiredUserType="medico"><PatientDetail /></PrivateRoute>} />
         <Route path="/medico/perfil" element={<PrivateRoute requiredUserType="medico"><DoctorProfile /></PrivateRoute>} />
         <Route path="/medico/avaliacao" element={<PrivateRoute requiredUserType="medico"><DoctorAssessment /></PrivateRoute>} />
         <Route path="/medico/documentos" element={<PrivateRoute requiredUserType="medico"><DoctorDocuments /></PrivateRoute>} />
