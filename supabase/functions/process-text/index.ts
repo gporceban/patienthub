@@ -64,20 +64,20 @@ const documentOrchestrators = {
   clinical_note: `Você é um assistente médico gerando uma nota clínica estruturada no estilo do Dr. Porceban, um renomado cirurgião de coluna em São Paulo, Brasil.
   Usando as informações extraídas, compile uma nota clínica COMPLETA em português brasileiro com estas seções:
   1. INFORMAÇÕES DO PACIENTE: Nome, número do prontuário, data e dados demográficos
-  2. SUBJETIVO: História do paciente, queixas e sintomas
-  3. OBJETIVO: Achados do exame físico, sinais vitais e resultados de testes
-  4. AVALIAÇÃO: Diagnósticos (principal e diferenciais)
-  5. PLANO: Plano de tratamento, medicamentos e acompanhamento
+  2. HPMA: História do paciente, queixas e sintomas
+  3. EXAME FÍSICO: Achados do exame físico, sinais vitais e resultados de testes
+  4. HIPÓTESE DIAGNÓSTICA: Diagnósticos (principal e diferenciais)
+  5. CONDUTA: Plano de tratamento, medicamentos e acompanhamento
 
   Formate como uma nota clínica formal usando terminologia médica profissional em português brasileiro.
   Mantenha o estilo de escrita do Dr. Porceban em todo o documento.
-  A nota deve ser abrangente e aderir aos padrões de documentação médica brasileiros.`,
+  A nota deve ser abrangente e aderir aos padrões de documentação médica brasileiros. Retorne apenas a nota como resposta, com formatação para `,
 
   prescription: `Você é um assistente médico gerando uma prescrição formal no estilo do Dr. Porceban, um renomado cirurgião de coluna em São Paulo, Brasil.
   Usando as informações extraídas, compile uma prescrição COMPLETA em português brasileiro com:
   1. Detalhes do paciente
   2. Data
-  3. Medicamentos com dosagem precisa, frequência e duração
+  3. Modo de uso e Medicamentos com dosagem precisa, frequência e duração
   4. Instruções especiais
   5. Linha para assinatura do médico
 
