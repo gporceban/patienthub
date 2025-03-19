@@ -1,14 +1,11 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Loader2, FileText, Volume2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import AudioRecorderStatus from './AudioRecorderStatus';
-import WaveformVisualizer from './WaveformVisualizer';
-
-const getAudioContext = (): AudioContext => {
-  return new (window.AudioContext)();
-};
+import RealtimeTranscription from './RealtimeTranscription';
 
 interface AudioRecorderProps {
   onTranscriptionComplete: (transcription: string) => void;
@@ -41,10 +38,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const [transcriptionComplete, setTranscriptionComplete] = useState(false);
   const [processingComplete, setProcessingComplete] = useState(false);
   
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
   const audioLevelRef = useRef<number>(0);
+  const [currentTranscription, setCurrentTranscription] = useState('');
   
   const [agentProgress, setAgentProgress] = useState({
     patientInfo: false,
@@ -58,9 +54,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const intervalRef = useRef<number | null>(null);
   const { toast } = useToast();
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      stopRecording();
+      cleanupResources();
+    };
+  }, []);
+
+  // Progress simulation for agent processing
   useEffect(() => {
     if (isProcessing && !processingComplete) {
       if (progressTimerRef.current) {
@@ -108,55 +114,56 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     };
   }, [isProcessing, processingComplete]);
 
-  useEffect(() => {
-    return () => {
-      if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
-      }
-      if (progressTimerRef.current) {
-        clearTimeout(progressTimerRef.current);
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (audioContext) {
-        audioContext.close();
-      }
-    };
-  }, [isRecording, audioContext]);
+  const cleanupResources = () => {
+    // Stop recording if in progress
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+    }
+    
+    // Clear any timers
+    if (progressTimerRef.current) {
+      clearTimeout(progressTimerRef.current);
+    }
+    
+    if (intervalRef.current) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
 
-  useEffect(() => {
-    if (!isRecording || !analyser) return;
+    // Close audio tracks
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  // Periodic transcription while recording
+  const startPeriodicTranscription = () => {
+    if (intervalRef.current) {
+      window.clearInterval(intervalRef.current);
+    }
     
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-    
-    const checkAudioLevel = () => {
-      if (!isRecording) return;
-      
-      analyser.getByteFrequencyData(dataArray);
-      
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        sum += dataArray[i];
+    // Start periodic transcription every 5 seconds
+    intervalRef.current = window.setInterval(async () => {
+      if (audioChunksRef.current.length === 0 || !isRecording) {
+        return;
       }
       
-      const avg = sum / dataArray.length;
-      const level = Math.min(1, avg / 128);
-      
-      audioLevelRef.current = level;
-      setAudioLevel(level);
-      
-      requestAnimationFrame(checkAudioLevel);
-    };
-    
-    checkAudioLevel();
-  }, [isRecording, analyser]);
+      try {
+        const tempBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await transcribeAudioChunk(tempBlob, false);
+      } catch (error) {
+        console.error('Error in periodic transcription:', error);
+      }
+    }, 5000);
+  };
 
   const startRecording = async () => {
     setHasError(false);
     setErrorMessage('');
     setTranscriptionComplete(false);
     setProcessingComplete(false);
+    setCurrentTranscription('');
     setAgentProgress({
       patientInfo: false,
       symptoms: false,
@@ -179,23 +186,44 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       console.log("Microphone access granted:", stream);
       streamRef.current = stream;
       
-      const context = getAudioContext();
-      const analyserNode = context.createAnalyser();
+      // Configure audio level monitoring
+      const audioContext = new AudioContext();
+      const analyserNode = audioContext.createAnalyser();
       analyserNode.fftSize = 2048;
       
-      const source = context.createMediaStreamSource(stream);
+      const source = audioContext.createMediaStreamSource(stream);
       source.connect(analyserNode);
       
-      setAudioContext(context);
-      setAnalyser(analyserNode);
+      // Monitor audio levels
+      const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
       
+      const checkAudioLevel = () => {
+        if (!isRecording) return;
+        
+        analyserNode.getByteFrequencyData(dataArray);
+        
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        
+        const avg = sum / dataArray.length;
+        const level = Math.min(1, avg / 128);
+        
+        audioLevelRef.current = level;
+        setAudioLevel(level);
+        
+        requestAnimationFrame(checkAudioLevel);
+      };
+      
+      // Set up MediaRecorder with proper options
       const options = { mimeType: 'audio/webm' };
       const mediaRecorder = new MediaRecorder(stream, options);
-      console.log("MediaRecorder created:", mediaRecorder);
+      console.log("MediaRecorder created with options:", options);
       mediaRecorderRef.current = mediaRecorder;
       
       mediaRecorder.ondataavailable = (event) => {
-        console.log("Data available:", event.data.size);
+        console.log("Data available event:", event.data.size);
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
@@ -214,6 +242,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           return;
         }
         
+        if (intervalRef.current) {
+          window.clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         console.log("Created audio blob:", audioBlob.size);
         setAudioBlob(audioBlob);
@@ -221,9 +254,17 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         stream.getTracks().forEach(track => track.stop());
       };
       
-      mediaRecorder.start(1000);
+      // Start the audio monitoring
+      checkAudioLevel();
+      
+      // Start recording
+      mediaRecorder.start(500); // Collect data every 500ms
       console.log("MediaRecorder started");
       setIsRecording(true);
+      
+      // Start periodic transcription
+      startPeriodicTranscription();
+      
       toast({
         title: "Gravação iniciada",
         description: "Fale claramente para obter os melhores resultados."
@@ -245,6 +286,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
       toast({
         title: "Gravação finalizada",
         description: "Áudio capturado com sucesso."
@@ -254,24 +301,15 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
   };
 
-  const transcribeAudio = async () => {
-    if (!audioBlob) {
-      toast({
-        variant: "destructive",
-        title: "Sem áudio",
-        description: "Nenhum áudio foi gravado para transcrição."
-      });
-      return;
-    }
-
-    setIsTranscribing(true);
-    setHasError(false);
-    setErrorMessage('');
-    
+  const transcribeAudioChunk = async (blob: Blob, isFinal: boolean) => {
     try {
-      console.log("Starting transcription of audio blob:", audioBlob.size);
+      console.log(`${isFinal ? 'Final' : 'Interim'} transcription of audio blob:`, blob.size);
+      if (isFinal) {
+        setIsTranscribing(true);
+      }
+      
       const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
+      reader.readAsDataURL(blob);
       reader.onloadend = async () => {
         const base64Audio = reader.result?.toString().split(',')[1];
         
@@ -291,31 +329,53 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         
         console.log("Transcription API response:", data);
         if (data?.text) {
-          setTranscriptionComplete(true);
-          toast({
-            title: "Transcrição completa",
-            description: "O áudio foi transcrito com sucesso e está sendo processado pelo sistema de agentes IA."
-          });
-          
-          onTranscriptionComplete(data.text);
-          
-          processTranscription(data.text);
+          if (isFinal) {
+            setTranscriptionComplete(true);
+            toast({
+              title: "Transcrição completa",
+              description: "O áudio foi transcrito com sucesso e está sendo processado pelo sistema de agentes IA."
+            });
+            
+            onTranscriptionComplete(data.text);
+            processTranscription(data.text);
+          } else {
+            // For interim transcription, just update the current text
+            setCurrentTranscription(data.text);
+          }
         } else {
           throw new Error('Nenhum texto recebido da transcrição');
         }
       };
     } catch (error) {
       console.error('Erro ao transcrever áudio:', error);
-      setHasError(true);
-      setErrorMessage(`Erro na transcrição: ${error instanceof Error ? error.message : 'Motivo desconhecido'}`);
+      if (isFinal) {
+        setHasError(true);
+        setIsTranscribing(false);
+        setErrorMessage(`Erro na transcrição: ${error instanceof Error ? error.message : 'Motivo desconhecido'}`);
+        toast({
+          variant: "destructive",
+          title: "Erro na transcrição",
+          description: "Não foi possível transcrever o áudio. Tente novamente."
+        });
+      }
+    } finally {
+      if (isFinal) {
+        setIsTranscribing(false);
+      }
+    }
+  };
+
+  const transcribeAudio = async () => {
+    if (!audioBlob) {
       toast({
         variant: "destructive",
-        title: "Erro na transcrição",
-        description: "Não foi possível transcrever o áudio. Tente novamente."
+        title: "Sem áudio",
+        description: "Nenhum áudio foi gravado para transcrição."
       });
-    } finally {
-      setIsTranscribing(false);
+      return;
     }
+
+    await transcribeAudioChunk(audioBlob, true);
   };
 
   const processTranscription = async (transcription: string) => {
@@ -419,10 +479,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         </p>
         
         <div className="w-full relative mb-4">
-          <WaveformVisualizer 
+          <RealtimeTranscription 
             isRecording={isRecording} 
-            audioContext={audioContext || undefined}
-            analyser={analyser || undefined}
+            transcription={currentTranscription}
+            isTranscribing={isTranscribing}
           />
           
           {isRecording && (

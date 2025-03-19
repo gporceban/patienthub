@@ -69,12 +69,12 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: 'audio/webm' });
     formData.append('file', blob, 'audio.webm');
     formData.append('model', 'whisper-1');
+    formData.append('language', 'pt'); // Set Portuguese language for better accuracy
     
     console.log('Sending request to OpenAI API...');
     console.log('OPENAI_API_KEY present:', !!Deno.env.get('OPENAI_API_KEY'));
 
-    // Send to OpenAI - Note: Audio transcription still uses the /audio/transcriptions endpoint
-    // as the new /responses endpoint doesn't yet support audio transcription
+    // Send to OpenAI
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
