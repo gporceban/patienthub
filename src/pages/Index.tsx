@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Logo from '@/components/Logo';
 import LoginForm from '@/components/LoginForm';
@@ -9,6 +9,26 @@ import StarBackground from '@/components/StarBackground';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("login");
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Add a simple loading effect to ensure DOM is ready
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-darkblue-900 via-darkblue-950 to-black">
+        <div className="animate-pulse">
+          <p className="text-amber-300">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 py-8 relative overflow-hidden">
