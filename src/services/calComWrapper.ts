@@ -63,10 +63,10 @@ class CalComWrapper {
         return null;
       }
 
-      // Try using the function invocation approach
+      // Try using the function invocation approach with params in the body
       const { data, error } = await supabase.functions.invoke('cal-com-bookings', {
         method: 'GET',
-        query: { userId: session.user.id }
+        body: { userId: session.user.id }
       });
 
       if (error) {
@@ -145,8 +145,7 @@ class CalComWrapper {
 
       const { data, error } = await supabase.functions.invoke('cal-com-bookings', {
         method: 'POST',
-        query: { userId, action: 'availability' },
-        body: { availability }
+        body: { userId, action: 'availability', availability }
       });
 
       if (error) {
@@ -172,7 +171,7 @@ class CalComWrapper {
 
       const { data, error } = await supabase.functions.invoke('cal-com-bookings', {
         method: 'GET',
-        query: { userId: session.user.id, action: 'event-types' }
+        body: { userId: session.user.id, action: 'event-types' }
       });
 
       if (error) {
@@ -198,8 +197,9 @@ class CalComWrapper {
 
       const { data, error } = await supabase.functions.invoke('cal-com-bookings', {
         method: 'POST',
-        query: { userId: session.user.id, action: 'create-booking' },
         body: { 
+          userId: session.user.id, 
+          action: 'create-booking',
           eventTypeId, 
           startTime, 
           attendee: attendeeDetails 

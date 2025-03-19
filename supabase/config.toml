@@ -29,7 +29,7 @@ jwt_expiry = 3600
 enable_signup = true
 
 [functions]
-serve_port = 54321
+port = 54321
 
 [functions.http]
 cors = { patterns = ["supabase/functions"], local_only = false }
