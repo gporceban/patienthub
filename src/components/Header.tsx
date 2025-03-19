@@ -1,4 +1,3 @@
-
 import React, { useContext } from 'react';
 import Logo from './Logo';
 import { Button } from "@/components/ui/button";
@@ -7,20 +6,22 @@ import { LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { AuthContext } from '@/contexts/AuthContext';
-
 interface HeaderProps {
   userType?: 'paciente' | 'medico';
   userName?: string;
 }
-
-const Header: React.FC<HeaderProps> = ({ userType, userName }) => {
+const Header: React.FC<HeaderProps> = ({
+  userType,
+  userName
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile } = useContext(AuthContext);
-  
+  const {
+    profile
+  } = useContext(AuthContext);
+
   // Use profile name if available, otherwise use provided userName or default
   const displayName = profile?.full_name || userName || 'Usuário';
-
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -43,9 +44,7 @@ const Header: React.FC<HeaderProps> = ({ userType, userName }) => {
   if (location.pathname === '/') {
     return null;
   }
-
-  return (
-    <header className="w-full py-4 px-6 bg-darkblue-900/80 backdrop-blur-md border-b border-darkblue-700/50 sticky top-0 z-10">
+  return <header className="w-full py-4 px-6 backdrop-blur-md border-b border-darkblue-700/50 sticky top-0 z-10 bg-slate-900 bg-[1b3341]">
       <div className="container mx-auto flex justify-between items-center">
         <Logo size="small" />
         
@@ -55,19 +54,12 @@ const Header: React.FC<HeaderProps> = ({ userType, userName }) => {
             <p className="font-medium">{displayName}</p>
           </div>
           
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleLogout}
-            className="border-darkblue-700 hover:bg-darkblue-800"
-          >
+          <Button variant="outline" size="sm" onClick={handleLogout} className="border-darkblue-700 hover:bg-darkblue-800">
             <LogOut size={16} className="mr-2" />
             Sair
           </Button>
         </div>
       </div>
-    </header>
-  );
+    </header>;
 };
-
 export default Header;
