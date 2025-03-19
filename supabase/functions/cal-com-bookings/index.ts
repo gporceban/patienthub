@@ -27,7 +27,7 @@ serve(async (req) => {
     // Parse the URL to get the action and ID if applicable
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
-    const action = pathParts[pathParts.length - 1];
+    const action = url.searchParams.get('action') || 'bookings';
     
     // Get query parameters
     const userId = url.searchParams.get('userId');
@@ -42,7 +42,7 @@ serve(async (req) => {
     // Get user's Cal.com token
     const { data: userData, error: userError } = await supabase
       .from('profiles')
-      .select('cal_com_token, cal_com_refresh_token')
+      .select('cal_com_token, cal_com_refresh_token, email')
       .eq('id', userId)
       .maybeSingle();
 
@@ -118,8 +118,21 @@ serve(async (req) => {
               }
 
               const bookingsData = await retryResponse.json();
+              
+              // Transform the data to a standardized format
+              const transformedBookings = bookingsData.bookings ? bookingsData.bookings.map((booking: any) => ({
+                id: booking.id,
+                title: booking.title || 'Consulta',
+                description: booking.description,
+                startTime: booking.startTime,
+                endTime: booking.endTime,
+                status: booking.status,
+                attendees: booking.attendees,
+                location: booking.location,
+              })) : [];
+              
               return new Response(
-                JSON.stringify(bookingsData),
+                JSON.stringify({ bookings: transformedBookings }),
                 { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
               );
             }
@@ -133,8 +146,21 @@ serve(async (req) => {
           }
 
           const data = await response.json();
+          
+          // Transform the data to a standardized format
+          const transformedBookings = data.bookings ? data.bookings.map((booking: any) => ({
+            id: booking.id,
+            title: booking.title || 'Consulta',
+            description: booking.description,
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            status: booking.status,
+            attendees: booking.attendees,
+            location: booking.location,
+          })) : [];
+          
           return new Response(
-            JSON.stringify(data),
+            JSON.stringify({ bookings: transformedBookings }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -142,13 +168,35 @@ serve(async (req) => {
         // POST /bookings - Create a new booking
         if (req.method === 'POST') {
           console.log("Creating a new booking");
+          
+          const { eventTypeId, startTime, attendee } = requestBody as any;
+          
+          if (!eventTypeId || !startTime || !attendee) {
+            return new Response(
+              JSON.stringify({ error: 'Missing required fields: eventTypeId, startTime, or attendee' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          const bookingData = {
+            eventTypeId,
+            start: startTime,
+            end: null, // Cal.com will calculate this based on event type duration
+            attendees: [{
+              email: attendee.email,
+              name: attendee.name,
+              timeZone: attendee.timeZone || 'America/Sao_Paulo'
+            }],
+            timeZone: attendee.timeZone || 'America/Sao_Paulo'
+          };
+          
           const response = await fetch(`${CAL_COM_API_URL}/bookings`, {
             method: 'POST',
             headers: {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${userData.cal_com_token}`
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(bookingData)
           });
 
           if (!response.ok) {
@@ -162,7 +210,7 @@ serve(async (req) => {
 
           const data = await response.json();
           return new Response(
-            JSON.stringify(data),
+            JSON.stringify({ success: true, booking: data }),
             { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -193,7 +241,7 @@ serve(async (req) => {
 
           const data = await response.json();
           return new Response(
-            JSON.stringify(data),
+            JSON.stringify({ eventTypes: data.event_types || [] }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -201,13 +249,30 @@ serve(async (req) => {
         // POST /event-types - Create a new event type
         if (req.method === 'POST') {
           console.log("Creating a new event type");
+          const { title, slug, length, description, locations } = requestBody as any;
+          
+          if (!title || !slug || !length) {
+            return new Response(
+              JSON.stringify({ error: 'Missing required fields: title, slug, or length' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          const eventTypeData = {
+            title,
+            slug,
+            length, // in minutes
+            description: description || "",
+            locations: locations || [{ type: "inPerson" }]
+          };
+          
           const response = await fetch(`${CAL_COM_API_URL}/event-types`, {
             method: 'POST',
             headers: {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${userData.cal_com_token}`
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(eventTypeData)
           });
 
           if (!response.ok) {
@@ -221,39 +286,158 @@ serve(async (req) => {
 
           const data = await response.json();
           return new Response(
-            JSON.stringify(data),
+            JSON.stringify({ success: true, eventType: data }),
             { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
         break;
       }
       
-      case 'schedules': {
-        // GET /schedules - Get all schedules
-        if (req.method === 'GET') {
-          console.log("Fetching schedules for user");
+      case 'availability': {
+        // POST /availability - Create or update availability
+        if (req.method === 'POST') {
+          console.log("Creating/updating availability");
+          const { availability } = requestBody as any;
           
-          const response = await fetch(`${CAL_COM_API_URL}/schedules`, {
+          if (!availability || !availability.days || !availability.startTime || !availability.endTime) {
+            return new Response(
+              JSON.stringify({ error: 'Missing required availability fields: days, startTime, or endTime' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          // First, get schedules to find ID or create a new one
+          const schedulesResponse = await fetch(`${CAL_COM_API_URL}/schedules`, {
             method: 'GET',
             headers: {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${userData.cal_com_token}`
             }
           });
-
-          if (!response.ok) {
-            const errorData = await response.json();
+          
+          if (!schedulesResponse.ok) {
+            const errorData = await schedulesResponse.json();
             console.error("Error fetching schedules:", errorData);
             return new Response(
               JSON.stringify({ error: 'Failed to fetch schedules', details: errorData }),
+              { status: schedulesResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          const schedulesData = await schedulesResponse.json();
+          let scheduleId = schedulesData.schedules && schedulesData.schedules.length > 0 
+                            ? schedulesData.schedules[0].id 
+                            : null;
+          
+          // If no schedule exists, create one
+          if (!scheduleId) {
+            const createScheduleResponse = await fetch(`${CAL_COM_API_URL}/schedules`, {
+              method: 'POST',
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${userData.cal_com_token}`
+              },
+              body: JSON.stringify({
+                name: "Default Schedule",
+                timeZone: availability.timezone
+              })
+            });
+            
+            if (!createScheduleResponse.ok) {
+              const errorData = await createScheduleResponse.json();
+              console.error("Error creating schedule:", errorData);
+              return new Response(
+                JSON.stringify({ error: 'Failed to create schedule', details: errorData }),
+                { status: createScheduleResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+            
+            const createScheduleData = await createScheduleResponse.json();
+            scheduleId = createScheduleData.id;
+          }
+          
+          // Now update the schedule with availability
+          const availabilityData = {
+            timeZone: availability.timezone,
+            name: "Default Schedule",
+            schedule: availability.days.map((day: number) => ({
+              days: [day],
+              startTime: availability.startTime,
+              endTime: availability.endTime
+            }))
+          };
+          
+          const updateResponse = await fetch(`${CAL_COM_API_URL}/schedules/${scheduleId}`, {
+            method: 'PUT',
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${userData.cal_com_token}`
+            },
+            body: JSON.stringify(availabilityData)
+          });
+          
+          if (!updateResponse.ok) {
+            const errorData = await updateResponse.json();
+            console.error("Error updating availability:", errorData);
+            return new Response(
+              JSON.stringify({ error: 'Failed to update availability', details: errorData }),
+              { status: updateResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          const updateData = await updateResponse.json();
+          return new Response(
+            JSON.stringify({ success: true, schedule: updateData }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        break;
+      }
+      
+      case 'create-booking': {
+        // POST /create-booking - Create a new booking directly
+        if (req.method === 'POST') {
+          const { eventTypeId, startTime, attendee } = requestBody as any;
+          
+          if (!eventTypeId || !startTime || !attendee || !attendee.email || !attendee.name) {
+            return new Response(
+              JSON.stringify({ error: 'Missing required booking details' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          const bookingData = {
+            start: startTime,
+            eventTypeId: eventTypeId,
+            attendee: {
+              name: attendee.name,
+              email: attendee.email,
+              timeZone: attendee.timeZone || 'America/Sao_Paulo'
+            }
+          };
+          
+          const response = await fetch(`${CAL_COM_API_URL}/bookings`, {
+            method: 'POST',
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${userData.cal_com_token}`
+            },
+            body: JSON.stringify(bookingData)
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error("Error creating booking:", errorData);
+            return new Response(
+              JSON.stringify({ error: 'Failed to create booking', details: errorData }),
               { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
 
           const data = await response.json();
           return new Response(
-            JSON.stringify(data),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            JSON.stringify({ success: true, booking: data }),
+            { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
         break;
