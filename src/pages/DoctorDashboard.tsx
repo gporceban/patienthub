@@ -1,3 +1,4 @@
+
 import React, { useContext, useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { AuthContext } from '@/contexts/AuthContext';
@@ -35,12 +36,12 @@ const DoctorDashboard = () => {
       try {
         setIsLoading(true);
         
-        // Get patient count
+        // Get patient count - fixed the is() method call by using eq()
         const { count: patientCount, error: patientError } = await supabase
           .from('appointments')
           .select('patient_id', { count: 'exact', head: true })
           .eq('doctor_id', profile.id)
-          .is('status', 'completed');
+          .eq('status', 'completed');
           
         if (patientError) throw patientError;
         

@@ -35,11 +35,14 @@ export const seedDoctorNotifications = async (doctorId: string) => {
   ];
   
   try {
-    const { error } = await fromDoctorNotifications(supabase).insert(notifications);
-    
-    if (error) {
-      console.error('Erro ao criar notificações de teste para médico:', error);
-      return { success: false, error };
+    // Fix: Process each notification individually
+    for (const notification of notifications) {
+      const { error } = await fromDoctorNotifications(supabase).insert(notification);
+      
+      if (error) {
+        console.error('Erro ao criar notificação de teste para médico:', error);
+        return { success: false, error };
+      }
     }
     
     return { success: true };
@@ -81,11 +84,14 @@ export const seedPatientNotifications = async (patientId: string) => {
   ];
   
   try {
-    const { error } = await fromPatientNotifications(supabase).insert(notifications);
-    
-    if (error) {
-      console.error('Erro ao criar notificações de teste para paciente:', error);
-      return { success: false, error };
+    // Fix: Process each notification individually
+    for (const notification of notifications) {
+      const { error } = await fromPatientNotifications(supabase).insert(notification);
+      
+      if (error) {
+        console.error('Erro ao criar notificação de teste para paciente:', error);
+        return { success: false, error };
+      }
     }
     
     return { success: true };

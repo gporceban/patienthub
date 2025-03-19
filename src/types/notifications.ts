@@ -33,7 +33,13 @@ export const fromDoctorNotifications = (supabase: any) => {
       
       return query.eq('doctor_id', doctorId).eq('read', false) as any;
     },
-    insert: (values: Omit<Notification, 'id' | 'created_at'>) => {
+    insert: (values: Omit<{
+      doctor_id: string;
+      title: string;
+      message: string;
+      icon_type: string;
+      read: boolean;
+    }, 'id' | 'created_at'>) => {
       return supabase.from('doctor_notifications').insert(values) as any;
     }
   };
@@ -61,7 +67,13 @@ export const fromPatientNotifications = (supabase: any) => {
       
       return query.eq('patient_id', patientId).eq('read', false) as any;
     },
-    insert: (values: Omit<Notification, 'id' | 'created_at'>) => {
+    insert: (values: Omit<{
+      patient_id: string;
+      title: string;
+      message: string;
+      icon_type: string;
+      read: boolean;
+    }, 'id' | 'created_at'>) => {
       return supabase.from('patient_notifications').insert(values) as any;
     }
   };
