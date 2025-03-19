@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +16,11 @@ const LoginForm: React.FC = () => {
   const { 
     user, 
     profile, 
+    userType,
     isLoading: authLoading, 
     error: authError, 
     refreshProfile,
+    refreshAuth,
     hasValidSession,
     isInitialized 
   } = useContext(AuthContext);
@@ -28,6 +29,7 @@ const LoginForm: React.FC = () => {
     console.log("LoginForm rendered. Auth state:", { 
       user: !!user, 
       profile, 
+      userType,
       loading: authLoading, 
       error: authError,
       hasValidSession,
@@ -35,33 +37,30 @@ const LoginForm: React.FC = () => {
     });
     
     // Only redirect if we have both user and profile with user_type and not already redirecting
-    if (isInitialized && !authLoading && user && profile?.user_type && hasValidSession) {
-      console.log("User already logged in with complete profile, redirecting to:", profile.user_type);
-      redirectBasedOnUserType(profile.user_type);
+    if (isInitialized && !authLoading && user && userType && hasValidSession) {
+      console.log("User already logged in with complete profile, redirecting to:", userType);
+      redirectBasedOnUserType(userType);
     }
-  }, [user, profile, authLoading, hasValidSession, isInitialized]);
+  }, [user, profile, userType, authLoading, hasValidSession, isInitialized]);
 
   const redirectBasedOnUserType = (userType: string) => {
-    console.log(`Attempting to redirect user to /${userType} page`);
+    console.log(`Attempting to redirect user to /${userType}/dashboard page`);
     
     try {
-      // Use a more substantial delay to ensure all state updates and context changes are propagated
-      setTimeout(() => {
-        if (userType === 'paciente') {
-          console.log("Navigating to /paciente with replace=true");
-          navigate('/paciente/dashboard', { replace: true });
-        } else if (userType === 'medico') {
-          console.log("Navigating to /medico with replace=true");
-          navigate('/medico/dashboard', { replace: true });
-        } else {
-          console.error("Unknown user type:", userType);
-          toast({
-            variant: "destructive",
-            title: "Erro de perfil",
-            description: "Tipo de usuário desconhecido. Por favor, contate o suporte.",
-          });
-        }
-      }, 200);
+      if (userType === 'paciente') {
+        console.log("Navigating to /paciente/dashboard with replace=true");
+        navigate('/paciente/dashboard', { replace: true });
+      } else if (userType === 'medico') {
+        console.log("Navigating to /medico/dashboard with replace=true");
+        navigate('/medico/dashboard', { replace: true });
+      } else {
+        console.error("Unknown user type:", userType);
+        toast({
+          variant: "destructive",
+          title: "Erro de perfil",
+          description: "Tipo de usuário desconhecido. Por favor, contate o suporte.",
+        });
+      }
     } catch (error) {
       console.error("Error during redirect:", error);
       toast({
@@ -108,45 +107,15 @@ const LoginForm: React.FC = () => {
       if (data?.user) {
         console.log("Login successful, fetching profile...");
         
-        // Fetch the user profile to confirm user type
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error("Error fetching profile:", profileError);
-          throw profileError;
-        }
-
-        if (!profileData) {
-          console.error("No profile found for user:", data.user.id);
-          toast({
-            variant: "destructive",
-            title: "Erro de perfil",
-            description: "Perfil de usuário não encontrado. Por favor, contate o suporte.",
-          });
-          await supabase.auth.signOut();
-          return;
-        }
-
-        // Safely access user_type after confirming profileData exists
-        const userType = profileData.user_type;
+        // Force a refresh of the auth context
+        await refreshAuth();
         
-        console.log(`Login successful as ${userType}, redirecting...`);
         toast({
           title: "Login realizado com sucesso",
           description: `Bem-vindo ao OrthoCareMosaic.`,
         });
         
-        // Force a refresh of the profile in the global context
-        if (refreshProfile) {
-          await refreshProfile();
-        }
-        
-        // Then redirect based on the user type from the profile we just fetched
-        redirectBasedOnUserType(userType);
+        // The redirectBasedOnUserType will be handled by the useEffect when the context updates
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -155,6 +124,7 @@ const LoginForm: React.FC = () => {
         title: "Erro ao fazer login",
         description: error.message || "Ocorreu um erro durante o login. Verifique suas credenciais.",
       });
+      setIsLoading(false);
     } finally {
       setIsLoading(false);
     }
@@ -212,11 +182,11 @@ const LoginForm: React.FC = () => {
     return (
       <div className="text-center">
         <p className="text-amber-300/90 text-lg font-semibold mb-4">
-          Você já está conectado como {profile.user_type === 'paciente' ? 'Paciente' : 'Médico'}
+          Você já está conectado como {userType === 'paciente' ? 'Paciente' : 'Médico'}
         </p>
         <div className="flex flex-col space-y-3">
           <button 
-            onClick={() => redirectBasedOnUserType(profile.user_type)}
+            onClick={() => redirectBasedOnUserType(userType || '')}
             className="button-gold-gradient px-6 py-2 rounded-lg font-semibold transition-all"
           >
             Ir para Dashboard

@@ -23,39 +23,68 @@ import PatientAssessmentDetails from './pages/PatientAssessmentDetails';
 import CalComCallback from './pages/CalComCallback';
 
 function App() {
-  const { user } = useContext(AuthContext);
+  const { user, userType, isLoading, hasValidSession } = useContext(AuthContext);
 
-  const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-    return user ? <>{children}</> : <Navigate to="/" />;
+  // Private route wrapper component
+  const PrivateRoute = ({ children, requiredUserType }: { children: React.ReactNode, requiredUserType?: 'medico' | 'paciente' }) => {
+    // Don't render anything while auth is loading
+    if (isLoading) return null;
+    
+    // Redirect to login if not authenticated
+    if (!user || !hasValidSession) {
+      return <Navigate to="/" replace />;
+    }
+    
+    // If a specific user type is required, check that too
+    if (requiredUserType && userType !== requiredUserType) {
+      // Redirect to appropriate dashboard based on actual user type
+      const redirectPath = userType === 'medico' ? '/medico/dashboard' : '/paciente/dashboard';
+      return <Navigate to={redirectPath} replace />;
+    }
+    
+    // User is authenticated and has the right type, render the children
+    return <>{children}</>;
   };
 
+  // Public route wrapper component - redirects to dashboard if already logged in
   const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-    return !user ? <>{children}</> : <Navigate to={user.user_metadata?.user_type === 'medico' ? '/medico/calendario' : '/paciente/calendario'} />;
+    // Don't render anything while auth is loading
+    if (isLoading) return null;
+    
+    if (user && hasValidSession && userType) {
+      const redirectPath = userType === 'medico' ? '/medico/dashboard' : '/paciente/dashboard';
+      return <Navigate to={redirectPath} replace />;
+    }
+    
+    return <>{children}</>;
   };
 
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Index />} />
-
         {/* Public Routes */}
+        <Route path="/" element={<PublicRoute><Index /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><Index /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Index /></PublicRoute>} />
-        <Route path="/register/doctor" element={<PublicRoute><Index /></PublicRoute>} />
-        <Route path="/register/patient" element={<PublicRoute><Index /></PublicRoute>} />
 
-        {/* Private Routes */}
-        <Route path="/medico/calendario" element={<PrivateRoute><DoctorCalendar /></PrivateRoute>} />
-        <Route path="/paciente/calendario" element={<PrivateRoute><PatientCalendar /></PrivateRoute>} />
-        <Route path="/medico/dashboard" element={<PrivateRoute><DoctorDashboard /></PrivateRoute>} />
-        <Route path="/paciente/dashboard" element={<PrivateRoute><PatientDashboard /></PrivateRoute>} />
-        <Route path="/medico/pacientes" element={<PrivateRoute><DoctorPatients /></PrivateRoute>} />
-        <Route path="/paciente/progresso" element={<PrivateRoute><PatientProgress /></PrivateRoute>} />
-        <Route path="/medico/perfil" element={<PrivateRoute><DoctorProfile /></PrivateRoute>} />
-        <Route path="/paciente/prontuario" element={<PrivateRoute><PatientRecords /></PrivateRoute>} />
-        <Route path="/paciente/avaliacao" element={<PrivateRoute><PatientAssessment /></PrivateRoute>} />
-        <Route path="/medico/avaliacao" element={<PrivateRoute><DoctorAssessment /></PrivateRoute>} />
-        <Route path="/paciente/avaliacao/:id" element={<PrivateRoute><PatientAssessmentDetails /></PrivateRoute>} />
+        {/* Doctor Routes */}
+        <Route path="/medico" element={<PrivateRoute requiredUserType="medico"><DoctorDashboard /></PrivateRoute>} />
+        <Route path="/medico/dashboard" element={<PrivateRoute requiredUserType="medico"><DoctorDashboard /></PrivateRoute>} />
+        <Route path="/medico/calendario" element={<PrivateRoute requiredUserType="medico"><DoctorCalendar /></PrivateRoute>} />
+        <Route path="/medico/pacientes" element={<PrivateRoute requiredUserType="medico"><DoctorPatients /></PrivateRoute>} />
+        <Route path="/medico/perfil" element={<PrivateRoute requiredUserType="medico"><DoctorProfile /></PrivateRoute>} />
+        <Route path="/medico/avaliacao" element={<PrivateRoute requiredUserType="medico"><DoctorAssessment /></PrivateRoute>} />
+
+        {/* Patient Routes */}
+        <Route path="/paciente" element={<PrivateRoute requiredUserType="paciente"><PatientDashboard /></PrivateRoute>} />
+        <Route path="/paciente/dashboard" element={<PrivateRoute requiredUserType="paciente"><PatientDashboard /></PrivateRoute>} />
+        <Route path="/paciente/calendario" element={<PrivateRoute requiredUserType="paciente"><PatientCalendar /></PrivateRoute>} />
+        <Route path="/paciente/progresso" element={<PrivateRoute requiredUserType="paciente"><PatientProgress /></PrivateRoute>} />
+        <Route path="/paciente/prontuario" element={<PrivateRoute requiredUserType="paciente"><PatientRecords /></PrivateRoute>} />
+        <Route path="/paciente/avaliacao" element={<PrivateRoute requiredUserType="paciente"><PatientAssessment /></PrivateRoute>} />
+        <Route path="/paciente/avaliacao/:id" element={<PrivateRoute requiredUserType="paciente"><PatientAssessmentDetails /></PrivateRoute>} />
+        
+        {/* Special Routes */}
         <Route path="/calcom/callback" element={<CalComCallback />} />
         
         {/* Catch-all route for 404 */}
