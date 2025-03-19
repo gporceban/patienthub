@@ -1,15 +1,16 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
-import { calComWrapper } from '@/services/calComWrapper';
+import { exchangeCodeForToken, storeCalComToken } from '@/services/calComService';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 
 const CalComCallback = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
+  const { user, userType } = useContext(AuthContext);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +36,11 @@ const CalComCallback = () => {
 
         console.log("Authorization code obtained:", code);
 
-        // Exchange code for token using our wrapper
+        // Exchange code for token
         const redirectUri = `${window.location.origin}/calcom/callback`;
         console.log("Using redirect URI for token exchange:", redirectUri);
         
-        const tokenData = await calComWrapper.exchangeCodeForToken(code, redirectUri);
+        const tokenData = await exchangeCodeForToken(code, redirectUri);
 
         if (!tokenData || !tokenData.access_token) {
           setError("Falha ao obter token de acesso");
@@ -50,14 +51,8 @@ const CalComCallback = () => {
         console.log("Token obtained, storing in database...");
 
         // Store the tokens in Supabase
-        const success = await calComWrapper.storeTokens(user.id, tokenData);
+        await storeCalComToken(user.id, tokenData);
         
-        if (!success) {
-          setError("Falha ao armazenar token de acesso");
-          setIsLoading(false);
-          return;
-        }
-
         console.log("Cal.com integration successful!");
         toast({
           title: "Conexão bem-sucedida",
@@ -66,7 +61,7 @@ const CalComCallback = () => {
         });
 
         // Redirect based on user type
-        const redirectPath = user.user_metadata?.user_type === 'medico' 
+        const redirectPath = userType === 'medico' 
           ? '/medico/calendario' 
           : '/paciente/calendario';
 
@@ -86,7 +81,7 @@ const CalComCallback = () => {
     };
 
     processOAuthCallback();
-  }, [location, navigate, user, toast]);
+  }, [location, navigate, user, toast, userType]);
 
   if (isLoading) {
     return (

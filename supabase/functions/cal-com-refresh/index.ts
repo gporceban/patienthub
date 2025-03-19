@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
-const CAL_COM_API_URL = "https://api.cal.com/v2";
+const CAL_COM_API_URL = "https://api.cal.com/v1";
 const CAL_COM_CLIENT_ID = "cm8cfb46t00dtp81l5a5yre86";
 const CAL_COM_CLIENT_SECRET = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcmVEZWZhdWx0RXZlbnRUeXBlc0VuYWJsZWQiOmZhbHNlLCJuYW1lIjoiRHIuIFBvcmNlYmFuIiwicGVybWlzc2lvbnMiOjEwMjMsInJlZGlyZWN0VXJpcyI6WyJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8iXSwiYm9va2luZ1JlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvIiwiYm9va2luZ0NhbmNlbFJlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvL2NhbmNlbCIsImJvb2tpbmdSZXNjaGVkdWxlUmVkaXJlY3RVcmkiOiJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8vYXNzZXNzbWVudCIsImFyZUVtYWlsc0VuYWJsZWQiOnRydWUsImlhdCI6MTc0MjE3NzE3NX0.ruccBtCPGcDWwuuDBkBYOdraCPNHnvdCrr6OPZQw0KU";
 
@@ -19,6 +19,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("cal-com-refresh function called");
+    
     // Create Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
@@ -28,6 +30,7 @@ serve(async (req) => {
     const { refreshToken } = await req.json();
 
     if (!refreshToken) {
+      console.error("No refresh token provided");
       return new Response(
         JSON.stringify({ error: 'Refresh token is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -36,14 +39,18 @@ serve(async (req) => {
 
     console.log("Refreshing Cal.com token with refresh token");
 
-    // Get a new token from Cal.com
-    const response = await fetch(`${CAL_COM_API_URL}/oauth/${CAL_COM_CLIENT_ID}/refresh`, {
+    // Get a new token from Cal.com using refresh token
+    const response = await fetch(`${CAL_COM_API_URL}/auth/refresh`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "x-cal-secret-key": CAL_COM_CLIENT_SECRET
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({
+        client_id: CAL_COM_CLIENT_ID,
+        client_secret: CAL_COM_CLIENT_SECRET,
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      }),
     });
 
     if (!response.ok) {
@@ -61,9 +68,9 @@ serve(async (req) => {
     // Return the new tokens
     return new Response(
       JSON.stringify({
-        accessToken: tokens.accessToken || tokens.access_token,
-        refreshToken: tokens.refreshToken || tokens.refresh_token,
-        expiresIn: tokens.expiresIn || tokens.expires_in,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresIn: tokens.expires_in,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

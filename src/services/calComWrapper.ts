@@ -6,10 +6,7 @@ import {
   getCalComToken, 
   hasCalComConnection, 
   refreshCalComToken, 
-  storeCalComToken, 
-  getCalComBookings,
-  updateCalComAvailability,
-  createCalComEventType
+  storeCalComToken
 } from './calComService';
 
 export interface CalComBooking {
@@ -63,10 +60,17 @@ class CalComWrapper {
         return null;
       }
 
+      // Get token
+      const token = await getCalComToken(session.user.id);
+      if (!token) {
+        console.error('No Cal.com token found');
+        return null;
+      }
+
       // Try using the function invocation approach with params in the body
       const { data, error } = await supabase.functions.invoke('cal-com-bookings', {
-        method: 'GET',
-        body: { userId: session.user.id }
+        method: 'POST',
+        body: { token, action: 'get-bookings' }
       });
 
       if (error) {
@@ -88,7 +92,7 @@ class CalComWrapper {
         }));
       }
 
-      return null;
+      return [];
     } catch (error) {
       console.error('Error getting bookings:', error);
       return null;
@@ -145,7 +149,7 @@ class CalComWrapper {
 
       const { data, error } = await supabase.functions.invoke('cal-com-bookings', {
         method: 'POST',
-        body: { userId, action: 'availability', availability }
+        body: { token, action: 'create-availability', availability }
       });
 
       if (error) {
@@ -169,9 +173,15 @@ class CalComWrapper {
         return null;
       }
 
+      const token = await getCalComToken(session.user.id);
+      if (!token) {
+        console.error('No Cal.com token found');
+        return null;
+      }
+
       const { data, error } = await supabase.functions.invoke('cal-com-bookings', {
-        method: 'GET',
-        body: { userId: session.user.id, action: 'event-types' }
+        method: 'POST',
+        body: { token, action: 'get-event-types' }
       });
 
       if (error) {
@@ -179,7 +189,7 @@ class CalComWrapper {
         return null;
       }
 
-      return data && data.eventTypes ? data.eventTypes : null;
+      return data && data.eventTypes ? data.eventTypes : [];
     } catch (error) {
       console.error('Error getting event types:', error);
       return null;
@@ -195,10 +205,16 @@ class CalComWrapper {
         return false;
       }
 
+      const token = await getCalComToken(session.user.id);
+      if (!token) {
+        console.error('No Cal.com token found');
+        return false;
+      }
+
       const { data, error } = await supabase.functions.invoke('cal-com-bookings', {
         method: 'POST',
         body: { 
-          userId: session.user.id, 
+          token,
           action: 'create-booking',
           eventTypeId, 
           startTime, 

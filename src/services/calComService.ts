@@ -16,14 +16,16 @@ export const exchangeCodeForToken = async (
   redirectUri: string
 ): Promise<CalComTokenResponse | null> => {
   try {
-    const response = await fetch('https://api.cal.com/v2/oauth/token', {
+    console.log("Exchanging code for token with redirectUri:", redirectUri);
+    
+    const response = await fetch('https://api.cal.com/v1/auth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        client_id: 'cm8cfb46t00dtp81l5a5yre86', // Updated with provided client ID
-        client_secret: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcmVEZWZhdWx0RXZlbnRUeXBlc0VuYWJsZWQiOmZhbHNlLCJuYW1lIjoiRHIuIFBvcmNlYmFuIiwicGVybWlzc2lvbnMiOjEwMjMsInJlZGlyZWN0VXJpcyI6WyJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8iXSwiYm9va2luZ1JlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvIiwiYm9va2luZ0NhbmNlbFJlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvL2NhbmNlbCIsImJvb2tpbmdSZXNjaGVkdWxlUmVkaXJlY3RVcmkiOiJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8vYXNzZXNzbWVudCIsImFyZUVtYWlsc0VuYWJsZWQiOnRydWUsImlhdCI6MTc0MjE3NzE3NX0.ruccBtCPGcDWwuuDBkBYOdraCPNHnvdCrr6OPZQw0KU', // Updated with provided client secret
+        client_id: 'cm8cfb46t00dtp81l5a5yre86',
+        client_secret: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcmVEZWZhdWx0RXZlbnRUeXBlc0VuYWJsZWQiOmZhbHNlLCJuYW1lIjoiRHIuIFBvcmNlYmFuIiwicGVybWlzc2lvbnMiOjEwMjMsInJlZGlyZWN0VXJpcyI6WyJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8iXSwiYm9va2luZ1JlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvIiwiYm9va2luZ0NhbmNlbFJlZGlyZWN0VXJpIjoiaHR0cHM6Ly9haS5kcmd1aWxoZXJtZXBvcmNlYmFuLmNvbS5ici9wYWNpZW50ZS9jYWxlbmRhcmlvL2NhbmNlbCIsImJvb2tpbmdSZXNjaGVkdWxlUmVkaXJlY3RVcmkiOiJodHRwczovL2FpLmRyZ3VpbGhlcm1lcG9yY2ViYW4uY29tLmJyL3BhY2llbnRlL2NhbGVuZGFyaW8vYXNzZXNzbWVudCIsImFyZUVtYWlsc0VuYWJsZWQiOnRydWUsImlhdCI6MTc0MjE3NzE3NX0.ruccBtCPGcDWwuuDBkBYOdraCPNHnvdCrr6OPZQw0KU',
         grant_type: 'authorization_code',
         code,
         redirect_uri: redirectUri,
@@ -36,7 +38,14 @@ export const exchangeCodeForToken = async (
       return null;
     }
 
-    return await response.json();
+    const tokenData = await response.json();
+    console.log("Token data received:", tokenData);
+    
+    return {
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_in: tokenData.expires_in || 3600
+    };
   } catch (error) {
     console.error('Failed to exchange code for token:', error);
     return null;
@@ -48,17 +57,23 @@ export const exchangeCodeForToken = async (
  */
 export const storeCalComToken = async (userId: string, tokenData: CalComTokenResponse): Promise<void> => {
   try {
+    console.log("Storing Cal.com token for user:", userId);
+    
     const { error } = await supabase
       .from('profiles')
       .update({ 
         cal_com_token: tokenData.access_token,
-        cal_com_refresh_token: tokenData.refresh_token
+        cal_com_refresh_token: tokenData.refresh_token,
+        cal_com_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
       })
       .eq('id', userId);
 
     if (error) {
+      console.error('Error storing Cal.com token:', error);
       throw error;
     }
+    
+    console.log("Cal.com token stored successfully");
   } catch (error) {
     console.error('Error storing Cal.com token:', error);
     throw error;
@@ -72,12 +87,27 @@ export const getCalComToken = async (userId: string): Promise<string | null> => 
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('cal_com_token')
+      .select('cal_com_token, cal_com_token_expires_at')
       .eq('id', userId)
       .maybeSingle();
 
-    if (error || !data || !data.cal_com_token) {
+    if (error) {
+      console.error('Error getting Cal.com token:', error);
       return null;
+    }
+    
+    if (!data || !data.cal_com_token) {
+      console.log("No Cal.com token found for user:", userId);
+      return null;
+    }
+
+    // Check if token is expired
+    if (data.cal_com_token_expires_at) {
+      const expiresAt = new Date(data.cal_com_token_expires_at);
+      if (expiresAt <= new Date()) {
+        console.log("Cal.com token expired, refreshing...");
+        return refreshCalComToken(userId);
+      }
     }
 
     return data.cal_com_token;
@@ -100,10 +130,12 @@ export const refreshCalComToken = async (userId: string): Promise<string | null>
       .maybeSingle();
 
     if (error || !data || !data.cal_com_refresh_token) {
-      console.error('No refresh token found for user');
+      console.error('No refresh token found for user:', error || 'No refresh token in data');
       return null;
     }
 
+    console.log("Refreshing Cal.com token using refresh token");
+    
     // Call the edge function to refresh the token
     const { data: tokenData, error: functionError } = await supabase.functions.invoke('cal-com-refresh', {
       body: { refreshToken: data.cal_com_refresh_token }
@@ -114,12 +146,15 @@ export const refreshCalComToken = async (userId: string): Promise<string | null>
       return null;
     }
 
+    console.log("Received new access token from refresh");
+    
     // Store the refreshed tokens
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
         cal_com_token: tokenData.accessToken,
-        cal_com_refresh_token: tokenData.refreshToken
+        cal_com_refresh_token: tokenData.refreshToken,
+        cal_com_token_expires_at: new Date(Date.now() + (tokenData.expiresIn || 3600) * 1000).toISOString()
       })
       .eq('id', userId);
 
@@ -136,49 +171,16 @@ export const refreshCalComToken = async (userId: string): Promise<string | null>
 };
 
 /**
- * Create a Cal.com managed user
- */
-export const createCalComManagedUser = async (
-  userId: string,
-  userData: {
-    email: string;
-    name?: string;
-    timeFormat?: 12 | 24;
-    weekStart?: string;
-    timeZone?: string;
-  }
-): Promise<{ success: boolean; calComUserId?: number }> => {
-  try {
-    const { data, error } = await supabase.functions.invoke('cal-com-create-user', {
-      body: {
-        userId,
-        userData,
-      },
-    });
-
-    if (error || !data) {
-      console.error('Error creating Cal.com user:', error || 'No data returned');
-      return { success: false };
-    }
-
-    return { 
-      success: true, 
-      calComUserId: data.calComUser?.id 
-    };
-  } catch (error) {
-    console.error('Failed to create Cal.com managed user:', error);
-    return { success: false };
-  }
-};
-
-/**
  * Generate Cal.com OAuth URL
  */
 export const getCalComOAuthUrl = (redirectUri: string): string => {
-  const clientId = 'cm8cfb46t00dtp81l5a5yre86'; // Updated with provided client ID
-  const scope = 'availability calendar bookings profile'; // Adjust scopes as needed
+  const clientId = 'cm8cfb46t00dtp81l5a5yre86'; 
+  const scope = 'availability calendar bookings profile'; 
   
-  return `https://api.cal.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+  const authUrl = `https://app.cal.com/auth/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+  console.log("Generated Cal.com OAuth URL:", authUrl);
+  
+  return authUrl;
 };
 
 /**
@@ -186,17 +188,23 @@ export const getCalComOAuthUrl = (redirectUri: string): string => {
  */
 export const hasCalComConnection = async (userId: string): Promise<boolean> => {
   try {
+    console.log("Checking Cal.com connection for user:", userId);
+    
     const { data, error } = await supabase
       .from('profiles')
       .select('cal_com_token, cal_com_refresh_token')
       .eq('id', userId)
       .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      console.error('Error checking Cal.com connection:', error);
       return false;
     }
-
-    return !!data.cal_com_token && !!data.cal_com_refresh_token;
+    
+    const hasConnection = !!data?.cal_com_token && !!data?.cal_com_refresh_token;
+    console.log("Cal.com connection status:", hasConnection);
+    
+    return hasConnection;
   } catch (error) {
     console.error('Error checking Cal.com connection:', error);
     return false;
