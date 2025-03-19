@@ -94,7 +94,7 @@ const documentOrchestrators = {
 
   Formate como uma nota clínica formal usando terminologia médica profissional em português brasileiro.
   Mantenha o estilo de escrita do Dr. Porceban em todo o documento.
-  A nota deve ser abrangente e aderir aos padrões de documentação médica brasileiros. Retorne apenas a nota como resposta, com formatação para `,
+  A nota deve ser abrangente e aderir aos padrões de documentação médica brasileiros. Retorne apenas a nota como resposta, com formatação para editor tipo QUILL`,
 
   prescription: `Você é um assistente médico gerando uma prescrição formal no estilo do Dr. Porceban, um renomado cirurgião de coluna em São Paulo, Brasil.
   Usando as informações extraídas, compile uma prescrição COMPLETA em português brasileiro com:
