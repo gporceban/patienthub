@@ -615,7 +615,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     
     toast({
       title: "Arquivo carregado",
-      description: `"${file.name}" está pronto para transcrição."
+      description: `"${file.name}" está pronto para transcrição.`
     });
   };
 
@@ -701,7 +701,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         
         {audioBlob && !isRecording && (
           <Button 
-            onClick={audioBlob === uploadedFileName ? uploadAndTranscribeAudio : transcribeAudio} 
+            onClick={uploadedFileName ? uploadAndTranscribeAudio : transcribeAudio} 
             variant="outline" 
             disabled={isTranscribing || isProcessing || isUploading}
             className="mb-4"
