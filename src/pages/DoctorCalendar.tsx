@@ -671,6 +671,7 @@ const DoctorCalendar = () => {
           ) : (
             <div className="mb-6">
               <FullCalendarComponent 
+                userId={user?.id || ''}
                 onEventClick={handleCalendarEventClick}
               />
               
