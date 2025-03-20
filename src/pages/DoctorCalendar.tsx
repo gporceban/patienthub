@@ -658,5 +658,93 @@ const DoctorCalendar = () => {
               <p className="text-gray-400 mb-6">
                 Crie sua conta no Cal.com para gerenciar sua agenda médica de forma mais eficiente.
                 Isto permite que pacientes agendem consultas com você online.
-             
+              </p>
+              <Button 
+                onClick={handleCreateCalComUser} 
+                className="bg-gold-500 hover:bg-gold-600 text-black"
+                disabled={isCreatingCalComUser}
+              >
+                <LinkIcon className="h-4 w-4 mr-2" />
+                {isCreatingCalComUser ? 'Criando conta...' : 'Criar Conta de Médico no Cal.com'}
+              </Button>
+            </Card>
+          ) : (
+            <div className="mb-6">
+              <FullCalendarComponent 
+                events={appointments.map(appointment => ({
+                  id: appointment.id,
+                  title: appointment.title,
+                  start: appointment.startTime,
+                  end: appointment.endTime,
+                  extendedProps: {
+                    attendees: appointment.attendees,
+                    status: appointment.status,
+                    location: appointment.location,
+                    description: appointment.description,
+                    eventTypeId: appointment.eventTypeId
+                  }
+                }))}
+                onEventClick={handleCalendarEventClick}
+              />
+              
+              <Dialog open={isSchedulingDialogOpen} onOpenChange={setIsSchedulingDialogOpen}>
+                <DialogContent className="sm:max-w-[525px] card-gradient">
+                  <DialogHeader>
+                    <DialogTitle>{selectedEvent?.title || 'Detalhes da Consulta'}</DialogTitle>
+                  </DialogHeader>
+                  {selectedEvent && (
+                    <div className="py-4">
+                      <div className="space-y-3">
+                        <div>
+                          <p className="font-medium text-gray-300">Paciente</p>
+                          <p>{selectedEvent.extendedProps?.attendees?.[0]?.name || 'Não especificado'}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-300">Data e Hora</p>
+                          <p className="text-gold-500">
+                            {formatAppointmentDate(selectedEvent.start.toISOString())}
+                          </p>
+                        </div>
+                        {selectedEvent.extendedProps?.location && (
+                          <div>
+                            <p className="font-medium text-gray-300">Local</p>
+                            <p>{selectedEvent.extendedProps.location}</p>
+                          </div>
+                        )}
+                        {selectedEvent.extendedProps?.description && (
+                          <div>
+                            <p className="font-medium text-gray-300">Descrição</p>
+                            <p>{selectedEvent.extendedProps.description}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-300">Status</p>
+                          <span className={`inline-block text-xs px-2 py-1 rounded-full mt-1 ${getStatusBadgeClass(selectedEvent.extendedProps?.status)}`}>
+                            {selectedEvent.extendedProps?.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <DialogFooter className="flex gap-2">
+                    <Button variant="outline">
+                      Reagendar
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className="text-red-500 hover:text-red-600"
+                    >
+                      Cancelar Consulta
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </Layout>
+  );
+};
 
+export default DoctorCalendar;
