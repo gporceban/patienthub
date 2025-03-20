@@ -31,4 +31,5 @@ jwt_expiry = 3600
 enable_signup = true
 
 [functions]
-serve = { cors = ["*"] }
+[functions.serve]
+cors = ["*"]

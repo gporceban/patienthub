@@ -4,7 +4,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { ptBR } from '@fullcalendar/core/locales';
+import ptBrLocale from '@fullcalendar/core/locales/pt-br';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getCalComBookings } from '@/services/calComV2Service';
@@ -159,7 +159,7 @@ const FullCalendarComponent: React.FC<FullCalendarComponentProps> = ({ userId, o
           center: 'title',
           right: 'dayGridMonth,timeGridWeek,timeGridDay'
         }}
-        locale={ptBR}
+        locale={ptBrLocale}
         events={events}
         eventClick={handleEventClick}
         height="auto"
