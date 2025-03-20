@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, User, Mail, Lock, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/contexts/AuthContext';
+import { createCalComManagedUser } from '@/services/calComV2Service';
 
 const PatientRegisterForm: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -135,6 +135,25 @@ const PatientRegisterForm: React.FC = () => {
 
       if (error) {
         throw error;
+      }
+
+      // Automatically create a Cal.com managed user for the patient
+      if (data?.user) {
+        console.log("Creating Cal.com managed user for new patient:", data.user.id);
+        try {
+          const calComResponse = await createCalComManagedUser(data.user.id);
+          
+          if (!calComResponse.success) {
+            console.warn("Cal.com user creation warning:", calComResponse.error);
+            // Continue with registration even if Cal.com user creation fails
+            // We'll try again later when they access the calendar
+          } else {
+            console.log("Cal.com managed user created successfully for patient:", calComResponse.calComUser);
+          }
+        } catch (calComError) {
+          console.warn("Error creating Cal.com user:", calComError);
+          // Continue with registration even if Cal.com user creation fails
+        }
       }
 
       toast({

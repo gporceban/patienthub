@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import { format, parseISO, startOfDay, endOfDay, addMonths } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -40,7 +39,6 @@ const DoctorCalendar = () => {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [availableSlots, setAvailableSlots] = useState<any[]>([]);
   
-  // State for the availability form
   const [availabilityForm, setAvailabilityForm] = useState({
     days: [] as string[],
     startTime: '09:00',
@@ -48,7 +46,6 @@ const DoctorCalendar = () => {
     timezone: 'America/Sao_Paulo'
   });
   
-  // State for event type form
   const [eventTypeForm, setEventTypeForm] = useState({
     title: '',
     slug: '',
@@ -56,7 +53,6 @@ const DoctorCalendar = () => {
     length: 30,
   });
   
-  // Function to fetch all appointments
   const fetchAppointments = async () => {
     if (!user?.id) return;
     
@@ -82,7 +78,6 @@ const DoctorCalendar = () => {
     }
   };
   
-  // Function to filter appointments by selected date
   const filterAppointmentsByDate = (appts: any[], date: Date) => {
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
@@ -171,7 +166,6 @@ const DoctorCalendar = () => {
     fetchAssessments();
   }, [user, toast]);
   
-  // Effect to filter appointments when selected date changes
   useEffect(() => {
     filterAppointmentsByDate(appointments, selected);
   }, [selected, appointments]);
@@ -187,7 +181,7 @@ const DoctorCalendar = () => {
         setHasCalComUser(true);
         toast({
           title: "Conta Cal.com criada",
-          description: "Sua conta no Cal.com foi criada com sucesso."
+          description: "Sua conta de médico no Cal.com foi criada com sucesso. Agora você pode gerenciar sua agenda.",
         });
         fetchAppointments();
       } else {
@@ -245,7 +239,6 @@ const DoctorCalendar = () => {
   };
   
   const handleCreateAvailability = async () => {
-    // Implementation will be added later with Cal.com availability API
     setIsAvailabilityDialogOpen(false);
     toast({
       title: "Disponibilidade criada",
@@ -254,7 +247,6 @@ const DoctorCalendar = () => {
   };
   
   const handleCreateEventType = async () => {
-    // Implementation will be added later with Cal.com event types API
     setIsEventTypeDialogOpen(false);
     toast({
       title: "Tipo de evento criado",
@@ -266,8 +258,7 @@ const DoctorCalendar = () => {
     setSelectedEvent(info.event);
     setIsSchedulingDialogOpen(true);
     
-    // Fetch available slots for this event type if needed
-    // fetchAvailableSlots(info.event.extendedProps.eventTypeId);
+    fetchAvailableSlots(info.event.extendedProps.eventTypeId);
   };
   
   return (
@@ -301,7 +292,8 @@ const DoctorCalendar = () => {
               <Card className="card-gradient p-6 text-center">
                 <h3 className="text-xl font-medium mb-4">Conecte seu Calendário</h3>
                 <p className="text-gray-400 mb-6">
-                  Crie uma conta no Cal.com para gerenciar sua agenda de forma mais eficiente.
+                  Crie sua conta no Cal.com para gerenciar sua agenda médica de forma mais eficiente.
+                  Isto permite que pacientes agendem consultas com você online.
                 </p>
                 <Button 
                   onClick={handleCreateCalComUser} 
@@ -309,7 +301,7 @@ const DoctorCalendar = () => {
                   disabled={isCreatingCalComUser}
                 >
                   <LinkIcon className="h-4 w-4 mr-2" />
-                  {isCreatingCalComUser ? 'Criando conta...' : 'Criar Conta Cal.com'}
+                  {isCreatingCalComUser ? 'Criando conta...' : 'Criar Conta de Médico no Cal.com'}
                 </Button>
               </Card>
             )}
@@ -664,109 +656,7 @@ const DoctorCalendar = () => {
             <Card className="card-gradient p-6 text-center">
               <h3 className="text-xl font-medium mb-4">Conecte seu Calendário</h3>
               <p className="text-gray-400 mb-6">
-                Crie uma conta no Cal.com para gerenciar sua agenda de forma mais eficiente.
-              </p>
-              <Button 
-                onClick={handleCreateCalComUser} 
-                className="bg-gold-500 hover:bg-gold-600 text-black"
-                disabled={isCreatingCalComUser}
-              >
-                <LinkIcon className="h-4 w-4 mr-2" />
-                {isCreatingCalComUser ? 'Criando conta...' : 'Criar Conta Cal.com'}
-              </Button>
-            </Card>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-4 justify-end mb-4">
-                <Button 
-                  className="bg-gold-500 hover:bg-gold-600 text-black"
-                  onClick={() => setIsEventTypeDialogOpen(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Tipo de Evento
-                </Button>
-                
-                <Button 
-                  variant="outline"
-                  onClick={() => setIsAvailabilityDialogOpen(true)}
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Definir Disponibilidade
-                </Button>
-              </div>
-              
-              {user?.id && (
-                <FullCalendarComponent 
-                  userId={user.id}
-                  onEventClick={handleCalendarEventClick}
-                />
-              )}
-              
-              {/* Event Details Dialog */}
-              <Dialog open={isSchedulingDialogOpen} onOpenChange={setIsSchedulingDialogOpen}>
-                <DialogContent className="sm:max-w-[500px] card-gradient">
-                  <DialogHeader>
-                    <DialogTitle>Detalhes do Evento</DialogTitle>
-                  </DialogHeader>
-                  {selectedEvent && (
-                    <div className="py-4">
-                      <div className="mb-4">
-                        <h3 className="text-lg font-medium mb-2">{selectedEvent.title}</h3>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Clock className="h-4 w-4 text-gold-400" />
-                          <span>
-                            {format(new Date(selectedEvent.start), "dd/MM/yyyy HH:mm", { locale: pt })} -
-                            {format(new Date(selectedEvent.end), " HH:mm", { locale: pt })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadgeClass(selectedEvent.extendedProps?.status || 'pending')}`}>
-                            {selectedEvent.extendedProps?.status || 'Pendente'}
-                          </span>
-                        </div>
-                        {selectedEvent.extendedProps?.description && (
-                          <p className="mt-3 text-gray-400">{selectedEvent.extendedProps.description}</p>
-                        )}
-                      </div>
-                      
-                      {selectedEvent.extendedProps?.attendees?.length > 0 && (
-                        <div className="mb-4">
-                          <h4 className="font-medium mb-2">Participantes:</h4>
-                          <ul className="space-y-2">
-                            {selectedEvent.extendedProps.attendees.map((attendee: any, index: number) => (
-                              <li key={index} className="text-sm">
-                                {attendee.name} - {attendee.email}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      
-                      <div className="flex justify-end space-x-3 mt-6">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                        >
-                          Reagendar
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="text-red-500 hover:text-red-600"
-                        >
-                          Cancelar Evento
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-            </>
-          )}
-        </TabsContent>
-      </Tabs>
-    </Layout>
-  );
-};
+                Crie sua conta no Cal.com para gerenciar sua agenda médica de forma mais eficiente.
+                Isto permite que pacientes agendem consultas com você online.
+             
 
-export default DoctorCalendar;
