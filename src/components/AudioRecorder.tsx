@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Loader2, FileText, Volume2, AlertCircle, Upload } from 'lucide-react';
@@ -432,42 +433,55 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       setHasError(false);
       setErrorMessage('');
       
+      console.log("Processing uploaded audio file, size:", audioBlob.size, "type:", audioBlob.type);
+      
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
       
       reader.onloadend = async () => {
-        const base64Audio = reader.result?.toString().split(',')[1];
-        
-        if (!base64Audio) {
-          throw new Error('Falha ao converter áudio para base64');
-        }
-        
-        console.log("Sending uploaded audio file to transcription API...");
-        const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-          body: { audio: base64Audio }
-        });
-        
-        if (error) {
-          console.error("Transcription API error:", error);
-          throw error;
-        }
-        
-        console.log("Transcription API response:", data);
-        if (data?.text) {
-          setTranscriptionComplete(true);
-          setCurrentTranscription(data.text);
+        try {
+          const base64Audio = reader.result?.toString().split(',')[1];
           
-          toast({
-            title: "Transcrição completa",
-            description: "O áudio foi transcrito com sucesso e está sendo processado pelo sistema de agentes IA."
+          if (!base64Audio) {
+            throw new Error('Falha ao converter áudio para base64');
+          }
+          
+          console.log("Sending uploaded audio file to transcription API...");
+          const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+            body: { audio: base64Audio }
           });
           
-          onTranscriptionComplete(data.text);
-          processTranscription(data.text);
-        } else {
-          throw new Error('Nenhum texto recebido da transcrição');
+          if (error) {
+            console.error("Transcription API error:", error);
+            throw error;
+          }
+          
+          console.log("Transcription API response:", data);
+          if (data?.text) {
+            setTranscriptionComplete(true);
+            setCurrentTranscription(data.text);
+            
+            toast({
+              title: "Transcrição completa",
+              description: "O áudio foi transcrito com sucesso e está sendo processado pelo sistema de agentes IA."
+            });
+            
+            onTranscriptionComplete(data.text);
+            processTranscription(data.text);
+          } else {
+            throw new Error('Nenhum texto recebido da transcrição');
+          }
+        } catch (error) {
+          console.error("Error in reader.onloadend:", error);
+          throw error;
         }
       };
+      
+      reader.onerror = (error) => {
+        console.error("FileReader error:", error);
+        throw new Error('Erro ao ler o arquivo de áudio');
+      };
+      
     } catch (error) {
       console.error('Erro ao transcrever áudio:', error);
       setHasError(true);
@@ -610,13 +624,22 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       return;
     }
     
-    setUploadedFileName(file.name);
-    setAudioBlob(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result;
+      if (result instanceof ArrayBuffer) {
+        const blob = new Blob([result], { type: file.type });
+        setAudioBlob(blob);
+        setUploadedFileName(file.name);
+        
+        toast({
+          title: "Arquivo carregado",
+          description: `"${file.name}" está pronto para transcrição.`
+        });
+      }
+    };
     
-    toast({
-      title: "Arquivo carregado",
-      description: `"${file.name}" está pronto para transcrição.`
-    });
+    reader.readAsArrayBuffer(file);
   };
 
   const handleUploadClick = () => {

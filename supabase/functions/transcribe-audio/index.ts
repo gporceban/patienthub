@@ -27,6 +27,14 @@ serve(async (req) => {
 
     console.log("Received audio data of length:", audio.length);
 
+    // Validate base64 format
+    if (!audio.match(/^[A-Za-z0-9+/=]+$/)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid base64 audio data" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
     // Here we'd normally send the audio to a speech-to-text API
     // For now we're just returning a mock response
 
@@ -35,7 +43,7 @@ serve(async (req) => {
     // const text = whisperResponse.text;
     
     // Mock response for development
-    const text = "Esta é uma transcrição simulada. Em um ambiente de produção, usaríamos uma API real de transcrição de fala para texto.";
+    const text = "Esta é uma transcrição simulada do arquivo de áudio enviado. Em um ambiente de produção, usaríamos uma API real de transcrição de fala para texto.";
 
     console.log("Returning transcription text");
     
