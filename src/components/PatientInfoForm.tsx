@@ -58,6 +58,7 @@ const PatientInfoForm: React.FC<PatientInfoFormProps> = ({ onSubmit, isLoading =
                   placeholder="Nome completo do paciente" 
                   {...field} 
                   className="bg-darkblue-900/50 border-darkblue-700"
+                  disabled={isLoading}
                 />
               </FormControl>
               <FormMessage />
@@ -77,6 +78,7 @@ const PatientInfoForm: React.FC<PatientInfoFormProps> = ({ onSubmit, isLoading =
                   placeholder="email@exemplo.com" 
                   {...field} 
                   className="bg-darkblue-900/50 border-darkblue-700"
+                  disabled={isLoading}
                 />
               </FormControl>
               <FormMessage />
@@ -95,6 +97,7 @@ const PatientInfoForm: React.FC<PatientInfoFormProps> = ({ onSubmit, isLoading =
                   placeholder="Número de identificação do prontuário" 
                   {...field} 
                   className="bg-darkblue-900/50 border-darkblue-700"
+                  disabled={isLoading}
                 />
               </FormControl>
               <FormMessage />

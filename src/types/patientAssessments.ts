@@ -17,7 +17,7 @@ export type PatientAssessment = {
   created_at: string;
   updated_at: string;
   // Additional fields for the UI
-  status?: 'completed' | 'scheduled' | 'canceled';
+  status?: 'completed' | 'in_progress' | 'scheduled' | 'canceled';
   appointment_date?: string;
 };
 
@@ -39,13 +39,14 @@ export const fromPatientAssessments = (supabase: any) => {
       summary?: string | null;
       patient_friendly_summary?: string | null;
       structured_data?: any | null;
+      status?: 'completed' | 'in_progress' | 'scheduled' | 'canceled';
       id?: string;
     }) => {
-      console.log("Inserting patient assessment with values:", values);
+      console.log("Inserting patient assessment with values:", JSON.stringify(values, null, 2));
       return supabase.from('patient_assessments').insert(values as any) as any;
     },
     update: (values: Partial<Omit<PatientAssessment, 'id' | 'created_at' | 'updated_at'>>, id: string) => {
-      console.log("Updating patient assessment with id:", id, "values:", values);
+      console.log("Updating patient assessment with id:", id, "values:", JSON.stringify(values, null, 2));
       return supabase.from('patient_assessments').update(values as any).eq('id', id) as any;
     },
     getByPatientEmail: (email: string) => {
@@ -71,6 +72,14 @@ export const fromPatientAssessments = (supabase: any) => {
         .select('*')
         .eq('prontuario_id', prontuarioId)
         .order('created_at', { ascending: false }) as any;
+    },
+    getById: (id: string) => {
+      console.log("Getting patient assessment by id:", id);
+      return supabase
+        .from('patient_assessments')
+        .select('*')
+        .eq('id', id)
+        .single() as any;
     }
   };
 };

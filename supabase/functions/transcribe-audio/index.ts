@@ -10,6 +10,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   console.log("transcribe-audio function called");
+  console.log("Request method:", req.method);
   
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -18,6 +19,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Content-Type:", req.headers.get("content-type"));
     console.log("Parsing request body");
     const requestData = await req.json();
     const { audio } = requestData;
@@ -31,12 +33,18 @@ serve(async (req) => {
     }
 
     console.log("Received audio data of length:", audio.length);
+    console.log("First 50 characters of audio data:", audio.substring(0, 50));
 
-    // Validate base64 format
-    if (!audio.match(/^[A-Za-z0-9+/=]+$/)) {
+    // Validate base64 format (allow both standard and URL-safe base64)
+    const base64Regex = /^[A-Za-z0-9+/=_-]+$/;
+    if (!base64Regex.test(audio)) {
       console.error("Invalid base64 audio data");
+      console.log("Invalid characters:", audio.match(/[^A-Za-z0-9+/=_-]/g)?.slice(0, 10));
       return new Response(
-        JSON.stringify({ error: "Invalid base64 audio data" }),
+        JSON.stringify({ 
+          error: "Invalid base64 audio data",
+          details: "The audio data contains invalid characters for base64 encoding."
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
@@ -51,7 +59,7 @@ serve(async (req) => {
     // Mock response for development
     const text = "Esta é uma transcrição simulada do arquivo de áudio enviado. Em um ambiente de produção, usaríamos uma API real de transcrição de fala para texto.";
 
-    console.log("Returning transcription text");
+    console.log("Returning transcription text of length:", text.length);
     
     // Return the transcription
     return new Response(
@@ -60,8 +68,13 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in transcribe-audio function:", error.message);
+    console.error("Error stack:", error.stack);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
