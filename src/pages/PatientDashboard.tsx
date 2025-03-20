@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import NotificationList from '@/components/NotificationList';
+import { seedTestNotifications } from '@/types/notifications';
 
 interface PatientAssessment {
   id: string;
@@ -32,7 +32,6 @@ const PatientDashboard = () => {
       try {
         setIsLoading(true);
         
-        // Fetch the patient's assessments
         const { data, error } = await supabase
           .from('patient_assessments')
           .select('id, patient_name, prontuario_id, created_at, summary')
@@ -56,6 +55,20 @@ const PatientDashboard = () => {
     
     fetchPatientData();
   }, [profile, toast]);
+  
+  useEffect(() => {
+    const seedNotifications = async () => {
+      if (!profile?.id) return;
+      
+      try {
+        await seedTestNotifications(supabase, 'paciente', profile.id);
+      } catch (error) {
+        console.error('Error seeding notifications:', error);
+      }
+    };
+    
+    seedNotifications();
+  }, [profile]);
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -142,7 +155,6 @@ const PatientDashboard = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
-          {/* Notifications Section */}
           {profile?.id && (
             <div className="mb-8">
               <NotificationList 

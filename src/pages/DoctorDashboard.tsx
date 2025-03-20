@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { AuthContext } from '@/contexts/AuthContext';
@@ -11,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import CalendarWidget from '@/components/CalendarWidget';
 import { createCalComManagedUser, hasCalComManagedUser } from '@/services/calComV2Service';
+import { seedTestNotifications } from '@/types/notifications';
 
 interface DashboardStat {
   title: string;
@@ -22,12 +22,8 @@ interface DashboardStat {
 }
 
 const DoctorDashboard = () => {
-  const {
-    profile
-  } = useContext(AuthContext);
-  const {
-    toast
-  } = useToast();
+  const { profile } = useContext(AuthContext);
+  const { toast } = useToast();
   const [stats, setStats] = useState({
     patients: 0,
     appointments: 0,
@@ -43,7 +39,6 @@ const DoctorDashboard = () => {
       try {
         setIsLoading(true);
 
-        // Get patient count - fixed the is() method call by using eq()
         const {
           count: patientCount,
           error: patientError
@@ -53,7 +48,6 @@ const DoctorDashboard = () => {
         }).eq('doctor_id', profile.id).eq('status', 'completed');
         if (patientError) throw patientError;
 
-        // Get appointment count
         const {
           count: appointmentCount,
           error: appointmentError
@@ -63,7 +57,6 @@ const DoctorDashboard = () => {
         }).eq('doctor_id', profile.id);
         if (appointmentError) throw appointmentError;
 
-        // Get assessment count
         const {
           count: assessmentCount,
           error: assessmentError
@@ -106,6 +99,20 @@ const DoctorDashboard = () => {
     };
     
     checkCalComUser();
+  }, [profile]);
+
+  useEffect(() => {
+    const seedNotifications = async () => {
+      if (!profile?.id) return;
+      
+      try {
+        await seedTestNotifications(supabase, 'medico', profile.id);
+      } catch (error) {
+        console.error('Error seeding notifications:', error);
+      }
+    };
+    
+    seedNotifications();
   }, [profile]);
 
   const handleCreateCalComUser = async () => {
@@ -170,13 +177,16 @@ const DoctorDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           {/* Notifications section */}
-          {profile?.id && <div className="mb-8">
+          {profile?.id && (
+            <div className="mb-8">
               <NotificationList userId={profile.id} userType="medico" limit={5} />
-            </div>}
+            </div>
+          )}
           
           {/* Stats cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            {dashboardStats.map((stat, index) => <Card key={index} className="card-gradient p-5 bg-gray-900 bg-[1B3341]">
+            {dashboardStats.map((stat, index) => (
+              <Card key={index} className="card-gradient p-5 bg-gray-900 bg-[1B3341]">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="bg-darkblue-800 p-2 rounded-full">
                     {stat.icon}
@@ -188,7 +198,8 @@ const DoctorDashboard = () => {
                 <Button asChild variant="outline" size="sm" className="w-full">
                   <Link to={stat.link}>{stat.linkText}</Link>
                 </Button>
-              </Card>)}
+              </Card>
+            ))}
           </div>
           
           {/* Calendar widget - only show if the user has a Cal.com account */}

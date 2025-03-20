@@ -79,6 +79,83 @@ export const fromPatientNotifications = (supabase: any) => {
   };
 };
 
+// Function to seed test notifications if none exist
+export const seedTestNotifications = async (supabase: any, userType: string, userId: string) => {
+  try {
+    // First check if notifications already exist
+    const { data: existingData, error: checkError } = await getNotifications(supabase, userType, userId);
+    
+    if (checkError) throw checkError;
+    
+    // If notifications already exist, don't seed
+    if (existingData && existingData.length > 0) {
+      console.log('Notifications already exist, not seeding test data');
+      return;
+    }
+    
+    console.log('No notifications found, seeding test data');
+    
+    const testNotifications = [];
+    const now = new Date();
+    
+    if (userType === 'medico') {
+      testNotifications.push({
+        doctor_id: userId,
+        title: 'Nova solicitação de consulta',
+        message: 'Nova solicitação de consulta de Rodrigo Alves.',
+        icon_type: 'calendar',
+        read: false
+      });
+      
+      testNotifications.push({
+        doctor_id: userId,
+        title: 'Consulta reagendada',
+        message: 'Consulta com Maria Silva reagendada para 28/11.',
+        icon_type: 'calendar',
+        read: false
+      });
+      
+      testNotifications.push({
+        doctor_id: userId,
+        title: 'Novo paciente cadastrado',
+        message: 'Novo paciente cadastrado: João Pereira.',
+        icon_type: 'patient',
+        read: false
+      });
+      
+      for (const notification of testNotifications) {
+        const { error } = await fromDoctorNotifications(supabase).insert(notification);
+        if (error) throw error;
+      }
+    } else if (userType === 'paciente') {
+      testNotifications.push({
+        patient_id: userId,
+        title: 'Consulta confirmada',
+        message: 'Sua consulta para o dia 15/11 foi confirmada.',
+        icon_type: 'calendar',
+        read: false
+      });
+      
+      testNotifications.push({
+        patient_id: userId,
+        title: 'Resultados disponíveis',
+        message: 'Seus resultados de exames estão disponíveis para visualização.',
+        icon_type: 'info',
+        read: false
+      });
+      
+      for (const notification of testNotifications) {
+        const { error } = await fromPatientNotifications(supabase).insert(notification);
+        if (error) throw error;
+      }
+    }
+    
+    console.log('Test notifications seeded successfully');
+  } catch (error) {
+    console.error('Error seeding test notifications:', error);
+  }
+};
+
 // Get notifications based on user type
 export const getNotifications = (supabase: any, userType: string, userId: string) => {
   if (userType === 'medico') {
