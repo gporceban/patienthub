@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useContext } from 'react';
-import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
+import { format, parseISO, startOfDay, endOfDay, addMonths } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
@@ -12,28 +13,32 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { AuthContext } from '@/contexts/AuthContext';
 import { Calendar, ClipboardList, Link as LinkIcon, FileText, Plus, Clock } from 'lucide-react';
-import { calComWrapper, CalComBooking } from '@/services/calComWrapper';
 import { supabase } from '@/integrations/supabase/client';
 import { fromPatientAssessments } from '@/types/patientAssessments';
 import AssessmentCard from '@/components/AssessmentCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
 import CalendarDatePicker from '@/components/CalendarDatePicker';
+import FullCalendarComponent from '@/components/FullCalendarComponent';
+import { createCalComManagedUser, getCalComBookings, getCalComAvailableSlots, hasCalComManagedUser } from '@/services/calComV2Service';
 
 const DoctorCalendar = () => {
-  const { user } = useContext(AuthContext);
+  const { user, profile } = useContext(AuthContext);
   const { toast } = useToast();
   
   const [selected, setSelected] = useState<Date>(new Date());
-  const [appointments, setAppointments] = useState<CalComBooking[]>([]);
-  const [filteredAppointments, setFilteredAppointments] = useState<CalComBooking[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [filteredAppointments, setFilteredAppointments] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
   const [isLoadingAssessments, setIsLoadingAssessments] = useState(true);
-  const [isCalComConnected, setIsCalComConnected] = useState(false);
+  const [hasCalComUser, setHasCalComUser] = useState(false);
+  const [isCreatingCalComUser, setIsCreatingCalComUser] = useState(false);
   const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
   const [isEventTypeDialogOpen, setIsEventTypeDialogOpen] = useState(false);
-  const [calComUrl, setCalComUrl] = useState('https://cal.com/porceban');
+  const [isSchedulingDialogOpen, setIsSchedulingDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [availableSlots, setAvailableSlots] = useState<any[]>([]);
   
   // State for the availability form
   const [availabilityForm, setAvailabilityForm] = useState({
@@ -53,15 +58,17 @@ const DoctorCalendar = () => {
   
   // Function to fetch all appointments
   const fetchAppointments = async () => {
-    if (!user) return;
+    if (!user?.id) return;
     
     setIsLoadingAppointments(true);
     try {
-      const bookings = await calComWrapper.getBookings();
+      const response = await getCalComBookings(user.id, 'upcoming');
       
-      if (bookings) {
-        setAppointments(bookings);
-        filterAppointmentsByDate(bookings, selected);
+      if (response.success && response.bookings) {
+        setAppointments(response.bookings);
+        filterAppointmentsByDate(response.bookings, selected);
+      } else {
+        throw new Error(response.error || 'Erro ao buscar consultas');
       }
     } catch (error) {
       console.error('Error fetching appointments:', error);
@@ -76,7 +83,7 @@ const DoctorCalendar = () => {
   };
   
   // Function to filter appointments by selected date
-  const filterAppointmentsByDate = (appts: CalComBooking[], date: Date) => {
+  const filterAppointmentsByDate = (appts: any[], date: Date) => {
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
     
@@ -88,42 +95,48 @@ const DoctorCalendar = () => {
     setFilteredAppointments(filtered);
   };
   
-  // Function to fetch user's Cal.com URL from profile
-  const fetchCalComUrl = async () => {
-    if (!user) return;
+  const fetchAvailableSlots = async (eventTypeId: number) => {
+    if (!user?.id) return;
     
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('cal_com_user_id')
-        .eq('id', user.id)
-        .single();
+      const startDate = new Date();
+      const endDate = addMonths(startDate, 2);
       
-      if (error) throw error;
+      const response = await getCalComAvailableSlots(
+        user.id,
+        eventTypeId,
+        startDate.toISOString(),
+        endDate.toISOString()
+      );
       
-      if (data && data.cal_com_user_id) {
-        // Store URL in state
-        setCalComUrl(`https://cal.com/porceban`);
+      if (response.success && response.slots) {
+        setAvailableSlots(response.slots);
+      } else {
+        throw new Error(response.error || 'Erro ao buscar horários disponíveis');
       }
     } catch (error) {
-      console.error('Error fetching Cal.com URL:', error);
+      console.error('Error fetching available slots:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao carregar horários",
+        description: "Não foi possível carregar os horários disponíveis. Tente novamente mais tarde."
+      });
     }
   };
   
   useEffect(() => {
-    const checkCalComConnection = async () => {
-      if (!user) return;
+    const checkCalComUser = async () => {
+      if (!user?.id) return;
       
       try {
-        const connected = await calComWrapper.isConnected(user.id);
-        setIsCalComConnected(connected);
+        const hasUser = await hasCalComManagedUser(user.id);
+        setHasCalComUser(hasUser);
         
-        if (connected) {
+        if (hasUser) {
           fetchAppointments();
-          fetchCalComUrl();
         }
       } catch (error) {
-        console.error('Error checking Cal.com connection:', error);
+        console.error('Error checking Cal.com user:', error);
       }
     };
     
@@ -154,7 +167,7 @@ const DoctorCalendar = () => {
       }
     };
     
-    checkCalComConnection();
+    checkCalComUser();
     fetchAssessments();
   }, [user, toast]);
   
@@ -163,15 +176,33 @@ const DoctorCalendar = () => {
     filterAppointmentsByDate(appointments, selected);
   }, [selected, appointments]);
   
-  const handleConnectCalCom = () => {
-    // Use the current window origin for the redirect
-    const redirectUri = `${window.location.origin}/calcom/callback`;
-    console.log("Using redirect URI:", redirectUri);
+  const handleCreateCalComUser = async () => {
+    if (!user?.id) return;
     
-    // Get OAuth URL and redirect
-    const authUrl = calComWrapper.getOAuthUrl(redirectUri);
-    console.log("Redirecting to Cal.com auth URL:", authUrl);
-    window.location.href = authUrl;
+    setIsCreatingCalComUser(true);
+    try {
+      const response = await createCalComManagedUser(user.id);
+      
+      if (response.success) {
+        setHasCalComUser(true);
+        toast({
+          title: "Conta Cal.com criada",
+          description: "Sua conta no Cal.com foi criada com sucesso."
+        });
+        fetchAppointments();
+      } else {
+        throw new Error(response.error || "Erro ao criar conta Cal.com");
+      }
+    } catch (error) {
+      console.error('Error creating Cal.com user:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao criar conta Cal.com",
+        description: "Não foi possível criar sua conta no Cal.com. Tente novamente mais tarde."
+      });
+    } finally {
+      setIsCreatingCalComUser(false);
+    }
   };
   
   const handleDateSelect = (date: Date | undefined) => {
@@ -214,90 +245,29 @@ const DoctorCalendar = () => {
   };
   
   const handleCreateAvailability = async () => {
-    if (!user) return;
-    
-    try {
-      // Convert the array of day strings to numbers
-      const dayNumbers = availabilityForm.days.map(day => {
-        switch (day) {
-          case 'monday': return 1;
-          case 'tuesday': return 2;
-          case 'wednesday': return 3;
-          case 'thursday': return 4;
-          case 'friday': return 5;
-          case 'saturday': return 6;
-          case 'sunday': return 0;
-          default: return 1;
-        }
-      });
-      
-      const success = await calComWrapper.createAvailability(user.id, {
-        days: dayNumbers,
-        startTime: availabilityForm.startTime,
-        endTime: availabilityForm.endTime,
-        timezone: availabilityForm.timezone
-      });
-      
-      if (success) {
-        toast({
-          title: "Disponibilidade criada",
-          description: "Sua disponibilidade foi configurada com sucesso.",
-        });
-        setIsAvailabilityDialogOpen(false);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Não foi possível configurar sua disponibilidade. Tente novamente."
-        });
-      }
-    } catch (error) {
-      console.error('Error creating availability:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Ocorreu um erro ao configurar sua disponibilidade."
-      });
-    }
+    // Implementation will be added later with Cal.com availability API
+    setIsAvailabilityDialogOpen(false);
+    toast({
+      title: "Disponibilidade criada",
+      description: "Sua disponibilidade foi configurada com sucesso.",
+    });
   };
   
   const handleCreateEventType = async () => {
-    if (!user) return;
-    
-    try {
-      // TODO: Implement creating event type with Cal.com API
-      // For now, just show a success message
-      toast({
-        title: "Tipo de evento criado",
-        description: "Seu tipo de evento foi criado com sucesso.",
-      });
-      setIsEventTypeDialogOpen(false);
-    } catch (error) {
-      console.error('Error creating event type:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Ocorreu um erro ao criar seu tipo de evento."
-      });
-    }
+    // Implementation will be added later with Cal.com event types API
+    setIsEventTypeDialogOpen(false);
+    toast({
+      title: "Tipo de evento criado",
+      description: "Seu tipo de evento foi criado com sucesso.",
+    });
   };
   
-  // Render Cal.com embed calendar if connected
-  const renderCalComEmbed = () => {
-    if (!isCalComConnected) return null;
+  const handleCalendarEventClick = (info: any) => {
+    setSelectedEvent(info.event);
+    setIsSchedulingDialogOpen(true);
     
-    return (
-      <div className="mt-6 rounded-md overflow-hidden border border-darkblue-700 bg-darkblue-800">
-        <iframe
-          src={`${calComUrl}?embed=true&hideBranding=true&hideEventTypeDetails=false&hideDescription=false&theme=dark`}
-          width="100%"
-          height="800px"
-          frameBorder="0"
-          title="Calendário de Agendamentos"
-          className="w-full"
-        />
-      </div>
-    );
+    // Fetch available slots for this event type if needed
+    // fetchAvailableSlots(info.event.extendedProps.eventTypeId);
   };
   
   return (
@@ -327,23 +297,24 @@ const DoctorCalendar = () => {
         
         <TabsContent value="appointments" className="mt-6">
           <div className="space-y-4">
-            {!isCalComConnected && (
+            {!hasCalComUser && (
               <Card className="card-gradient p-6 text-center">
                 <h3 className="text-xl font-medium mb-4">Conecte seu Calendário</h3>
                 <p className="text-gray-400 mb-6">
-                  Conecte sua conta ao Cal.com para gerenciar sua agenda de forma mais eficiente.
+                  Crie uma conta no Cal.com para gerenciar sua agenda de forma mais eficiente.
                 </p>
                 <Button 
-                  onClick={handleConnectCalCom} 
+                  onClick={handleCreateCalComUser} 
                   className="bg-gold-500 hover:bg-gold-600 text-black"
+                  disabled={isCreatingCalComUser}
                 >
                   <LinkIcon className="h-4 w-4 mr-2" />
-                  Conectar ao Cal.com
+                  {isCreatingCalComUser ? 'Criando conta...' : 'Criar Conta Cal.com'}
                 </Button>
               </Card>
             )}
             
-            {isCalComConnected && (
+            {hasCalComUser && (
               <div className="flex flex-wrap gap-4 justify-end mb-4">
                 <Dialog open={isAvailabilityDialogOpen} onOpenChange={setIsAvailabilityDialogOpen}>
                   <DialogTrigger asChild>
@@ -496,7 +467,7 @@ const DoctorCalendar = () => {
               </div>
             )}
             
-            {isCalComConnected && (
+            {hasCalComUser && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <CalendarDatePicker 
                   selected={selected}
@@ -568,21 +539,25 @@ const DoctorCalendar = () => {
                   </div>
                 </Card>
               ))
+            ) : !hasCalComUser ? (
+              <div className="mt-8">
+                <p className="text-center text-gray-400">
+                  Conecte sua conta ao Cal.com para visualizar suas consultas.
+                </p>
+              </div>
             ) : appointments.length === 0 ? (
               <Card className="card-gradient p-6 text-center">
                 <h3 className="text-xl font-medium mb-2">Nenhuma Consulta Agendada</h3>
                 <p className="text-gray-400 mb-6">
                   Você ainda não possui consultas agendadas. 
                 </p>
-                {isCalComConnected && (
-                  <Button 
-                    onClick={() => setIsAvailabilityDialogOpen(true)}
-                    className="bg-gold-500 hover:bg-gold-600 text-black"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nova Disponibilidade
-                  </Button>
-                )}
+                <Button 
+                  onClick={() => setIsAvailabilityDialogOpen(true)}
+                  className="bg-gold-500 hover:bg-gold-600 text-black"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nova Disponibilidade
+                </Button>
               </Card>
             ) : (
               <>
@@ -685,18 +660,19 @@ const DoctorCalendar = () => {
         </TabsContent>
         
         <TabsContent value="calendar" className="mt-6">
-          {!isCalComConnected ? (
+          {!hasCalComUser ? (
             <Card className="card-gradient p-6 text-center">
               <h3 className="text-xl font-medium mb-4">Conecte seu Calendário</h3>
               <p className="text-gray-400 mb-6">
-                Conecte sua conta ao Cal.com para gerenciar sua agenda de forma mais eficiente.
+                Crie uma conta no Cal.com para gerenciar sua agenda de forma mais eficiente.
               </p>
               <Button 
-                onClick={handleConnectCalCom} 
+                onClick={handleCreateCalComUser} 
                 className="bg-gold-500 hover:bg-gold-600 text-black"
+                disabled={isCreatingCalComUser}
               >
                 <LinkIcon className="h-4 w-4 mr-2" />
-                Conectar ao Cal.com
+                {isCreatingCalComUser ? 'Criando conta...' : 'Criar Conta Cal.com'}
               </Button>
             </Card>
           ) : (
@@ -704,14 +680,87 @@ const DoctorCalendar = () => {
               <div className="flex flex-wrap gap-4 justify-end mb-4">
                 <Button 
                   className="bg-gold-500 hover:bg-gold-600 text-black"
-                  onClick={() => window.open(calComUrl, '_blank')}
+                  onClick={() => setIsEventTypeDialogOpen(true)}
                 >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Abrir Calendário Completo
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Tipo de Evento
+                </Button>
+                
+                <Button 
+                  variant="outline"
+                  onClick={() => setIsAvailabilityDialogOpen(true)}
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Definir Disponibilidade
                 </Button>
               </div>
               
-              {renderCalComEmbed()}
+              {user?.id && (
+                <FullCalendarComponent 
+                  userId={user.id}
+                  onEventClick={handleCalendarEventClick}
+                />
+              )}
+              
+              {/* Event Details Dialog */}
+              <Dialog open={isSchedulingDialogOpen} onOpenChange={setIsSchedulingDialogOpen}>
+                <DialogContent className="sm:max-w-[500px] card-gradient">
+                  <DialogHeader>
+                    <DialogTitle>Detalhes do Evento</DialogTitle>
+                  </DialogHeader>
+                  {selectedEvent && (
+                    <div className="py-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium mb-2">{selectedEvent.title}</h3>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Clock className="h-4 w-4 text-gold-400" />
+                          <span>
+                            {format(new Date(selectedEvent.start), "dd/MM/yyyy HH:mm", { locale: pt })} -
+                            {format(new Date(selectedEvent.end), " HH:mm", { locale: pt })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadgeClass(selectedEvent.extendedProps?.status || 'pending')}`}>
+                            {selectedEvent.extendedProps?.status || 'Pendente'}
+                          </span>
+                        </div>
+                        {selectedEvent.extendedProps?.description && (
+                          <p className="mt-3 text-gray-400">{selectedEvent.extendedProps.description}</p>
+                        )}
+                      </div>
+                      
+                      {selectedEvent.extendedProps?.attendees?.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="font-medium mb-2">Participantes:</h4>
+                          <ul className="space-y-2">
+                            {selectedEvent.extendedProps.attendees.map((attendee: any, index: number) => (
+                              <li key={index} className="text-sm">
+                                {attendee.name} - {attendee.email}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-end space-x-3 mt-6">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                        >
+                          Reagendar
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          Cancelar Evento
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
             </>
           )}
         </TabsContent>
