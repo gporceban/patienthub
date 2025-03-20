@@ -57,6 +57,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const intervalRef = useRef<number | null>(null);
   const { toast } = useToast();
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserNodeRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   // Clean up on unmount
   useEffect(() => {
@@ -130,6 +133,17 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       intervalRef.current = null;
     }
 
+    // Cancel any animation frames
+    if (animationFrameRef.current) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    // Close audio context
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(console.error);
+    }
+
     // Close audio tracks
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -187,20 +201,20 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       streamRef.current = stream;
       
       // Configure audio level monitoring
-      const audioContext = new AudioContext();
-      const analyserNode = audioContext.createAnalyser();
-      analyserNode.fftSize = 2048;
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      analyserNodeRef.current = audioContextRef.current.createAnalyser();
+      analyserNodeRef.current.fftSize = 2048;
       
-      const source = audioContext.createMediaStreamSource(stream);
-      source.connect(analyserNode);
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserNodeRef.current);
       
       // Monitor audio levels
-      const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+      const dataArray = new Uint8Array(analyserNodeRef.current.frequencyBinCount);
       
       const checkAudioLevel = () => {
-        if (!isRecording) return;
+        if (!isRecording || !analyserNodeRef.current) return;
         
-        analyserNode.getByteFrequencyData(dataArray);
+        analyserNodeRef.current.getByteFrequencyData(dataArray);
         
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) {
@@ -213,11 +227,22 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         audioLevelRef.current = level;
         setAudioLevel(level);
         
-        requestAnimationFrame(checkAudioLevel);
+        animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
       };
       
       // Set up MediaRecorder with proper options
-      const options = { mimeType: 'audio/webm' };
+      let options: MediaRecorderOptions = {};
+      
+      // Check browser support for different codecs
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        options.mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        options.mimeType = 'audio/webm';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        options.mimeType = 'audio/mp4';
+      }
+      
+      console.log("Creating MediaRecorder with options:", options);
       const mediaRecorder = new MediaRecorder(stream, options);
       console.log("MediaRecorder created with options:", options);
       mediaRecorderRef.current = mediaRecorder;
@@ -246,8 +271,13 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           window.clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
+
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
         
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: options.mimeType || 'audio/webm' });
         console.log("Created audio blob:", audioBlob.size);
         setAudioBlob(audioBlob);
         
@@ -290,6 +320,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       if (intervalRef.current) {
         window.clearInterval(intervalRef.current);
         intervalRef.current = null;
+      }
+
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
       
       toast({
@@ -390,6 +425,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         email: patientInfo.email
       } : null;
       
+      // We'll do each request separately to ensure better error handling
+      console.log("Processing transcription for clinical note...");
       const { data, error } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -400,9 +437,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       });
       
       if (error) {
+        console.error("Error processing clinical note:", error);
         throw error;
       }
       
+      console.log("Processing transcription for summary...");
       const { data: summaryData, error: summaryError } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -413,9 +452,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       });
       
       if (summaryError) {
+        console.error("Error processing summary:", summaryError);
         throw summaryError;
       }
       
+      console.log("Processing transcription for prescription...");
       const { data: prescriptionData, error: prescriptionError } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -426,9 +467,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       });
       
       if (prescriptionError) {
+        console.error("Error processing prescription:", prescriptionError);
         throw prescriptionError;
       }
       
+      console.log("Processing transcription for structured data...");
       const { data: structuredData, error: structuredError } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -439,6 +482,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       });
       
       if (structuredError) {
+        console.error("Error processing structured data:", structuredError);
         throw structuredError;
       }
       

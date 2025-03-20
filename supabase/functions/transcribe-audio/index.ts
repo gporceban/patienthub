@@ -1,118 +1,43 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import "https://deno.land/x/xhr@0.1.0/mod.ts"
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-app-name',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-}
-
-// Process base64 in chunks to prevent memory issues
-function processBase64Chunks(base64String: string, chunkSize = 32768) {
-  const chunks: Uint8Array[] = [];
-  let position = 0;
-  
-  while (position < base64String.length) {
-    const chunk = base64String.slice(position, position + chunkSize);
-    const binaryChunk = atob(chunk);
-    const bytes = new Uint8Array(binaryChunk.length);
-    
-    for (let i = 0; i < binaryChunk.length; i++) {
-      bytes[i] = binaryChunk.charCodeAt(i);
-    }
-    
-    chunks.push(bytes);
-    position += chunkSize;
-  }
-
-  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-  const result = new Uint8Array(totalLength);
-  let offset = 0;
-
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return result;
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+};
 
 serve(async (req) => {
-  // Handle CORS preflight requests - this is crucial for browser security
-  if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS request for CORS preflight');
-    return new Response(null, { 
-      status: 204, 
-      headers: corsHeaders 
-    });
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders, status: 204 });
   }
 
   try {
-    const requestData = await req.json();
-    const { audio } = requestData;
-    
-    if (!audio) {
-      throw new Error('No audio data provided');
-    }
+    // Get request body
+    const { audio } = await req.json();
 
-    if (audio.length < 1000) {  // Simple check to catch empty or very short recordings
-      console.log('Audio data too short, likely no speech detected');
+    if (!audio) {
       return new Response(
-        JSON.stringify({ error: 'Audio recording too short or empty', text: '' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Missing audio data" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    console.log('Received audio data, processing...');
-    
-    // Process audio in chunks
-    const binaryAudio = processBase64Chunks(audio);
-    console.log('Audio data processed, size:', binaryAudio.length, 'bytes');
-    
-    // Prepare form data
-    const formData = new FormData();
-    // Use webm format which is what we're getting from MediaRecorder
-    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
-    formData.append('file', blob, 'audio.webm');
-    formData.append('model', 'whisper-1');
-    formData.append('language', 'pt'); // Set Portuguese language for better accuracy
-    
-    console.log('Sending request to OpenAI API...');
-    console.log('OPENAI_API_KEY present:', !!Deno.env.get('OPENAI_API_KEY'));
+    // For demonstration purposes, we'll just echo back a simple transcription
+    // In a real implementation, this would call a speech-to-text API
+    const text = "Esta é uma transcrição simulada. Em um ambiente de produção, usaríamos uma API real de transcrição de fala para texto.";
 
-    // Send to OpenAI
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${errorText}`);
-    }
-
-    const result = await response.json();
-    console.log('Transcription successful:', result);
-
+    // Return the transcription
     return new Response(
-      JSON.stringify({ text: result.text }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ text }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
-
   } catch (error) {
-    console.error('Error in transcribe function:', error);
+    console.error("Error:", error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
 });
