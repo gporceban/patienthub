@@ -1,4 +1,3 @@
-
 import React, { useContext } from 'react';
 import Logo from './Logo';
 import { Button } from "@/components/ui/button";
@@ -7,23 +6,22 @@ import { LogOut, BellIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { AuthContext } from '@/contexts/AuthContext';
-
 interface HeaderProps {
   userType?: 'paciente' | 'medico';
   userName?: string;
 }
-
 const Header: React.FC<HeaderProps> = ({
   userType,
   userName
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile } = useContext(AuthContext);
+  const {
+    profile
+  } = useContext(AuthContext);
 
   // Use profile name if available, otherwise use provided userName or default
   const displayName = profile?.full_name || userName || 'Usuário';
-  
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -46,9 +44,7 @@ const Header: React.FC<HeaderProps> = ({
   if (location.pathname === '/') {
     return null;
   }
-  
-  return (
-    <header className="w-full py-4 backdrop-blur-md border-b border-darkblue-700/50 sticky top-0 z-10 bg-slate-900 bg-opacity-95 px-4 md:px-6">
+  return <header className="w-full py-4 backdrop-blur-md border-b border-darkblue-700/50 sticky top-0 z-10 bg-slate-900 bg-opacity-95 px-4 md:px-6 bg-[2F4159]">
       <div className="container mx-auto flex justify-between items-center">
         <Logo size="small" />
         
@@ -64,8 +60,6 @@ const Header: React.FC<HeaderProps> = ({
           </Button>
         </div>
       </div>
-    </header>
-  );
+    </header>;
 };
-
 export default Header;
