@@ -27,8 +27,14 @@ serve(async (req) => {
 
     console.log("Received audio data of length:", audio.length);
 
-    // For demonstration purposes, we'll just echo back a simple transcription
-    // In a real implementation, this would call a speech-to-text API
+    // Here we'd normally send the audio to a speech-to-text API
+    // For now we're just returning a mock response
+
+    // In a production environment, you would use OpenAI's Whisper API or similar
+    // const whisperResponse = await callWhisperAPI(audio);
+    // const text = whisperResponse.text;
+    
+    // Mock response for development
     const text = "Esta é uma transcrição simulada. Em um ambiente de produção, usaríamos uma API real de transcrição de fala para texto.";
 
     console.log("Returning transcription text");

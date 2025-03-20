@@ -31,5 +31,5 @@ jwt_expiry = 3600
 enable_signup = true
 
 [functions]
-[functions.serve]
-cors = ["*"]
+# Remove the incorrect [functions.serve] section with cors key
+# Instead, CORS headers are handled directly in each function
