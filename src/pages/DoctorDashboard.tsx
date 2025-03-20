@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { AuthContext } from '@/contexts/AuthContext';
@@ -9,7 +8,6 @@ import { Link } from 'react-router-dom';
 import { CalendarDays, Users, ClipboardCheck, Activity, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-
 interface DashboardStat {
   title: string;
   value: string | number;
@@ -18,53 +16,58 @@ interface DashboardStat {
   link: string;
   linkText: string;
 }
-
 const DoctorDashboard = () => {
-  const { profile } = useContext(AuthContext);
-  const { toast } = useToast();
+  const {
+    profile
+  } = useContext(AuthContext);
+  const {
+    toast
+  } = useToast();
   const [stats, setStats] = useState({
     patients: 0,
     appointments: 0,
-    assessments: 0,
+    assessments: 0
   });
   const [isLoading, setIsLoading] = useState(true);
-  
   useEffect(() => {
     const fetchDoctorStats = async () => {
       if (!profile?.id) return;
-      
       try {
         setIsLoading(true);
-        
+
         // Get patient count - fixed the is() method call by using eq()
-        const { count: patientCount, error: patientError } = await supabase
-          .from('appointments')
-          .select('patient_id', { count: 'exact', head: true })
-          .eq('doctor_id', profile.id)
-          .eq('status', 'completed');
-          
+        const {
+          count: patientCount,
+          error: patientError
+        } = await supabase.from('appointments').select('patient_id', {
+          count: 'exact',
+          head: true
+        }).eq('doctor_id', profile.id).eq('status', 'completed');
         if (patientError) throw patientError;
-        
+
         // Get appointment count
-        const { count: appointmentCount, error: appointmentError } = await supabase
-          .from('appointments')
-          .select('id', { count: 'exact', head: true })
-          .eq('doctor_id', profile.id);
-          
+        const {
+          count: appointmentCount,
+          error: appointmentError
+        } = await supabase.from('appointments').select('id', {
+          count: 'exact',
+          head: true
+        }).eq('doctor_id', profile.id);
         if (appointmentError) throw appointmentError;
-        
+
         // Get assessment count
-        const { count: assessmentCount, error: assessmentError } = await supabase
-          .from('patient_assessments')
-          .select('id', { count: 'exact', head: true })
-          .eq('doctor_id', profile.id);
-          
+        const {
+          count: assessmentCount,
+          error: assessmentError
+        } = await supabase.from('patient_assessments').select('id', {
+          count: 'exact',
+          head: true
+        }).eq('doctor_id', profile.id);
         if (assessmentError) throw assessmentError;
-        
         setStats({
           patients: patientCount || 0,
           appointments: appointmentCount || 0,
-          assessments: assessmentCount || 0,
+          assessments: assessmentCount || 0
         });
       } catch (error) {
         console.error('Error fetching doctor stats:', error);
@@ -77,39 +80,31 @@ const DoctorDashboard = () => {
         setIsLoading(false);
       }
     };
-    
     fetchDoctorStats();
   }, [profile, toast]);
-  
-  const dashboardStats: DashboardStat[] = [
-    {
-      title: "Pacientes",
-      value: stats.patients,
-      icon: <Users className="h-6 w-6 text-gold-400" />,
-      description: "Total de pacientes atendidos",
-      link: "/medico/pacientes",
-      linkText: "Ver pacientes"
-    },
-    {
-      title: "Consultas",
-      value: stats.appointments,
-      icon: <CalendarDays className="h-6 w-6 text-gold-400" />,
-      description: "Consultas realizadas e agendadas",
-      link: "/medico/agenda",
-      linkText: "Ver agenda"
-    },
-    {
-      title: "Avaliações",
-      value: stats.assessments,
-      icon: <ClipboardCheck className="h-6 w-6 text-gold-400" />,
-      description: "Avaliações realizadas",
-      link: "/medico/avaliacao",
-      linkText: "Ver avaliações"
-    }
-  ];
-  
-  return (
-    <Layout userType="medico">
+  const dashboardStats: DashboardStat[] = [{
+    title: "Pacientes",
+    value: stats.patients,
+    icon: <Users className="h-6 w-6 text-gold-400" />,
+    description: "Total de pacientes atendidos",
+    link: "/medico/pacientes",
+    linkText: "Ver pacientes"
+  }, {
+    title: "Consultas",
+    value: stats.appointments,
+    icon: <CalendarDays className="h-6 w-6 text-gold-400" />,
+    description: "Consultas realizadas e agendadas",
+    link: "/medico/agenda",
+    linkText: "Ver agenda"
+  }, {
+    title: "Avaliações",
+    value: stats.assessments,
+    icon: <ClipboardCheck className="h-6 w-6 text-gold-400" />,
+    description: "Avaliações realizadas",
+    link: "/medico/avaliacao",
+    linkText: "Ver avaliações"
+  }];
+  return <Layout userType="medico">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">Bem-vindo, Dr. {profile?.full_name?.split(' ')[0] || ''}</h1>
         <p className="text-gray-400">
@@ -120,20 +115,13 @@ const DoctorDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           {/* Notifications section */}
-          {profile?.id && (
-            <div className="mb-8">
-              <NotificationList 
-                userId={profile.id} 
-                userType="medico" 
-                limit={5} 
-              />
-            </div>
-          )}
+          {profile?.id && <div className="mb-8">
+              <NotificationList userId={profile.id} userType="medico" limit={5} />
+            </div>}
           
           {/* Stats cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            {dashboardStats.map((stat, index) => (
-              <Card key={index} className="card-gradient p-5">
+            {dashboardStats.map((stat, index) => <Card key={index} className="card-gradient p-5 bg-gray-900 bg-[1B3341]">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="bg-darkblue-800 p-2 rounded-full">
                     {stat.icon}
@@ -145,8 +133,7 @@ const DoctorDashboard = () => {
                 <Button asChild variant="outline" size="sm" className="w-full">
                   <Link to={stat.link}>{stat.linkText}</Link>
                 </Button>
-              </Card>
-            ))}
+              </Card>)}
           </div>
           
           {/* Recent activity */}
@@ -222,8 +209,6 @@ const DoctorDashboard = () => {
           </Card>
         </div>
       </div>
-    </Layout>
-  );
+    </Layout>;
 };
-
 export default DoctorDashboard;
