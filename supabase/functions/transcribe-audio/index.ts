@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,10 +25,14 @@ serve(async (req) => {
       );
     }
 
+    console.log("Received audio data of length:", audio.length);
+
     // For demonstration purposes, we'll just echo back a simple transcription
     // In a real implementation, this would call a speech-to-text API
     const text = "Esta é uma transcrição simulada. Em um ambiente de produção, usaríamos uma API real de transcrição de fala para texto.";
 
+    console.log("Returning transcription text");
+    
     // Return the transcription
     return new Response(
       JSON.stringify({ text }),

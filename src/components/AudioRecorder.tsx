@@ -410,7 +410,24 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       return;
     }
 
-    await transcribeAudioChunk(audioBlob, true);
+    try {
+      console.log("Starting transcription of recorded audio, blob size:", audioBlob.size);
+      setIsTranscribing(true);
+      setHasError(false);
+      setErrorMessage('');
+      
+      await transcribeAudioChunk(audioBlob, true);
+    } catch (error) {
+      console.error("Error in transcribeAudio:", error);
+      setHasError(true);
+      setIsTranscribing(false);
+      setErrorMessage(`Erro na transcrição: ${error instanceof Error ? error.message : 'Motivo desconhecido'}`);
+      toast({
+        variant: "destructive",
+        title: "Erro na transcrição",
+        description: "Não foi possível transcrever o áudio. Tente novamente."
+      });
+    }
   };
 
   const processTranscription = async (transcription: string) => {

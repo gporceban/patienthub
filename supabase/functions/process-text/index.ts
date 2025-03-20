@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Process-text function called");
+    
     // Create Supabase client
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") || "",
@@ -23,6 +26,8 @@ serve(async (req) => {
 
     // Parse request body
     const { text, mode, reviewRequired, additionalInstructions, patientInfo } = await req.json();
+
+    console.log("Request parameters:", { mode, reviewRequired, patientInfo: !!patientInfo });
 
     if (!text) {
       return new Response(
@@ -34,6 +39,8 @@ serve(async (req) => {
     // For now, our "AI processing" just returns structured data based on the text
     // In a real implementation, this would call an actual AI model
     const processedText = processTextWithAI(text, mode, additionalInstructions, patientInfo);
+
+    console.log("Processing complete for mode:", mode);
 
     // Handle different modes (clinical_note, prescription, summary, etc.)
     let result;
