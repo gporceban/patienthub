@@ -35,17 +35,35 @@ export const seedDoctorNotifications = async (doctorId: string) => {
   ];
   
   try {
-    // Fix: Process each notification individually
-    for (const notification of notifications) {
-      const { error } = await fromDoctorNotifications(supabase).insert(notification);
+    // Check if notifications already exist for this doctor to prevent duplicates
+    const { data: existingNotifications, error: checkError } = await supabase
+      .from('doctor_notifications')
+      .select('id')
+      .eq('doctor_id', doctorId)
+      .limit(1);
       
-      if (error) {
-        console.error('Erro ao criar notificação de teste para médico:', error);
-        return { success: false, error };
-      }
+    if (checkError) {
+      console.error('Erro ao verificar notificações existentes:', checkError);
+      return { success: false, error: checkError };
     }
     
-    return { success: true };
+    // Only seed if no notifications exist
+    if (existingNotifications && existingNotifications.length === 0) {
+      // Fix: Process each notification individually
+      for (const notification of notifications) {
+        const { error } = await fromDoctorNotifications(supabase).insert(notification);
+        
+        if (error) {
+          console.error('Erro ao criar notificação de teste para médico:', error);
+          return { success: false, error };
+        }
+      }
+      
+      return { success: true };
+    } else {
+      console.log('Notificações já existem para este médico, pulando seed');
+      return { success: true, skipped: true };
+    }
   } catch (error) {
     console.error('Erro ao criar notificações de teste para médico:', error);
     return { success: false, error };
@@ -84,17 +102,35 @@ export const seedPatientNotifications = async (patientId: string) => {
   ];
   
   try {
-    // Fix: Process each notification individually
-    for (const notification of notifications) {
-      const { error } = await fromPatientNotifications(supabase).insert(notification);
+    // Check if notifications already exist for this patient to prevent duplicates
+    const { data: existingNotifications, error: checkError } = await supabase
+      .from('patient_notifications')
+      .select('id')
+      .eq('patient_id', patientId)
+      .limit(1);
       
-      if (error) {
-        console.error('Erro ao criar notificação de teste para paciente:', error);
-        return { success: false, error };
-      }
+    if (checkError) {
+      console.error('Erro ao verificar notificações existentes:', checkError);
+      return { success: false, error: checkError };
     }
     
-    return { success: true };
+    // Only seed if no notifications exist
+    if (existingNotifications && existingNotifications.length === 0) {
+      // Fix: Process each notification individually
+      for (const notification of notifications) {
+        const { error } = await fromPatientNotifications(supabase).insert(notification);
+        
+        if (error) {
+          console.error('Erro ao criar notificação de teste para paciente:', error);
+          return { success: false, error };
+        }
+      }
+      
+      return { success: true };
+    } else {
+      console.log('Notificações já existem para este paciente, pulando seed');
+      return { success: true, skipped: true };
+    }
   } catch (error) {
     console.error('Erro ao criar notificações de teste para paciente:', error);
     return { success: false, error };

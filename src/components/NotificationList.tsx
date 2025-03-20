@@ -130,7 +130,7 @@ const NotificationList: React.FC<NotificationListProps> = ({
     return (
       <Card className="p-6 text-center">
         <Bell className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-        <h3 className="text-lg font-medium mb-2">Sem novas notificações</h3>
+        <h3 className="text-lg font-medium mb-2">Sem notificações</h3>
         <p className="text-muted-foreground">
           Você não possui notificações no momento.
         </p>
