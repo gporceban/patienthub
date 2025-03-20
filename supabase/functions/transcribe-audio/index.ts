@@ -9,16 +9,21 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log("transcribe-audio function called");
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
+    console.log("Handling OPTIONS request");
     return new Response(null, { headers: corsHeaders, status: 204 });
   }
 
   try {
-    // Get request body
-    const { audio } = await req.json();
+    console.log("Parsing request body");
+    const requestData = await req.json();
+    const { audio } = requestData;
 
     if (!audio) {
+      console.error("Missing audio data in request");
       return new Response(
         JSON.stringify({ error: "Missing audio data" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -29,6 +34,7 @@ serve(async (req) => {
 
     // Validate base64 format
     if (!audio.match(/^[A-Za-z0-9+/=]+$/)) {
+      console.error("Invalid base64 audio data");
       return new Response(
         JSON.stringify({ error: "Invalid base64 audio data" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -53,7 +59,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("Error in transcribe-audio function:", error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }

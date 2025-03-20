@@ -341,6 +341,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
         
         console.log("Sending audio to transcription API...");
+        console.log("Base64 audio length:", base64Audio.length);
+        
         const { data, error } = await supabase.functions.invoke('transcribe-audio', {
           body: { audio: base64Audio }
         });
@@ -447,6 +449,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           }
           
           console.log("Sending uploaded audio file to transcription API...");
+          console.log("Base64 audio length:", base64Audio.length);
+          
           const { data, error } = await supabase.functions.invoke('transcribe-audio', {
             body: { audio: base64Audio }
           });
@@ -511,6 +515,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       } : null;
       
       console.log("Processing transcription for clinical note...");
+      console.log("PatientHistoryParam:", patientHistoryParam);
+      
       const { data, error } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -524,6 +530,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         console.error("Error processing clinical note:", error);
         throw error;
       }
+      
+      console.log("Clinical note processing response:", data);
       
       console.log("Processing transcription for summary...");
       const { data: summaryData, error: summaryError } = await supabase.functions.invoke('process-text', {
@@ -540,6 +548,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         throw summaryError;
       }
       
+      console.log("Summary processing response:", summaryData);
+      
       console.log("Processing transcription for prescription...");
       const { data: prescriptionData, error: prescriptionError } = await supabase.functions.invoke('process-text', {
         body: { 
@@ -555,6 +565,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         throw prescriptionError;
       }
       
+      console.log("Prescription processing response:", prescriptionData);
+      
       console.log("Processing transcription for structured data...");
       const { data: structuredData, error: structuredError } = await supabase.functions.invoke('process-text', {
         body: { 
@@ -569,6 +581,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         console.error("Error processing structured data:", structuredError);
         throw structuredError;
       }
+      
+      console.log("Structured data processing response:", structuredData);
       
       setProcessingComplete(true);
       const historyMessage = patientInfo ? "integrado com histórico do paciente" : "";

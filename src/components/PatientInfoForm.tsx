@@ -36,10 +36,17 @@ const PatientInfoForm: React.FC<PatientInfoFormProps> = ({ onSubmit, isLoading =
       prontuarioId: "",
     },
   });
+  
+  console.log("PatientInfoForm rendered, isLoading:", isLoading);
+  
+  const handleSubmit = (data: PatientInfo) => {
+    console.log("PatientInfoForm submitted with data:", data);
+    onSubmit(data);
+  };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="name"

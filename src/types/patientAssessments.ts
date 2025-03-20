@@ -25,6 +25,7 @@ export type PatientAssessment = {
 export const fromPatientAssessments = (supabase: any) => {
   return {
     select: () => {
+      console.log("Selecting all patient assessments");
       return supabase.from('patient_assessments').select('*') as any;
     },
     insert: (values: { 
@@ -36,16 +37,19 @@ export const fromPatientAssessments = (supabase: any) => {
       clinical_note?: string | null;
       prescription?: string | null;
       summary?: string | null;
-      patient_friendly_summary?: string | null; // Add to insert type
+      patient_friendly_summary?: string | null;
       structured_data?: any | null;
       id?: string;
     }) => {
+      console.log("Inserting patient assessment with values:", values);
       return supabase.from('patient_assessments').insert(values as any) as any;
     },
     update: (values: Partial<Omit<PatientAssessment, 'id' | 'created_at' | 'updated_at'>>, id: string) => {
+      console.log("Updating patient assessment with id:", id, "values:", values);
       return supabase.from('patient_assessments').update(values as any).eq('id', id) as any;
     },
     getByPatientEmail: (email: string) => {
+      console.log("Getting patient assessments by email:", email);
       return supabase
         .from('patient_assessments')
         .select('*')
@@ -53,6 +57,7 @@ export const fromPatientAssessments = (supabase: any) => {
         .order('created_at', { ascending: false }) as any;
     },
     getByDoctorId: (doctorId: string) => {
+      console.log("Getting patient assessments by doctor id:", doctorId);
       return supabase
         .from('patient_assessments')
         .select('*')
@@ -60,6 +65,7 @@ export const fromPatientAssessments = (supabase: any) => {
         .order('created_at', { ascending: false }) as any;
     },
     getByProntuarioId: (prontuarioId: string) => {
+      console.log("Getting patient assessments by prontuario id:", prontuarioId);
       return supabase
         .from('patient_assessments')
         .select('*')
