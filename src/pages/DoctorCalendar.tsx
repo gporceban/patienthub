@@ -671,19 +671,6 @@ const DoctorCalendar = () => {
           ) : (
             <div className="mb-6">
               <FullCalendarComponent 
-                events={appointments.map(appointment => ({
-                  id: appointment.id,
-                  title: appointment.title,
-                  start: appointment.startTime,
-                  end: appointment.endTime,
-                  extendedProps: {
-                    attendees: appointment.attendees,
-                    status: appointment.status,
-                    location: appointment.location,
-                    description: appointment.description,
-                    eventTypeId: appointment.eventTypeId
-                  }
-                }))}
                 onEventClick={handleCalendarEventClick}
               />
               
