@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Notification, getNotifications, markNotificationsAsRead } from '@/types/notifications';
@@ -38,9 +37,15 @@ const NotificationList: React.FC<NotificationListProps> = ({
     
     try {
       setIsLoading(true);
+      console.log(`Fetching notifications for ${userType} with ID ${userId}`);
       const { data, error } = await getNotifications(supabase, userType, userId);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching notifications:", error);
+        throw error;
+      }
+      
+      console.log("Fetched notifications:", data);
       
       // Apply limit if provided
       const limitedData = limit ? data.slice(0, limit) : data;
@@ -89,7 +94,6 @@ const NotificationList: React.FC<NotificationListProps> = ({
     }
   };
 
-  // Format relative time from timestamp
   const formatRelativeTime = (dateString: string) => {
     try {
       return formatDistanceToNow(new Date(dateString), { 
@@ -103,6 +107,10 @@ const NotificationList: React.FC<NotificationListProps> = ({
 
   useEffect(() => {
     fetchNotifications();
+    // Add a refresh interval to periodically check for new notifications
+    const refreshInterval = setInterval(fetchNotifications, 30000); // refresh every 30 seconds
+    
+    return () => clearInterval(refreshInterval);
   }, [userId, userType]);
 
   const hasUnreadNotifications = notifications.some(notification => !notification.read);
@@ -126,7 +134,7 @@ const NotificationList: React.FC<NotificationListProps> = ({
     );
   }
 
-  if (notifications.length === 0) {
+  if (!isLoading && (!notifications || notifications.length === 0)) {
     return (
       <Card className="p-6 text-center">
         <Bell className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
