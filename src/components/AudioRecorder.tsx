@@ -1,11 +1,11 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, Square, Loader2, FileText, Volume2, AlertCircle } from 'lucide-react';
+import { Mic, Square, Loader2, FileText, Volume2, AlertCircle, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import AudioRecorderStatus from './AudioRecorderStatus';
 import RealtimeTranscription from './RealtimeTranscription';
+import { Input } from '@/components/ui/input';
 
 interface AudioRecorderProps {
   onTranscriptionComplete: (transcription: string) => void;
@@ -60,8 +60,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserNodeRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Clean up on unmount
   useEffect(() => {
     return () => {
       stopRecording();
@@ -69,7 +71,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     };
   }, []);
 
-  // Progress simulation for agent processing
   useEffect(() => {
     if (isProcessing && !processingComplete) {
       if (progressTimerRef.current) {
@@ -118,12 +119,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   }, [isProcessing, processingComplete]);
 
   const cleanupResources = () => {
-    // Stop recording if in progress
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
     }
     
-    // Clear any timers
     if (progressTimerRef.current) {
       clearTimeout(progressTimerRef.current);
     }
@@ -133,31 +132,26 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       intervalRef.current = null;
     }
 
-    // Cancel any animation frames
     if (animationFrameRef.current) {
       window.cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
 
-    // Close audio context
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close().catch(console.error);
     }
 
-    // Close audio tracks
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
   };
 
-  // Periodic transcription while recording
   const startPeriodicTranscription = () => {
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
     }
     
-    // Start periodic transcription every 5 seconds
     intervalRef.current = window.setInterval(async () => {
       if (audioChunksRef.current.length === 0 || !isRecording) {
         return;
@@ -200,7 +194,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       console.log("Microphone access granted:", stream);
       streamRef.current = stream;
       
-      // Configure audio level monitoring
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       analyserNodeRef.current = audioContextRef.current.createAnalyser();
       analyserNodeRef.current.fftSize = 2048;
@@ -208,7 +201,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       const source = audioContextRef.current.createMediaStreamSource(stream);
       source.connect(analyserNodeRef.current);
       
-      // Monitor audio levels
       const dataArray = new Uint8Array(analyserNodeRef.current.frequencyBinCount);
       
       const checkAudioLevel = () => {
@@ -230,10 +222,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
       };
       
-      // Set up MediaRecorder with proper options
       let options: MediaRecorderOptions = {};
       
-      // Check browser support for different codecs
       if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
         options.mimeType = 'audio/webm;codecs=opus';
       } else if (MediaRecorder.isTypeSupported('audio/webm')) {
@@ -284,15 +274,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         stream.getTracks().forEach(track => track.stop());
       };
       
-      // Start the audio monitoring
       checkAudioLevel();
       
-      // Start recording
-      mediaRecorder.start(500); // Collect data every 500ms
+      mediaRecorder.start(500);
       console.log("MediaRecorder started");
       setIsRecording(true);
       
-      // Start periodic transcription
       startPeriodicTranscription();
       
       toast({
@@ -374,7 +361,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
             onTranscriptionComplete(data.text);
             processTranscription(data.text);
           } else {
-            // For interim transcription, just update the current text
             setCurrentTranscription(data.text);
           }
         } else {
@@ -430,6 +416,74 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
   };
 
+  const uploadAndTranscribeAudio = async () => {
+    if (!audioBlob) {
+      toast({
+        variant: "destructive",
+        title: "Sem áudio",
+        description: "Nenhum arquivo de áudio foi carregado para transcrição."
+      });
+      return;
+    }
+    
+    try {
+      setIsUploading(true);
+      setIsTranscribing(true);
+      setHasError(false);
+      setErrorMessage('');
+      
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      
+      reader.onloadend = async () => {
+        const base64Audio = reader.result?.toString().split(',')[1];
+        
+        if (!base64Audio) {
+          throw new Error('Falha ao converter áudio para base64');
+        }
+        
+        console.log("Sending uploaded audio file to transcription API...");
+        const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+          body: { audio: base64Audio }
+        });
+        
+        if (error) {
+          console.error("Transcription API error:", error);
+          throw error;
+        }
+        
+        console.log("Transcription API response:", data);
+        if (data?.text) {
+          setTranscriptionComplete(true);
+          setCurrentTranscription(data.text);
+          
+          toast({
+            title: "Transcrição completa",
+            description: "O áudio foi transcrito com sucesso e está sendo processado pelo sistema de agentes IA."
+          });
+          
+          onTranscriptionComplete(data.text);
+          processTranscription(data.text);
+        } else {
+          throw new Error('Nenhum texto recebido da transcrição');
+        }
+      };
+    } catch (error) {
+      console.error('Erro ao transcrever áudio:', error);
+      setHasError(true);
+      setIsTranscribing(false);
+      setErrorMessage(`Erro na transcrição: ${error instanceof Error ? error.message : 'Motivo desconhecido'}`);
+      toast({
+        variant: "destructive",
+        title: "Erro na transcrição",
+        description: "Não foi possível transcrever o áudio. Tente novamente."
+      });
+    } finally {
+      setIsUploading(false);
+      setIsTranscribing(false);
+    }
+  };
+
   const processTranscription = async (transcription: string) => {
     onProcessingStart();
     setIsProcessing(true);
@@ -442,7 +496,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         email: patientInfo.email
       } : null;
       
-      // We'll do each request separately to ensure better error handling
       console.log("Processing transcription for clinical note...");
       const { data, error } = await supabase.functions.invoke('process-text', {
         body: { 
@@ -531,12 +584,53 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
   };
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    
+    if (!file) {
+      return;
+    }
+    
+    if (!file.type.startsWith('audio/')) {
+      toast({
+        variant: "destructive",
+        title: "Tipo de arquivo inválido",
+        description: "Por favor, envie apenas arquivos de áudio."
+      });
+      return;
+    }
+    
+    const maxSize = 30 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        variant: "destructive",
+        title: "Arquivo muito grande",
+        description: "O tamanho máximo permitido é 30MB."
+      });
+      return;
+    }
+    
+    setUploadedFileName(file.name);
+    setAudioBlob(file);
+    
+    toast({
+      title: "Arquivo carregado",
+      description: `"${file.name}" está pronto para transcrição."
+    });
+  };
+
+  const handleUploadClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col items-center">
         <h3 className="text-lg font-medium mb-2">Gravação de Áudio</h3>
         <p className="text-sm text-gray-400 mb-4">
-          {patientInfo ? "Grave a consulta para gerar documentos integrados com o histórico do paciente" : "Grave a consulta para gerar documentos automaticamente utilizando Agentes IA especializados"}
+          {patientInfo ? "Grave ou envie o áudio da consulta para gerar documentos integrados com o histórico do paciente" : "Grave ou envie o áudio da consulta para gerar documentos automaticamente utilizando Agentes IA especializados"}
         </p>
         
         <div className="w-full relative mb-4">
@@ -561,14 +655,32 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         
         <div className="flex gap-4 mb-4">
           {!isRecording ? (
-            <Button 
-              onClick={startRecording} 
-              className="bg-gold-500 hover:bg-gold-600 text-black"
-              disabled={isTranscribing || isProcessing}
-            >
-              <Mic className="h-4 w-4 mr-2" />
-              Iniciar Gravação
-            </Button>
+            <>
+              <Button 
+                onClick={startRecording} 
+                className="bg-gold-500 hover:bg-gold-600 text-black"
+                disabled={isTranscribing || isProcessing || isUploading}
+              >
+                <Mic className="h-4 w-4 mr-2" />
+                Iniciar Gravação
+              </Button>
+              
+              <Button
+                onClick={handleUploadClick}
+                variant="outline"
+                disabled={isRecording || isTranscribing || isProcessing || isUploading}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Carregar Áudio
+              </Button>
+              <Input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="audio/*"
+                onChange={handleFileUpload}
+              />
+            </>
           ) : (
             <Button 
               onClick={stopRecording} 
@@ -578,27 +690,35 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
               Parar Gravação
             </Button>
           )}
-          
-          {audioBlob && !isRecording && (
-            <Button 
-              onClick={transcribeAudio} 
-              variant="outline" 
-              disabled={isTranscribing || isProcessing}
-            >
-              {isTranscribing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Transcrevendo...
-                </>
-              ) : (
-                <>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Transcrever e Processar
-                </>
-              )}
-            </Button>
-          )}
         </div>
+
+        {uploadedFileName && !isRecording && (
+          <div className="flex items-center text-gray-300 mb-4">
+            <FileText className="h-4 w-4 mr-2 text-gold-500" />
+            <span className="text-sm">{uploadedFileName}</span>
+          </div>
+        )}
+        
+        {audioBlob && !isRecording && (
+          <Button 
+            onClick={audioBlob === uploadedFileName ? uploadAndTranscribeAudio : transcribeAudio} 
+            variant="outline" 
+            disabled={isTranscribing || isProcessing || isUploading}
+            className="mb-4"
+          >
+            {isTranscribing || isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {isUploading ? "Enviando..." : "Transcrevendo..."}
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4 mr-2" />
+                Transcrever e Processar
+              </>
+            )}
+          </Button>
+        )}
         
         {hasError && (
           <div className="flex items-center text-red-500 mt-1 mb-2">
@@ -616,6 +736,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           transcriptionComplete={transcriptionComplete}
           processingComplete={processingComplete}
           agentProgress={agentProgress}
+          isUploading={isUploading}
         />
       </div>
     </div>
