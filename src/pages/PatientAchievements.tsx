@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Award, Trophy, Target, Star, Calendar, TrendingUp } from 'lucide-react';
-import { PatientAssessment } from '@/types/patientAssessments';
+import { PatientAssessment, AssessmentStatus } from '@/types/patientAssessments';
 import { Link } from 'react-router-dom';
 
 // Estrutura para achievements

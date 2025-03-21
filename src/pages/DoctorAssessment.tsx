@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
@@ -13,20 +12,16 @@ import AudioRecorder from '@/components/AudioRecorder';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, PencilLine, Check, RotateCcw, History } from 'lucide-react';
 import PatientInfoForm, { PatientInfo } from '@/components/PatientInfoForm';
-import { PatientAssessment, fromPatientAssessments } from '@/types/patientAssessments';
+import { PatientAssessment, fromPatientAssessments, AssessmentStatus } from '@/types/patientAssessments';
 
 const DoctorAssessment = () => {
   const { user } = useContext(AuthContext);
   const { toast } = useToast();
   
-  // Patient info state
   const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
-  
-  // Assessment ID for updates
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [creatingAssessment, setCreatingAssessment] = useState(false);
   
-  // Generated content state
   const [summary, setSummary] = useState('');
   const [clinicalNote, setClinicalNote] = useState('');
   const [prescription, setPrescription] = useState('');
@@ -34,28 +29,23 @@ const DoctorAssessment = () => {
   const [patientFriendlySummary, setPatientFriendlySummary] = useState('');
   const [structuredData, setStructuredData] = useState<any>(null);
   
-  // Previous assessments state
   const [previousAssessments, setPreviousAssessments] = useState<PatientAssessment[]>([]);
   const [hasPreviousAssessments, setHasPreviousAssessments] = useState(false);
   
-  // Editing state for human-in-the-loop
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [isEditingClinicalNote, setIsEditingClinicalNote] = useState(false);
   const [isEditingPrescription, setIsEditingPrescription] = useState(false);
   const [isEditingPatientSummary, setIsEditingPatientSummary] = useState(false);
   
-  // AI instruction state for refinement
   const [aiInstruction, setAiInstruction] = useState('');
   const [isSubmittingInstruction, setIsSubmittingInstruction] = useState(false);
   
-  // Workflow state management
   const [currentStep, setCurrentStep] = useState<'info' | 'recording' | 'review'>('info');
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [docsGenerated, setDocsGenerated] = useState(false);
   const [isGeneratingPatientSummary, setIsGeneratingPatientSummary] = useState(false);
   
-  // Fetch previous assessments when patient info changes
   useEffect(() => {
     const fetchPreviousAssessments = async () => {
       if (patientInfo && patientInfo.prontuarioId) {
@@ -95,7 +85,6 @@ const DoctorAssessment = () => {
     fetchPreviousAssessments();
   }, [patientInfo, toast]);
   
-  // Create initial assessment with patient info
   const createInitialAssessment = async (patientData: PatientInfo) => {
     if (!user) {
       toast({
@@ -118,7 +107,7 @@ const DoctorAssessment = () => {
         patient_name: patientData.name,
         patient_email: patientData.email,
         prontuario_id: patientData.prontuarioId,
-        status: 'in_progress' as const
+        status: 'in_progress' as AssessmentStatus
       };
       
       const patientAssessments = fromPatientAssessments(supabase);
@@ -149,7 +138,6 @@ const DoctorAssessment = () => {
     }
   };
   
-  // Update assessment with completed data
   const updateAssessment = async () => {
     if (!assessmentId) {
       console.error("No assessment ID to update");
@@ -167,7 +155,7 @@ const DoctorAssessment = () => {
         patient_friendly_summary: patientFriendlySummary,
         transcription,
         structured_data: structuredData,
-        status: 'completed'
+        status: 'completed' as AssessmentStatus
       }, assessmentId);
       
       if (error) {
@@ -194,7 +182,6 @@ const DoctorAssessment = () => {
     }
   };
   
-  // Save completed assessment
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -210,12 +197,10 @@ const DoctorAssessment = () => {
     const success = await updateAssessment();
     
     if (success) {
-      // Reset all state
       resetForm();
     }
   };
   
-  // Reset the form completely
   const resetForm = () => {
     setPatientInfo(null);
     setAssessmentId(null);
@@ -232,11 +217,9 @@ const DoctorAssessment = () => {
     setHasPreviousAssessments(false);
   };
   
-  // Transcription completion handler
   const handleTranscriptionComplete = (text: string) => {
     setTranscription(text);
     
-    // Update the assessment with the transcription
     if (assessmentId) {
       const patientAssessments = fromPatientAssessments(supabase);
       patientAssessments.update({
@@ -251,13 +234,11 @@ const DoctorAssessment = () => {
     }
   };
   
-  // Processing start handler
   const handleProcessingStart = () => {
     setIsProcessing(true);
     setDocsGenerated(false);
   };
   
-  // Processing completion handler
   const handleProcessingComplete = (data: {
     clinical_note?: string;
     prescription?: string;
@@ -272,10 +253,8 @@ const DoctorAssessment = () => {
     setIsProcessing(false);
     setDocsGenerated(true);
     
-    // Set to review step when processing is complete
     setCurrentStep('review');
     
-    // Update the assessment with the processed data
     if (assessmentId) {
       const patientAssessments = fromPatientAssessments(supabase);
       patientAssessments.update({
@@ -298,18 +277,15 @@ const DoctorAssessment = () => {
     });
   };
   
-  // Handle patient info submission
   const handlePatientInfoSubmit = async (data: PatientInfo) => {
     setPatientInfo(data);
     
-    // Create initial assessment in Supabase
     const newId = await createInitialAssessment(data);
     
     if (newId) {
       setAssessmentId(newId);
       setCurrentStep('recording');
     } else {
-      // If assessment creation fails, stay on the info step
       toast({
         variant: "destructive",
         title: "Erro ao iniciar avaliação",
@@ -318,7 +294,6 @@ const DoctorAssessment = () => {
     }
   };
   
-  // Generate patient-friendly summary
   const generatePatientFriendlySummary = async () => {
     if (!clinicalNote || !summary) {
       toast({
@@ -345,7 +320,6 @@ const DoctorAssessment = () => {
       if (data?.text) {
         setPatientFriendlySummary(data.text);
         
-        // Update the assessment with the patient friendly summary
         if (assessmentId) {
           const patientAssessments = fromPatientAssessments(supabase);
           patientAssessments.update({
@@ -374,7 +348,6 @@ const DoctorAssessment = () => {
     }
   };
   
-  // Regenerate AI content with human instruction
   const submitAiInstruction = async () => {
     if (!transcription || !aiInstruction) {
       toast({
@@ -388,7 +361,6 @@ const DoctorAssessment = () => {
     try {
       setIsSubmittingInstruction(true);
       
-      // Process the transcription with additional instructions
       const { data, error } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -406,7 +378,6 @@ const DoctorAssessment = () => {
       if (data?.text) {
         setClinicalNote(data.text);
         
-        // Update the clinical note in the assessment
         if (assessmentId) {
           const patientAssessments = fromPatientAssessments(supabase);
           patientAssessments.update({
@@ -418,7 +389,6 @@ const DoctorAssessment = () => {
           });
         }
         
-        // Clear the instruction after processing
         setAiInstruction('');
         
         toast({
@@ -449,7 +419,6 @@ const DoctorAssessment = () => {
         </p>
       </div>
       
-      {/* Step 1: Patient Information */}
       {currentStep === 'info' && (
         <Card className="card-gradient p-6 max-w-2xl mb-6">
           <h2 className="text-lg font-semibold mb-4">Informações do Paciente</h2>
@@ -460,7 +429,6 @@ const DoctorAssessment = () => {
         </Card>
       )}
       
-      {/* Step 2: Recording */}
       {currentStep === 'recording' && patientInfo && (
         <Card className="card-gradient p-6 max-w-2xl mb-6">
           <div className="flex justify-between items-center mb-4">
@@ -509,7 +477,6 @@ const DoctorAssessment = () => {
         </Card>
       )}
       
-      {/* Step 3: Review and Edit */}
       {currentStep === 'review' && docsGenerated && (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
           <Card className="card-gradient p-6">
@@ -543,7 +510,6 @@ const DoctorAssessment = () => {
               </TabsList>
               
               <TabsContent value="medical" className="space-y-6 pt-4">
-                {/* Summary field with edit capability */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium leading-none">
@@ -567,7 +533,6 @@ const DoctorAssessment = () => {
                   />
                 </div>
                 
-                {/* Clinical Note field with edit capability */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium leading-none">
@@ -591,7 +556,6 @@ const DoctorAssessment = () => {
                   />
                 </div>
                 
-                {/* Prescription field with edit capability */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium leading-none">
@@ -615,7 +579,6 @@ const DoctorAssessment = () => {
                   />
                 </div>
                 
-                {/* AI Instruction for feedback to improve content */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">
                     Instruções para a IA (opcional)
@@ -649,7 +612,6 @@ const DoctorAssessment = () => {
               </TabsContent>
               
               <TabsContent value="patient" className="space-y-6 pt-4">
-                {/* Patient-friendly summary */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium leading-none">

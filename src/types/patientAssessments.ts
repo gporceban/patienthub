@@ -1,6 +1,9 @@
 
 import { Database } from "@/integrations/supabase/types";
 
+// Define the status type explicitly to match what we're using
+export type AssessmentStatus = 'completed' | 'in_progress' | 'scheduled' | 'canceled';
+
 // This is your custom Patient Assessment type
 export type PatientAssessment = {
   id: string;
@@ -16,8 +19,8 @@ export type PatientAssessment = {
   structured_data: any | null;
   created_at: string;
   updated_at: string;
-  // Additional fields for the UI
-  status?: 'completed' | 'in_progress' | 'scheduled' | 'canceled';
+  // Change this to accept both string and our specific values
+  status: string | AssessmentStatus | null;
   appointment_date?: string;
 };
 
@@ -39,7 +42,7 @@ export const fromPatientAssessments = (supabase: any) => {
       summary?: string | null;
       patient_friendly_summary?: string | null;
       structured_data?: any | null;
-      status?: 'completed' | 'in_progress' | 'scheduled' | 'canceled';
+      status?: string | AssessmentStatus | null;
       id?: string;
     }) => {
       console.log("Inserting patient assessment with values:", JSON.stringify(values, null, 2));
