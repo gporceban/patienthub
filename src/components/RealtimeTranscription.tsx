@@ -89,7 +89,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       
       const websocket = new WebSocket(websocketUrl, {
         headers: {
-          "Authorization": "Bearer $(sessionTokenRef.current)"
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
           "OpenAI-Beta": "realtime=v1",
         },
       });
