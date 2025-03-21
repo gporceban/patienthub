@@ -1,35 +1,12 @@
 
-# This is your Supabase project configuration
-
+# The project ID of your Supabase project
 project_id = "tokybrabdqqahhbxxpzj"
 
-[api]
-port = 54321
-schemas = ["public", "storage"]
-extra_search_path = ["extensions"]
-max_rows = 1000
+[functions.realtime-transcription-token]
+verify_jwt = false
 
-[db]
-port = 54322
-major_version = 15
+[functions.process-text]
+verify_jwt = false
 
-[studio]
-port = 54323
-
-[inbucket]
-port = 54324
-smtp_port = 54325
-pop3_port = 54326
-
-[storage]
-file_size_limit = "50MiB"
-
-[auth]
-site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://localhost:3000"]
-jwt_expiry = 3600
-enable_signup = true
-
-[functions]
-# Remove the incorrect [functions.serve] section with cors key
-# Instead, CORS headers are handled directly in each function
+[functions.transcribe-audio]
+verify_jwt = false

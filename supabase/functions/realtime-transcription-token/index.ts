@@ -1,0 +1,58 @@
+
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+};
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders, status: 204 });
+  }
+
+  try {
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not set');
+    }
+
+    // Request an ephemeral token from OpenAI for transcription
+    const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("OpenAI API error:", errorData);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
+    }
+
+    const data = await response.json();
+    console.log("Transcription session created:", data);
+    
+    return new Response(JSON.stringify(data), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200
+    });
+  } catch (error) {
+    console.error("Error in realtime-transcription-token function:", error.message);
+    console.error("Error stack:", error.stack);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+    );
+  }
+});

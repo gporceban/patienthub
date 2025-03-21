@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Loader2, FileText, Volume2, AlertCircle, Upload } from 'lucide-react';
@@ -64,6 +63,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [useRealtimeTranscription, setUseRealtimeTranscription] = useState(true);
 
   useEffect(() => {
     return () => {
@@ -153,18 +153,20 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       window.clearInterval(intervalRef.current);
     }
     
-    intervalRef.current = window.setInterval(async () => {
-      if (audioChunksRef.current.length === 0 || !isRecording) {
-        return;
-      }
-      
-      try {
-        const tempBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await transcribeAudioChunk(tempBlob, false);
-      } catch (error) {
-        console.error('Error in periodic transcription:', error);
-      }
-    }, 5000);
+    if (!useRealtimeTranscription) {
+      intervalRef.current = window.setInterval(async () => {
+        if (audioChunksRef.current.length === 0 || !isRecording) {
+          return;
+        }
+        
+        try {
+          const tempBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          await transcribeAudioChunk(tempBlob, false);
+        } catch (error) {
+          console.error('Error in periodic transcription:', error);
+        }
+      }, 5000);
+    }
   };
 
   const startRecording = async () => {
@@ -281,11 +283,15 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       console.log("MediaRecorder started");
       setIsRecording(true);
       
-      startPeriodicTranscription();
+      if (!useRealtimeTranscription) {
+        startPeriodicTranscription();
+      }
       
       toast({
         title: "Gravação iniciada",
-        description: "Fale claramente para obter os melhores resultados."
+        description: useRealtimeTranscription ? 
+          "Transcrição em tempo real ativada. Fale claramente." : 
+          "Fale claramente para obter os melhores resultados."
       });
     } catch (error) {
       console.error('Erro ao acessar o microfone:', error);
@@ -405,7 +411,13 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       setHasError(false);
       setErrorMessage('');
       
-      await transcribeAudioChunk(audioBlob, true);
+      if (useRealtimeTranscription && currentTranscription) {
+        setTranscriptionComplete(true);
+        onTranscriptionComplete(currentTranscription);
+        processTranscription(currentTranscription);
+      } else {
+        await transcribeAudioChunk(audioBlob, true);
+      }
     } catch (error) {
       console.error("Error in transcribeAudio:", error);
       setHasError(true);
@@ -648,7 +660,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         
         toast({
           title: "Arquivo carregado",
-          description: `"${file.name}" está pronto para transcrição.`
+          description: `"${file.name}" está pronto para transcrição."
         });
       }
     };
@@ -660,6 +672,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
+  };
+
+  const handleRealtimeTranscriptionUpdate = (text: string) => {
+    setCurrentTranscription(text);
   };
 
   return (
@@ -675,6 +691,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
             isRecording={isRecording} 
             transcription={currentTranscription}
             isTranscribing={isTranscribing}
+            onTranscriptionUpdate={useRealtimeTranscription ? handleRealtimeTranscriptionUpdate : undefined}
           />
           
           {isRecording && (
@@ -687,6 +704,27 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
                 />
               </div>
             </div>
+          )}
+        </div>
+        
+        <div className="flex items-center mb-4">
+          <div className="flex items-center mr-4">
+            <input
+              type="checkbox"
+              id="realtimeTranscription"
+              checked={useRealtimeTranscription}
+              onChange={(e) => setUseRealtimeTranscription(e.target.checked)}
+              className="mr-2 h-4 w-4 text-gold-500 rounded border-gray-600 focus:ring-gold-500"
+              disabled={isRecording}
+            />
+            <label htmlFor="realtimeTranscription" className="text-sm text-gray-300">
+              Usar transcrição em tempo real
+            </label>
+          </div>
+          {useRealtimeTranscription && (
+            <p className="text-xs text-gold-500">
+              A transcrição aparecerá enquanto você fala
+            </p>
           )}
         </div>
         
