@@ -31,7 +31,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   const wsRef = useRef<WebSocket | null>(null);
   const audioData = useRef<Float32Array | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<LegacyAudioContext | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | AudioWorkletNode | null>(null);
   const maxRetryAttemptsRef = useRef<number>(3); // Reduced retries for faster feedback
   const retryCountRef = useRef<number>(0);
@@ -89,9 +89,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         await audioContextRef.current.close();
       }
       
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
+      const newAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
         sampleRate: 16000
-      }) as LegacyAudioContext;
+      });
+      audioContextRef.current = newAudioContext;
       
       const source = audioContextRef.current.createMediaStreamSource(stream);
       
@@ -108,8 +109,9 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
           };
         } catch (workletError) {
           console.warn('AudioWorklet not supported or failed to load, falling back to ScriptProcessor:', workletError);
-          if (audioContextRef.current?.createScriptProcessor) {
-            processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+          const legacyContext = audioContextRef.current as unknown as LegacyAudioContext;
+          if (legacyContext.createScriptProcessor) {
+            processorRef.current = legacyContext.createScriptProcessor(4096, 1, 1);
             (processorRef.current as ScriptProcessorNode).onaudioprocess = (e) => {
               if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
               
@@ -127,8 +129,9 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         }
       } else {
         console.warn('AudioWorklet not supported, using deprecated ScriptProcessor');
-        if (audioContextRef.current?.createScriptProcessor) {
-          processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+        const legacyContext = audioContextRef.current as unknown as LegacyAudioContext;
+        if (legacyContext.createScriptProcessor) {
+          processorRef.current = legacyContext.createScriptProcessor(4096, 1, 1);
           (processorRef.current as ScriptProcessorNode).onaudioprocess = (e) => {
             if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
             
