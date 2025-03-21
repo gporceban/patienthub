@@ -25,7 +25,17 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ChevronsRight, Plus, UserRound, FileText, Copy, Check } from 'lucide-react';
-import { PatientAssessment, fromPatientAssessments } from '@/types/patientAssessments';
+
+type AssessmentType = {
+  id: string;
+  created_at: string;
+  patient_id: string;
+  doctor_id: string;
+  summary: string | null;
+  clinical_note: string | null;
+  prescription: string | null;
+  status: string;
+};
 
 type PatientType = {
   id: string;
@@ -77,33 +87,24 @@ const DoctorAssessment = () => {
   
   const loadAssessment = async (assessmentId: string) => {
     try {
-      const { data: assessment, error } = await fromPatientAssessments(supabase)
-        .getById(assessmentId);
+      const { data: assessment, error } = await supabase
+        .from('assessments')
+        .select('*')
+        .eq('id', assessmentId)
+        .single();
         
       if (error) throw error;
       
       if (assessment) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
+        const { data: patient, error: patientError } = await supabase
+          .from('patients')
           .select('*')
-          .eq('email', assessment.patient_email)
+          .eq('id', assessment.patient_id)
           .single();
           
-        if (profileError) {
-          console.error('Error fetching patient profile:', profileError);
-        }
+        if (patientError) throw patientError;
         
-        const patientData: PatientType = {
-          id: profileData?.id || 'unknown',
-          email: assessment.patient_email,
-          full_name: assessment.patient_name,
-          phone: null,
-          date_of_birth: null,
-          sex: null,
-          prontuario_id: assessment.prontuario_id
-        };
-        
-        setSelectedPatient(patientData);
+        setSelectedPatient(patient);
         setClinicalNote(assessment.clinical_note || '');
         setPrescription(assessment.prescription || '');
         setSummary(assessment.summary || '');
@@ -131,24 +132,13 @@ const DoctorAssessment = () => {
   const fetchPatients = async () => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('patients')
         .select('*')
-        .eq('user_type', 'paciente')
         .order('full_name');
         
       if (error) throw error;
       
-      const patientData: PatientType[] = data.map(profile => ({
-        id: profile.id,
-        email: profile.email,
-        full_name: profile.full_name,
-        phone: null,
-        date_of_birth: null,
-        sex: null,
-        prontuario_id: null
-      }));
-      
-      setPatients(patientData);
+      setPatients(data || []);
     } catch (error) {
       console.error('Error fetching patients:', error);
       toast({
@@ -162,30 +152,22 @@ const DoctorAssessment = () => {
   const handleCreatePatient = async () => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('patients')
         .insert([{
-          id: crypto.randomUUID(),
-          email: newPatient.email,
           full_name: newPatient.full_name,
-          user_type: 'paciente',
+          email: newPatient.email,
+          phone: newPatient.phone || null,
+          date_of_birth: newPatient.date_of_birth || null,
+          sex: newPatient.sex || null,
+          prontuario_id: newPatient.prontuario_id || null
         }])
         .select()
         .single();
         
       if (error) throw error;
       
-      const newPatientData: PatientType = {
-        id: data.id,
-        email: data.email,
-        full_name: data.full_name,
-        phone: newPatient.phone || null,
-        date_of_birth: newPatient.date_of_birth || null,
-        sex: newPatient.sex || null,
-        prontuario_id: newPatient.prontuario_id || null
-      };
-      
-      setPatients([...patients, newPatientData]);
-      setSelectedPatient(newPatientData);
+      setPatients([...patients, data]);
+      setSelectedPatient(data);
       setIsNewPatientDialogOpen(false);
       
       toast({
@@ -213,18 +195,19 @@ const DoctorAssessment = () => {
     }
     
     try {
-      const { data, error } = await fromPatientAssessments(supabase)
-        .insert({
-          patient_email: selectedPatient.email,
-          patient_name: selectedPatient.full_name,
-          prontuario_id: selectedPatient.prontuario_id || `P-${Date.now()}`,
-          doctor_id: (await supabase.auth.getUser()).data.user?.id || null,
+      const { data, error } = await supabase
+        .from('assessments')
+        .insert([{
+          patient_id: selectedPatient.id,
+          doctor_id: (await supabase.auth.getUser()).data.user?.id,
           status: 'in_progress'
-        });
+        }])
+        .select()
+        .single();
         
       if (error) throw error;
       
-      setAssessmentId(data[0].id);
+      setAssessmentId(data.id);
       setCurrentStep('recording');
       console.log("Assessment created, moving to recording step");
     } catch (error) {
@@ -268,14 +251,17 @@ const DoctorAssessment = () => {
     if (!assessmentId) return;
     
     try {
-      const { error } = await fromPatientAssessments(supabase)
+      const { error } = await supabase
+        .from('assessments')
         .update({
           clinical_note: clinicalNote,
           prescription: prescription,
           summary: summary,
           structured_data: structuredData,
-          status: 'completed'
-        }, assessmentId);
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', assessmentId);
         
       if (error) throw error;
       
