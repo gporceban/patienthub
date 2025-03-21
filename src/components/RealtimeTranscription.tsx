@@ -84,10 +84,15 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       console.log("Received transcription session token");
       
       // Connect using the WebSocket API with the token
-      const websocketUrl = `wss://api.openai.com/v1/realtime/transcribe?token=${sessionTokenRef.current}`;
+      const websocketUrl = `wss://api.openai.com/v1/realtime?intent=transcription?token=${sessionTokenRef.current}`;
       console.log("Connecting to WebSocket with URL:", websocketUrl);
       
-      const websocket = new WebSocket(websocketUrl);
+      const websocket = new WebSocket(websocketUrl, {
+        headers: {
+          "Authorization": "Bearer $(sessionTokenRef.current)"
+          "OpenAI-Beta": "realtime=v1",
+        },
+      });
       websocketRef.current = websocket;
       
       websocket.onopen = async () => {
