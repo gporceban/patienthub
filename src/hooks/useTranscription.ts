@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -87,10 +86,6 @@ export const useTranscription = ({
           title: "Erro na transcrição",
           description: "Não foi possível transcrever o áudio. Tente novamente."
         });
-      }
-    } finally {
-      if (isFinal) {
-        setIsTranscribing(false);
       }
     }
   };

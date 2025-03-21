@@ -25,29 +25,20 @@ serve(async (req) => {
     }
 
     // Request an ephemeral token from OpenAI for transcription
+    // Updating to use the current API endpoint for whisper
     console.log("Sending request to OpenAI...");
-    const response = await fetch("https://api.openai.com/v1/audio/realtime/transcription_sessions", {
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        "input_audio_format": "pcm16",
-        "input_audio_transcription": {
-          "model": "whisper-1",
-          "language": "pt",
-          "prompt": "Vocabulário médico, terminologia ortopédica"
-        },
-        "turn_detection": {
-          "type": "server_vad",
-          "threshold": 0.5,
-          "prefix_padding_ms": 300,
-          "silence_duration_ms": 500
-        },
-        "input_audio_noise_reduction": {
-          "type": "near_field"
-        }
+        model: "whisper-1",
+        language: "pt",
+        response_format: "json",
+        temperature: 0.2,
+        prompt: "Vocabulário médico, terminologia ortopédica"
       })
     });
 
@@ -60,7 +51,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("Transcription session created successfully, token_type:", data.client_secret?.type);
+    console.log("Transcription token request successful");
     
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
