@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Loader2, FileText, Volume2, AlertCircle, Upload } from 'lucide-react';
@@ -660,7 +661,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         
         toast({
           title: "Arquivo carregado",
-          description: `"${file.name}" está pronto para transcrição."
+          description: `"${file.name}" está pronto para transcrição.`
         });
       }
     };
