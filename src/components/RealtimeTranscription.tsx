@@ -54,7 +54,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
     return () => {
       cleanupRealtimeTranscription();
     };
-  }, [isRecording, onTranscriptionUpdate]);
+  }, [isRecording, onTranscriptionUpdate, isConnected, isConnecting]);
   
   useEffect(() => {
     if (onTranscriptionUpdate && realtimeText) {

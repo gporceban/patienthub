@@ -25,7 +25,6 @@ serve(async (req) => {
     }
 
     // Request a transcription session token from OpenAI
-    // The endpoint is specifically for transcription sessions
     console.log("Sending request to OpenAI Realtime Transcription API...");
     const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
       method: "POST",
@@ -71,6 +70,9 @@ serve(async (req) => {
 
     const data = await response.json();
     console.log("Transcription session created successfully");
+    
+    // Log the structure of the response for debugging
+    console.log("Session data structure:", JSON.stringify(Object.keys(data)));
     console.log("Session data received:", data);
     
     return new Response(JSON.stringify(data), {
