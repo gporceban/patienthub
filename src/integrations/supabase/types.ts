@@ -128,6 +128,7 @@ export type Database = {
           patient_name: string
           prescription: string | null
           prontuario_id: string
+          status: string | null
           structured_data: Json | null
           summary: string | null
           transcription: string | null
@@ -143,6 +144,7 @@ export type Database = {
           patient_name: string
           prescription?: string | null
           prontuario_id: string
+          status?: string | null
           structured_data?: Json | null
           summary?: string | null
           transcription?: string | null
@@ -158,6 +160,7 @@ export type Database = {
           patient_name?: string
           prescription?: string | null
           prontuario_id?: string
+          status?: string | null
           structured_data?: Json | null
           summary?: string | null
           transcription?: string | null
