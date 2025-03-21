@@ -25,6 +25,9 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const maxRetryAttemptsRef = useRef<number>(3);
+  const retryCountRef = useRef<number>(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!isConnected) {
@@ -90,10 +93,14 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
           const inputData = e.inputBuffer.getChannelData(0);
           const encodedAudio = encodeAudioData(inputData);
           
-          wsRef.current.send(JSON.stringify({
-            type: 'input_audio_buffer.append',
-            audio: encodedAudio
-          }));
+          try {
+            wsRef.current.send(JSON.stringify({
+              type: 'input_audio_buffer.append',
+              audio: encodedAudio
+            }));
+          } catch (err) {
+            console.error('Error sending audio data:', err);
+          }
         }
       };
       
@@ -113,6 +120,25 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
     }
   }, [toast]);
 
+  const retryConnection = useCallback(() => {
+    if (retryCountRef.current < maxRetryAttemptsRef.current) {
+      retryCountRef.current += 1;
+      console.log(`Retrying connection (attempt ${retryCountRef.current} of ${maxRetryAttemptsRef.current})...`);
+      
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+      
+      retryTimeoutRef.current = setTimeout(() => {
+        connectWebSocket();
+      }, 2000); // Retry after 2 seconds
+    } else {
+      console.log('Max retry attempts reached, giving up...');
+      setError('Falha ao conectar ao serviço de transcrição após várias tentativas');
+      setIsConnecting(false);
+    }
+  }, []);
+
   const connectWebSocket = useCallback(async () => {
     if (isConnected || isConnecting) return;
     
@@ -120,9 +146,12 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       setIsConnecting(true);
       setError(null);
       
+      console.log('Requesting transcription token...');
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke(
         'realtime-transcription-token'
       );
+      
+      console.log('Token response:', tokenData, tokenError);
       
       if (tokenError || !tokenData?.client_secret?.value) {
         throw new Error(tokenError?.message || 'Failed to get authentication token');
@@ -135,10 +164,13 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         wsRef.current = null;
       }
       
+      console.log('Opening WebSocket connection...');
       wsRef.current = new WebSocket('wss://api.openai.com/v1/realtime?intent=transcription');
       
       wsRef.current.onopen = () => {
         console.log('WebSocket connection opened for transcription');
+        retryCountRef.current = 0; // Reset retry count on successful connection
+        
         if (!wsRef.current) return;
         
         wsRef.current.send(JSON.stringify({
@@ -218,13 +250,17 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         console.error('WebSocket error:', event);
         setError('Erro na conexão de transcrição');
         setIsConnected(false);
-        setIsConnecting(false);
+        retryConnection();
       };
       
-      wsRef.current.onclose = () => {
-        console.log('WebSocket connection closed');
+      wsRef.current.onclose = (event) => {
+        console.log('WebSocket connection closed', event);
         setIsConnected(false);
         setIsConnecting(false);
+        
+        if (isRecording && !event.wasClean) {
+          retryConnection();
+        }
       };
       
     } catch (error) {
@@ -237,10 +273,16 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       setError(error instanceof Error ? error.message : "Erro desconhecido");
       setIsConnected(false);
       setIsConnecting(false);
+      retryConnection();
     }
-  }, [isConnected, isConnecting, onTranscriptionUpdate, setupAudio, toast]);
+  }, [isConnected, isConnecting, onTranscriptionUpdate, setupAudio, toast, retryConnection, isRecording]);
 
   const disconnectWebSocket = useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;

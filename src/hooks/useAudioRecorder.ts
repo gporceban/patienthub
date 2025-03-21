@@ -45,7 +45,11 @@ export const useAudioRecorder = ({
 
   const cleanupResources = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (err) {
+        console.error("Error stopping mediaRecorder:", err);
+      }
     }
     
     if (intervalRef.current) {
@@ -208,23 +212,32 @@ export const useAudioRecorder = ({
   const stopRecording = () => {
     console.log("Stopping recording...");
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+      try {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+        
+        if (intervalRef.current) {
+          window.clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
 
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+        
+        toast({
+          title: "Gravação finalizada",
+          description: "Áudio capturado com sucesso."
+        });
+      } catch (error) {
+        console.error("Error stopping recording:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao finalizar gravação",
+          description: "Houve um problema ao finalizar a gravação. Tente novamente."
+        });
       }
-      
-      toast({
-        title: "Gravação finalizada",
-        description: "Áudio capturado com sucesso."
-      });
     } else {
       console.warn("Attempted to stop recording, but mediaRecorder is not active");
     }

@@ -15,13 +15,16 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Requesting transcription token from OpenAI");
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY is not set");
       throw new Error('OPENAI_API_KEY is not set');
     }
 
     // Request an ephemeral token from OpenAI for transcription
+    console.log("Sending request to OpenAI...");
     const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
       method: "POST",
       headers: {
@@ -30,6 +33,8 @@ serve(async (req) => {
       }
     });
 
+    console.log("OpenAI API response:", response.status);
+    
     if (!response.ok) {
       const errorData = await response.text();
       console.error("OpenAI API error:", errorData);
