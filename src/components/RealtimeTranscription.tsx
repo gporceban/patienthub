@@ -82,8 +82,8 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       sessionTokenRef.current = sessionData.client_secret.value;
       console.log("Received transcription session token, connecting WebSocket...");
       
-      // Iniciar WebSocket
-      const websocket = new WebSocket("wss://api.openai.com/v1/realtime");
+      // Iniciar WebSocket com o token na URL para autenticação
+      const websocket = new WebSocket(`wss://api.openai.com/v1/realtime`);
       websocketRef.current = websocket;
       
       websocket.onopen = async () => {
@@ -108,21 +108,20 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
             
             // Enviar configuração da sessão após autenticação bem-sucedida
             websocket.send(JSON.stringify({
-              type: "transcription_session.update",
-              input_audio_format: "pcm16",
-              input_audio_transcription: {
-                model: "gpt-4o-transcribe",
-                prompt: "Vocabulário médico, terminologia ortopédica",
-                language: "pt"
-              },
-              turn_detection: {
-                type: "server_vad",
-                threshold: 0.5,
-                prefix_padding_ms: 300,
-                silence_duration_ms: 1000,
-              },
-              input_audio_noise_reduction: {
-                type: "near_field"
+              type: "session.update",
+              session: {
+                input_audio_format: "pcm16",
+                input_audio_transcription: {
+                  model: "gpt-4o-transcribe",
+                  prompt: "Vocabulário médico, terminologia ortopédica",
+                  language: "pt"
+                },
+                turn_detection: {
+                  type: "server_vad",
+                  threshold: 0.5,
+                  prefix_padding_ms: 300,
+                  silence_duration_ms: 1000,
+                }
               }
             }));
             
@@ -151,6 +150,19 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
           else if (data.type === "error") {
             console.error("WebSocket error:", data);
             setError(`Erro na transcrição: ${data.message || "Erro desconhecido"}`);
+            
+            // Special handling for authentication errors - retry with proper URL
+            if (data.error?.message?.includes("authentication")) {
+              cleanupWebSocket();
+              
+              // Try to reconnect with the token directly in the URL
+              console.log("Retrying with token in URL...");
+              const authUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-transcribe&token=${sessionTokenRef.current}`;
+              const newWs = new WebSocket(authUrl);
+              websocketRef.current = newWs;
+              
+              setupWebSocketEvents(newWs);
+            }
           }
         } catch (e) {
           console.error("Error parsing WebSocket message:", e, event.data);
@@ -180,6 +192,57 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       // Increment connection attempts
       setConnectionAttempts(prev => prev + 1);
     }
+  };
+
+  // Separate function to set up WebSocket event handlers for reusability
+  const setupWebSocketEvents = (websocket: WebSocket) => {
+    websocket.onopen = () => {
+      console.log("WebSocket reconnection established with token in URL");
+      setupMicrophone();
+      setIsConnected(true);
+      setIsConnecting(false);
+      setError(null);
+      setConnectionAttempts(0);
+    };
+    
+    websocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("WebSocket message received:", data.type);
+        
+        if (data.type === "conversation.item.input_audio_transcription.delta") {
+          const newText = data.delta || "";
+          setRealtimeText((prev) => prev + newText);
+        } 
+        else if (data.type === "conversation.item.input_audio_transcription.completed") {
+          const completeText = data.transcript || "";
+          if (data.item_id !== lastTranscriptId) {
+            setLastTranscriptId(data.item_id);
+            setRealtimeText(completeText);
+          }
+        }
+        else if (data.type === "error") {
+          console.error("WebSocket error:", data);
+          setError(`Erro na transcrição: ${data.message || "Erro desconhecido"}`);
+        }
+      } catch (e) {
+        console.error("Error parsing WebSocket message:", e, event.data);
+      }
+    };
+    
+    websocket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      setError("Erro na conexão WebSocket. Tente novamente.");
+      setIsConnected(false);
+      setIsConnecting(false);
+      setConnectionAttempts(prev => prev + 1);
+    };
+    
+    websocket.onclose = (event) => {
+      console.log(`WebSocket connection closed: ${event.code} - ${event.reason}`);
+      setIsConnected(false);
+      setIsConnecting(false);
+    };
   };
 
   const setupMicrophone = async () => {
