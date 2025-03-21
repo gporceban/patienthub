@@ -4,9 +4,11 @@ project_id = "tokybrabdqqahhbxxpzj"
 
 [functions.realtime-transcription-token]
 verify_jwt = false
+allowed_http_methods = ["POST", "OPTIONS"]
 
 [functions.process-text]
 verify_jwt = false
 
 [functions.transcribe-audio]
 verify_jwt = false
+allowed_http_methods = ["POST", "OPTIONS"]

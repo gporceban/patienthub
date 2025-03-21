@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,9 +26,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const maxRetryAttemptsRef = useRef<number>(3);
+  const maxRetryAttemptsRef = useRef<number>(5);
   const retryCountRef = useRef<number>(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const backoffTimeRef = useRef<number>(1000); // Start with 1 second
 
   useEffect(() => {
     if (!isConnected) {
@@ -123,7 +125,11 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   const retryConnection = useCallback(() => {
     if (retryCountRef.current < maxRetryAttemptsRef.current) {
       retryCountRef.current += 1;
-      console.log(`Retrying connection (attempt ${retryCountRef.current} of ${maxRetryAttemptsRef.current})...`);
+      const backoffTime = backoffTimeRef.current * Math.pow(1.5, retryCountRef.current - 1);
+      const jitter = backoffTime * 0.1 * Math.random(); // Add 0-10% jitter
+      const retryTime = Math.min(10000, backoffTime + jitter); // Cap at 10 seconds
+      
+      console.log(`Retrying connection (attempt ${retryCountRef.current} of ${maxRetryAttemptsRef.current}) in ${Math.round(retryTime)}ms...`);
       
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
@@ -131,7 +137,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       
       retryTimeoutRef.current = setTimeout(() => {
         connectWebSocket();
-      }, 2000); // Retry after 2 seconds
+      }, retryTime);
     } else {
       console.log('Max retry attempts reached, giving up...');
       setError('Falha ao conectar ao serviço de transcrição após várias tentativas');
@@ -170,6 +176,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       wsRef.current.onopen = () => {
         console.log('WebSocket connection opened for transcription');
         retryCountRef.current = 0; // Reset retry count on successful connection
+        backoffTimeRef.current = 1000; // Reset backoff time
         
         if (!wsRef.current) return;
         
@@ -250,6 +257,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         console.error('WebSocket error:', event);
         setError('Erro na conexão de transcrição');
         setIsConnected(false);
+        setIsConnecting(false);
         retryConnection();
       };
       

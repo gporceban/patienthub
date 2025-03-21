@@ -4,13 +4,14 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-app-name",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
+    console.log("Handling OPTIONS request with CORS headers");
     return new Response(null, { headers: corsHeaders, status: 204 });
   }
 
@@ -33,7 +34,7 @@ serve(async (req) => {
       }
     });
 
-    console.log("OpenAI API response:", response.status);
+    console.log("OpenAI API response status:", response.status);
     
     if (!response.ok) {
       const errorData = await response.text();
@@ -42,7 +43,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("Transcription session created:", data);
+    console.log("Transcription session created successfully");
     
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
