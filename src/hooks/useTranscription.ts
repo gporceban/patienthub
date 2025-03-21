@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -32,6 +33,7 @@ export const useTranscription = ({
   const [processingComplete, setProcessingComplete] = useState(false);
   const [currentTranscription, setCurrentTranscription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isUsingRealtime, setIsUsingRealtime] = useState(false);
   
   const { toast } = useToast();
   
@@ -91,7 +93,7 @@ export const useTranscription = ({
   };
 
   const transcribeAudio = async (audioBlob: Blob | null, existingTranscription: string = '') => {
-    if (!audioBlob) {
+    if (!audioBlob && !existingTranscription) {
       toast({
         variant: "destructive",
         title: "Sem áudio",
@@ -101,18 +103,22 @@ export const useTranscription = ({
     }
 
     try {
-      console.log("Starting transcription of recorded audio, blob size:", audioBlob.size);
+      if (audioBlob) {
+        console.log("Starting transcription of recorded audio, blob size:", audioBlob.size);
+      }
       setIsTranscribing(true);
       setHasError(false);
       setErrorMessage('');
       
       if (existingTranscription) {
+        setIsUsingRealtime(true);
         setTranscriptionComplete(true);
         if (onTranscriptionComplete) {
           onTranscriptionComplete(existingTranscription);
         }
         processTranscription(existingTranscription);
-      } else {
+      } else if (audioBlob) {
+        setIsUsingRealtime(false);
         await transcribeAudioChunk(audioBlob, true);
       }
     } catch (error) {
@@ -280,6 +286,7 @@ export const useTranscription = ({
     isTranscribing,
     isProcessing,
     isUploading,
+    isUsingRealtime,
     hasError,
     errorMessage,
     transcriptionComplete,

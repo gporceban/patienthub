@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Requesting transcription token from OpenAI");
+    console.log("Requesting transcription session token from OpenAI");
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
@@ -24,21 +24,32 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not set');
     }
 
-    // Request an ephemeral token from OpenAI for transcription
-    // Updating to use the current API endpoint for whisper
-    console.log("Sending request to OpenAI...");
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    // Request an ephemeral session token from OpenAI for realtime transcription
+    console.log("Sending request to OpenAI Realtime API...");
+    const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "whisper-1",
-        language: "pt",
-        response_format: "json",
-        temperature: 0.2,
-        prompt: "Vocabulário médico, terminologia ortopédica"
+        // Create a transcription-only session
+        session_type: "transcription",
+        input_audio_format: "pcm16",
+        input_audio_transcription: {
+          model: "gpt-4o-transcribe",
+          prompt: "Vocabulário médico, terminologia ortopédica",
+          language: "pt"
+        },
+        turn_detection: {
+          type: "server_vad",
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 1000,
+        },
+        input_audio_noise_reduction: {
+          type: "near_field"
+        }
       })
     });
 
@@ -51,7 +62,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("Transcription token request successful");
+    console.log("Transcription session created successfully");
     
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
