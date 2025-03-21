@@ -24,7 +24,7 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not set');
     }
 
-    // Request an ephemeral session token from OpenAI for realtime transcription
+    // Request an ephemeral session token from OpenAI for transcription only
     console.log("Sending request to OpenAI Realtime API...");
     const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
@@ -33,7 +33,6 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        // Create a transcription-only session
         session_type: "transcription",
         input_audio_format: "pcm16",
         input_audio_transcription: {

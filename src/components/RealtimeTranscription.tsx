@@ -63,12 +63,15 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   const setupRealtimeTranscription = async () => {
     try {
       // Obter token de sessão da função Edge
+      console.log("Requesting transcription token...");
       const { data: sessionData, error: tokenError } = await supabase.functions.invoke("realtime-transcription-token");
       
       if (tokenError) {
         console.error("Error getting transcription token:", tokenError);
         throw new Error(`Erro ao obter token de transcrição: ${tokenError.message}`);
       }
+      
+      console.log("Session data received:", sessionData);
       
       if (!sessionData || !sessionData.client_secret?.value) {
         throw new Error("Token de transcrição inválido ou ausente");
@@ -82,11 +85,15 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       websocketRef.current = websocket;
       
       websocket.onopen = async () => {
-        console.log("WebSocket connection established, starting audio capture...");
-        await setupMicrophone();
-        setIsConnected(true);
-        setIsConnecting(false);
-        setError(null);
+        console.log("WebSocket connection established, authenticating...");
+        
+        // Enviar token de autenticação
+        websocket.send(JSON.stringify({ 
+          type: "session.authenticate",
+          client_secret: sessionTokenRef.current
+        }));
+        
+        console.log("Authentication sent, waiting for confirmation...");
       };
       
       websocket.onmessage = (event) => {
@@ -94,21 +101,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
           const data = JSON.parse(event.data);
           console.log("WebSocket message received:", data.type);
           
-          if (data.type === "conversation.item.input_audio_transcription.delta") {
-            const newText = data.delta || "";
-            setRealtimeText((prev) => prev + newText);
-          } 
-          else if (data.type === "conversation.item.input_audio_transcription.completed") {
-            const completeText = data.transcript || "";
-            if (data.item_id !== lastTranscriptId) {
-              setLastTranscriptId(data.item_id);
-              setRealtimeText(completeText);
-            }
-          }
-          else if (data.type === "session.created") {
+          if (data.type === "session.created") {
             console.log("Transcription session created successfully");
             
-            // Enviar configuração da sessão
+            // Enviar configuração da sessão após autenticação bem-sucedida
             websocket.send(JSON.stringify({
               type: "transcription_session.update",
               input_audio_format: "pcm16",
@@ -127,6 +123,26 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
                 type: "near_field"
               }
             }));
+            
+            // Iniciar captura de áudio após configuração da sessão
+            setupMicrophone();
+            setIsConnected(true);
+            setIsConnecting(false);
+            setError(null);
+          }
+          else if (data.type === "session.updated") {
+            console.log("Session settings updated successfully");
+          }
+          else if (data.type === "conversation.item.input_audio_transcription.delta") {
+            const newText = data.delta || "";
+            setRealtimeText((prev) => prev + newText);
+          } 
+          else if (data.type === "conversation.item.input_audio_transcription.completed") {
+            const completeText = data.transcript || "";
+            if (data.item_id !== lastTranscriptId) {
+              setLastTranscriptId(data.item_id);
+              setRealtimeText(completeText);
+            }
           }
           else if (data.type === "error") {
             console.error("WebSocket error:", data);
