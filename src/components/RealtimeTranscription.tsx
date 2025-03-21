@@ -34,6 +34,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   // Cleanup WebSocket connection
   const cleanupWebSocket = () => {
     if (websocketRef.current) {
+      console.log("Closing WebSocket connection");
       websocketRef.current.close();
       websocketRef.current = null;
     }
@@ -80,10 +81,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       }
       
       sessionTokenRef.current = sessionData.client_secret.value;
-      console.log("Received transcription session token, connecting WebSocket...");
+      console.log("Received transcription session token");
       
-      // Connect directly with token in the URL - this is the recommended way to authenticate
-      const websocketUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-transcribe&token=${sessionTokenRef.current}`;
+      // Connect using the WebSocket API with the token
+      const websocketUrl = `wss://api.openai.com/v1/realtime/transcribe?token=${sessionTokenRef.current}`;
       console.log("Connecting to WebSocket with URL:", websocketUrl);
       
       const websocket = new WebSocket(websocketUrl);
@@ -92,31 +93,14 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       websocket.onopen = async () => {
         console.log("WebSocket connection established successfully");
         
-        // Send session configuration
-        websocket.send(JSON.stringify({
-          type: "session.update",
-          session: {
-            input_audio_format: "pcm16",
-            input_audio_transcription: {
-              model: "gpt-4o-transcribe",
-              prompt: "Vocabulário médico, terminologia ortopédica",
-              language: "pt"
-            },
-            turn_detection: {
-              type: "server_vad",
-              threshold: 0.5,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 1000,
-            }
-          }
-        }));
-        
-        // Start audio capture after successful connection
-        setupMicrophone();
+        // Successfully connected
         setIsConnected(true);
         setIsConnecting(false);
         setError(null);
         setConnectionAttempts(0);
+        
+        // Setup microphone capture
+        setupMicrophone();
       };
       
       websocket.onmessage = (event) => {
@@ -124,14 +108,11 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
           const data = JSON.parse(event.data);
           console.log("WebSocket message received:", data.type);
           
-          if (data.type === "session.updated") {
-            console.log("Session settings updated successfully");
-          }
-          else if (data.type === "conversation.item.input_audio_transcription.delta") {
+          if (data.type === "transcription.delta") {
             const newText = data.delta || "";
             setRealtimeText((prev) => prev + newText);
           } 
-          else if (data.type === "conversation.item.input_audio_transcription.completed") {
+          else if (data.type === "transcription.completed") {
             const completeText = data.transcript || "";
             if (data.item_id !== lastTranscriptId) {
               setLastTranscriptId(data.item_id);

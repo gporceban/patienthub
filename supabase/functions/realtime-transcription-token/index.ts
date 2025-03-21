@@ -24,22 +24,21 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not set');
     }
 
-    // Request an ephemeral session token from OpenAI based on the latest API format
-    console.log("Sending request to OpenAI Realtime API...");
-    const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
+    // Request a transcription session token from OpenAI
+    // The endpoint is specifically for transcription sessions
+    console.log("Sending request to OpenAI Realtime Transcription API...");
+    const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-transcribe", // Required model parameter
-        modalities: ["text"], // Audio disabled, text only for transcription
         input_audio_format: "pcm16",
         input_audio_transcription: {
           model: "gpt-4o-transcribe",
-          prompt: "Vocabulário médico, terminologia ortopédica",
-          language: "pt"
+          language: "pt",
+          prompt: "Vocabulário médico, terminologia ortopédica"
         },
         turn_detection: {
           type: "server_vad",
@@ -72,7 +71,7 @@ serve(async (req) => {
 
     const data = await response.json();
     console.log("Transcription session created successfully");
-    console.log("Session data structure:", Object.keys(data));
+    console.log("Session data received:", data);
     
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
