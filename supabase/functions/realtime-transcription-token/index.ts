@@ -25,7 +25,6 @@ serve(async (req) => {
     }
 
     // Request an ephemeral session token from OpenAI for transcription only
-    // Make sure to follow the latest API format from the documentation
     console.log("Sending request to OpenAI Realtime API...");
     const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
@@ -35,9 +34,10 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         session_type: "transcription", // Explicitly set to transcription-only mode
+        model: "gpt-4o-transcribe", // This was missing! Adding the required model parameter
         input_audio_format: "pcm16",
         input_audio_transcription: {
-          model: "gpt-4o-transcribe", // Using the latest transcription model
+          model: "gpt-4o-transcribe", // Same model for transcription
           prompt: "Vocabulário médico, terminologia ortopédica",
           language: "pt"
         },
