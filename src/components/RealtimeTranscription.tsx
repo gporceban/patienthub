@@ -313,7 +313,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
             return;
           }
           
-          // Handle different message types from the new API
+          // Handle different message types from the OpenAI API
           if (data.type === "auth_success") {
             console.log('Authentication successful');
             setIsConnected(true);

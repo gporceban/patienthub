@@ -49,21 +49,61 @@ serve(async (req) => {
       );
     }
 
-    // Here we'd normally send the audio to a speech-to-text API
-    // For now we're just returning a mock response
-
-    // In a production environment, you would use OpenAI's Whisper API or similar
-    // const whisperResponse = await callWhisperAPI(audio);
-    // const text = whisperResponse.text;
+    // Get OpenAI API Key
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
-    // Mock response for development
-    const text = "Esta é uma transcrição simulada do arquivo de áudio enviado. Em um ambiente de produção, usaríamos uma API real de transcrição de fala para texto.";
+    if (!OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY is not set");
+      throw new Error('OPENAI_API_KEY is not set');
+    }
 
-    console.log("Returning transcription text of length:", text.length);
+    console.log("Sending audio to OpenAI's Whisper API...");
+    
+    // Create a buffer from the base64 string
+    const binaryData = atob(audio);
+    const bytes = new Uint8Array(binaryData.length);
+    for (let i = 0; i < binaryData.length; i++) {
+      bytes[i] = binaryData.charCodeAt(i);
+    }
+
+    // Create a Blob from the Uint8Array
+    const blob = new Blob([bytes], { type: 'audio/webm' });
+
+    // Create FormData to send to OpenAI
+    const formData = new FormData();
+    formData.append("file", blob, "audio.webm");
+    formData.append("model", "whisper-1");
+    formData.append("language", "pt");
+    formData.append("prompt", "Vocabulário médico, terminologia ortopédica");
+    
+    // Call OpenAI's Whisper API
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`
+        // No Content-Type header as FormData sets it automatically with the boundary
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log("OpenAI API response:", result);
+    
+    if (!result.text) {
+      throw new Error("No transcription returned from OpenAI");
+    }
+
+    console.log("Transcription result:", result.text.substring(0, 100) + "...");
     
     // Return the transcription
     return new Response(
-      JSON.stringify({ text }),
+      JSON.stringify({ text: result.text }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
