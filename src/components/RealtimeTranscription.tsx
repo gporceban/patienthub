@@ -275,7 +275,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         }
       }
       
-      wsRef.current = new WebSocket('wss://api.openai.com/v1/realtime/transcription');
+      wsRef.current = new WebSocket('wss://api.openai.com/v1/audio/realtime/transcription');
       
       wsRef.current.onopen = () => {
         console.log('WebSocket connection opened for transcription');

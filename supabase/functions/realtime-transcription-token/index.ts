@@ -26,7 +26,7 @@ serve(async (req) => {
 
     // Request an ephemeral token from OpenAI for transcription
     console.log("Sending request to OpenAI...");
-    const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
+    const response = await fetch("https://api.openai.com/v1/audio/realtime/transcription_sessions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
