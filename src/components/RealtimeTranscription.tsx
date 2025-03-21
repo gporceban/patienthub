@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +7,14 @@ interface RealtimeTranscriptionProps {
   transcription: string;
   isTranscribing: boolean;
   onTranscriptionUpdate?: (text: string) => void;
+}
+
+interface LegacyAudioContext extends AudioContext {
+  createScriptProcessor?: (
+    bufferSize: number,
+    numberOfInputChannels: number,
+    numberOfOutputChannels: number
+  ) => ScriptProcessorNode;
 }
 
 const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
@@ -24,7 +31,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   const wsRef = useRef<WebSocket | null>(null);
   const audioData = useRef<Float32Array | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioContextRef = useRef<LegacyAudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | AudioWorkletNode | null>(null);
   const maxRetryAttemptsRef = useRef<number>(3); // Reduced retries for faster feedback
   const retryCountRef = useRef<number>(0);
@@ -84,11 +91,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
         sampleRate: 16000
-      });
+      }) as LegacyAudioContext;
       
       const source = audioContextRef.current.createMediaStreamSource(stream);
       
-      // Try to use AudioWorkletNode if supported
       if ('audioWorklet' in audioContextRef.current) {
         try {
           await audioContextRef.current.audioWorklet.addModule('https://cdn.jsdelivr.net/npm/audio-worklet-polyfill@1.0.1/dist/worklet-processor.min.js');
@@ -102,7 +108,26 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
           };
         } catch (workletError) {
           console.warn('AudioWorklet not supported or failed to load, falling back to ScriptProcessor:', workletError);
-          // Fall back to ScriptProcessor
+          if (audioContextRef.current?.createScriptProcessor) {
+            processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+            (processorRef.current as ScriptProcessorNode).onaudioprocess = (e) => {
+              if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+              
+              const inputData = e.inputBuffer.getChannelData(0);
+              audioData.current = new Float32Array(inputData.length);
+              audioData.current.set(inputData);
+              
+              const pcmData = convertToInt16(audioData.current);
+              wsRef.current.send(pcmData.buffer);
+            };
+          } else {
+            console.error('Neither AudioWorklet nor ScriptProcessor is supported in this browser');
+            throw new Error('Audio processing is not supported in this browser');
+          }
+        }
+      } else {
+        console.warn('AudioWorklet not supported, using deprecated ScriptProcessor');
+        if (audioContextRef.current?.createScriptProcessor) {
           processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
           (processorRef.current as ScriptProcessorNode).onaudioprocess = (e) => {
             if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -114,26 +139,14 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
             const pcmData = convertToInt16(audioData.current);
             wsRef.current.send(pcmData.buffer);
           };
+        } else {
+          console.error('ScriptProcessor is not supported in this browser');
+          throw new Error('Audio processing is not supported in this browser');
         }
-      } else {
-        // Fall back to ScriptProcessor for older browsers
-        console.warn('AudioWorklet not supported, using deprecated ScriptProcessor');
-        processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
-        (processorRef.current as ScriptProcessorNode).onaudioprocess = (e) => {
-          if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-          
-          const inputData = e.inputBuffer.getChannelData(0);
-          audioData.current = new Float32Array(inputData.length);
-          audioData.current.set(inputData);
-          
-          const pcmData = convertToInt16(audioData.current);
-          wsRef.current.send(pcmData.buffer);
-        };
       }
       
       source.connect(processorRef.current);
       
-      // If using ScriptProcessor, we need to connect to destination
       if ('onaudioprocess' in processorRef.current) {
         processorRef.current.connect(audioContextRef.current.destination);
       }
@@ -254,7 +267,6 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         }
       }
       
-      // Create a new WebSocket connection
       wsRef.current = new WebSocket('wss://api.openai.com/v1/realtime/transcription');
       
       wsRef.current.onopen = () => {
@@ -308,7 +320,6 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         console.log(`WebSocket closed with code ${event.code}: ${event.reason}`);
         setIsConnected(false);
         
-        // Don't retry if it was a normal closure or if we're not recording anymore
         if (event.code !== 1000 && isRecording) {
           console.log('Abnormal WebSocket closure, attempting to reconnect...');
           retryConnection();
@@ -320,7 +331,6 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       wsRef.current.onerror = (event) => {
         console.error('WebSocket error:', event);
         setError('Erro na conexão de transcrição. Tentando reconectar...');
-        // Don't set isConnecting to false here, let the onclose handler deal with it
       };
     } catch (error) {
       console.error('Error connecting to WebSocket:', error);
