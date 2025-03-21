@@ -2,241 +2,235 @@ import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { useContext } from 'react';
-import { AuthContext } from '@/contexts/AuthContext';
+import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { v4 as uuidv4 } from 'uuid';
 import AudioRecorder from '@/components/AudioRecording/AudioRecorder';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, PencilLine, Check, RotateCcw, History } from 'lucide-react';
-import PatientInfoForm, { PatientInfo } from '@/components/PatientInfoForm';
-import { PatientAssessment, fromPatientAssessments, AssessmentStatus } from '@/types/patientAssessments';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { ChevronsRight, Plus, UserRound, FileText, Copy, Check } from 'lucide-react';
+
+type AssessmentType = {
+  id: string;
+  created_at: string;
+  patient_id: string;
+  doctor_id: string;
+  summary: string | null;
+  clinical_note: string | null;
+  prescription: string | null;
+  status: string;
+};
+
+type PatientType = {
+  id: string;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  date_of_birth: string | null;
+  sex: string | null;
+  prontuario_id: string | null;
+};
+
+type Step = 'patient-selection' | 'recording' | 'editing' | 'completed';
 
 const DoctorAssessment = () => {
-  const { user } = useContext(AuthContext);
-  const { toast } = useToast();
-  
-  const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
-  const [assessmentId, setAssessmentId] = useState<string | null>(null);
-  const [creatingAssessment, setCreatingAssessment] = useState(false);
-  
-  const [summary, setSummary] = useState('');
+  const [currentStep, setCurrentStep] = useState<Step>('patient-selection');
+  const [patients, setPatients] = useState<PatientType[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<PatientType | null>(null);
+  const [isNewPatientDialogOpen, setIsNewPatientDialogOpen] = useState(false);
+  const [newPatient, setNewPatient] = useState({ 
+    full_name: '', 
+    email: '', 
+    phone: '', 
+    date_of_birth: '', 
+    sex: '',
+    prontuario_id: ''
+  });
+  const [transcription, setTranscription] = useState('');
   const [clinicalNote, setClinicalNote] = useState('');
   const [prescription, setPrescription] = useState('');
-  const [transcription, setTranscription] = useState('');
-  const [patientFriendlySummary, setPatientFriendlySummary] = useState('');
+  const [summary, setSummary] = useState('');
   const [structuredData, setStructuredData] = useState<any>(null);
-  
-  const [previousAssessments, setPreviousAssessments] = useState<PatientAssessment[]>([]);
-  const [hasPreviousAssessments, setHasPreviousAssessments] = useState(false);
-  
-  const [isEditingSummary, setIsEditingSummary] = useState(false);
-  const [isEditingClinicalNote, setIsEditingClinicalNote] = useState(false);
-  const [isEditingPrescription, setIsEditingPrescription] = useState(false);
-  const [isEditingPatientSummary, setIsEditingPatientSummary] = useState(false);
-  
-  const [aiInstruction, setAiInstruction] = useState('');
-  const [isSubmittingInstruction, setIsSubmittingInstruction] = useState(false);
-  
-  const [currentStep, setCurrentStep] = useState<'info' | 'recording' | 'review'>('info');
-  const [isSaving, setIsSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [docsGenerated, setDocsGenerated] = useState(false);
-  const [isGeneratingPatientSummary, setIsGeneratingPatientSummary] = useState(false);
+  const [assessmentId, setAssessmentId] = useState<string | null>(null);
+  const [copiedFields, setCopiedFields] = useState<{[key: string]: boolean}>({});
+  
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { id } = useParams();
   
   useEffect(() => {
-    const fetchPreviousAssessments = async () => {
-      if (patientInfo && patientInfo.prontuarioId) {
-        try {
-          const { data, error } = await supabase
-            .from('patient_assessments')
-            .select('*')
-            .eq('prontuario_id', patientInfo.prontuarioId)
-            .order('created_at', { ascending: false })
-            .limit(5);
+    if (id) {
+      loadAssessment(id);
+      setAssessmentId(id);
+      setCurrentStep('editing');
+    } else {
+      fetchPatients();
+    }
+  }, [id]);
+  
+  const loadAssessment = async (assessmentId: string) => {
+    try {
+      const { data: assessment, error } = await supabase
+        .from('assessments')
+        .select('*')
+        .eq('id', assessmentId)
+        .single();
+        
+      if (error) throw error;
+      
+      if (assessment) {
+        const { data: patient, error: patientError } = await supabase
+          .from('patients')
+          .select('*')
+          .eq('id', assessment.patient_id)
+          .single();
           
-          if (error) throw error;
-          
-          if (data && data.length > 0) {
-            setPreviousAssessments(data);
-            setHasPreviousAssessments(true);
-            
-            toast({
-              title: `${data.length} avaliações anteriores encontradas`,
-              description: "Histórico do paciente será utilizado para gerar uma avaliação mais completa."
-            });
-          } else {
-            setPreviousAssessments([]);
-            setHasPreviousAssessments(false);
+        if (patientError) throw patientError;
+        
+        setSelectedPatient(patient);
+        setClinicalNote(assessment.clinical_note || '');
+        setPrescription(assessment.prescription || '');
+        setSummary(assessment.summary || '');
+        
+        if (assessment.structured_data) {
+          try {
+            setStructuredData(typeof assessment.structured_data === 'string' 
+              ? JSON.parse(assessment.structured_data) 
+              : assessment.structured_data);
+          } catch (e) {
+            console.error('Error parsing structured data:', e);
           }
-        } catch (error) {
-          console.error('Error fetching previous assessments:', error);
-          toast({
-            variant: "destructive",
-            title: "Erro ao buscar histórico",
-            description: "Não foi possível recuperar avaliações anteriores do paciente."
-          });
         }
       }
-    };
-    
-    fetchPreviousAssessments();
-  }, [patientInfo, toast]);
-  
-  const createInitialAssessment = async (patientData: PatientInfo) => {
-    if (!user) {
-      toast({
-        variant: "destructive",
-        title: "Não autenticado",
-        description: "Você precisa estar logado para criar uma avaliação."
-      });
-      return null;
-    }
-    
-    setCreatingAssessment(true);
-    
-    try {
-      const newId = uuidv4();
-      console.log("Creating initial assessment with ID:", newId);
-      
-      const assessmentData = {
-        id: newId,
-        doctor_id: user.id,
-        patient_name: patientData.name,
-        patient_email: patientData.email,
-        prontuario_id: patientData.prontuarioId,
-        status: 'in_progress' as AssessmentStatus
-      };
-      
-      const patientAssessments = fromPatientAssessments(supabase);
-      const { data, error } = await patientAssessments.insert(assessmentData);
-      
-      if (error) {
-        console.error("Error creating initial assessment:", error);
-        throw error;
-      }
-      
-      console.log("Initial assessment created:", data);
-      toast({
-        title: "Avaliação iniciada",
-        description: "Prossiga com a gravação da consulta."
-      });
-      
-      return newId;
     } catch (error) {
-      console.error('Error creating initial assessment:', error);
+      console.error('Error loading assessment:', error);
       toast({
         variant: "destructive",
-        title: "Erro ao iniciar avaliação",
-        description: "Não foi possível criar o registro inicial. Tente novamente."
+        title: "Erro",
+        description: "Não foi possível carregar a avaliação",
       });
-      return null;
-    } finally {
-      setCreatingAssessment(false);
     }
   };
   
-  const updateAssessment = async () => {
-    if (!assessmentId) {
-      console.error("No assessment ID to update");
-      return false;
-    }
-    
+  const fetchPatients = async () => {
     try {
-      setIsSaving(true);
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .order('full_name');
+        
+      if (error) throw error;
       
-      const patientAssessments = fromPatientAssessments(supabase);
-      const { error } = await patientAssessments.update({
-        summary,
-        clinical_note: clinicalNote,
-        prescription,
-        patient_friendly_summary: patientFriendlySummary,
-        transcription,
-        structured_data: structuredData,
-        status: 'completed' as AssessmentStatus
-      }, assessmentId);
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Avaliação salva com sucesso",
-        description: "A avaliação do paciente foi atualizada e finalizada."
-      });
-      
-      return true;
+      setPatients(data || []);
     } catch (error) {
-      console.error('Error updating assessment:', error);
+      console.error('Error fetching patients:', error);
       toast({
         variant: "destructive",
-        title: "Erro ao salvar avaliação",
-        description: "Não foi possível atualizar a avaliação do paciente."
+        title: "Erro",
+        description: "Erro ao buscar lista de pacientes",
       });
-      
-      return false;
-    } finally {
-      setIsSaving(false);
     }
   };
   
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!user || !patientInfo) {
+  const handleCreatePatient = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('patients')
+        .insert([{
+          full_name: newPatient.full_name,
+          email: newPatient.email,
+          phone: newPatient.phone || null,
+          date_of_birth: newPatient.date_of_birth || null,
+          sex: newPatient.sex || null,
+          prontuario_id: newPatient.prontuario_id || null
+        }])
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      setPatients([...patients, data]);
+      setSelectedPatient(data);
+      setIsNewPatientDialogOpen(false);
+      
+      toast({
+        title: "Sucesso",
+        description: "Paciente cadastrado com sucesso",
+      });
+    } catch (error) {
+      console.error('Error creating patient:', error);
       toast({
         variant: "destructive",
-        title: "Informações incompletas",
-        description: "Preencha as informações do paciente antes de salvar."
+        title: "Erro",
+        description: "Erro ao cadastrar paciente",
+      });
+    }
+  };
+  
+  const handleSelectPatient = async () => {
+    if (!selectedPatient) {
+      toast({
+        variant: "destructive",
+        title: "Atenção",
+        description: "Selecione um paciente para continuar",
       });
       return;
     }
     
-    const success = await updateAssessment();
-    
-    if (success) {
-      resetForm();
-    }
-  };
-  
-  const resetForm = () => {
-    setPatientInfo(null);
-    setAssessmentId(null);
-    setSummary('');
-    setClinicalNote('');
-    setPrescription('');
-    setTranscription('');
-    setPatientFriendlySummary('');
-    setStructuredData(null);
-    setDocsGenerated(false);
-    setCurrentStep('info');
-    setAiInstruction('');
-    setPreviousAssessments([]);
-    setHasPreviousAssessments(false);
-  };
-  
-  const handleTranscriptionComplete = (text: string) => {
-    setTranscription(text);
-    
-    if (assessmentId) {
-      const patientAssessments = fromPatientAssessments(supabase);
-      patientAssessments.update({
-        transcription: text
-      }, assessmentId).then(({ error }) => {
-        if (error) {
-          console.error("Error updating transcription:", error);
-        } else {
-          console.log("Transcription updated in assessment record");
-        }
+    try {
+      const { data, error } = await supabase
+        .from('assessments')
+        .insert([{
+          patient_id: selectedPatient.id,
+          doctor_id: (await supabase.auth.getUser()).data.user?.id,
+          status: 'in_progress'
+        }])
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      setAssessmentId(data.id);
+      setCurrentStep('recording');
+      console.log("Assessment created, moving to recording step");
+    } catch (error) {
+      console.error('Error creating assessment:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao criar avaliação",
       });
     }
   };
   
+  const handlePatientChange = (patientId: string) => {
+    const patient = patients.find(p => p.id === patientId);
+    setSelectedPatient(patient || null);
+  };
+  
+  const handleTranscriptionComplete = (text: string) => {
+    setTranscription(text);
+  };
+  
   const handleProcessingStart = () => {
     setIsProcessing(true);
-    setDocsGenerated(false);
   };
   
   const handleProcessingComplete = (data: {
@@ -245,444 +239,462 @@ const DoctorAssessment = () => {
     summary?: string;
     structured_data?: any;
   }) => {
-    if (data.clinical_note) setClinicalNote(data.clinical_note);
-    if (data.prescription) setPrescription(data.prescription);
-    if (data.summary) setSummary(data.summary);
-    if (data.structured_data) setStructuredData(data.structured_data);
-    
+    setClinicalNote(data.clinical_note || '');
+    setPrescription(data.prescription || '');
+    setSummary(data.summary || '');
+    setStructuredData(data.structured_data || null);
     setIsProcessing(false);
-    setDocsGenerated(true);
+    setCurrentStep('editing');
+  };
+  
+  const handleSaveAssessment = async () => {
+    if (!assessmentId) return;
     
-    setCurrentStep('review');
-    
-    if (assessmentId) {
-      const patientAssessments = fromPatientAssessments(supabase);
-      patientAssessments.update({
-        clinical_note: data.clinical_note,
-        prescription: data.prescription,
-        summary: data.summary,
-        structured_data: data.structured_data
-      }, assessmentId).then(({ error }) => {
-        if (error) {
-          console.error("Error updating processed data:", error);
-        } else {
-          console.log("Processed data updated in assessment record");
-        }
+    try {
+      const { error } = await supabase
+        .from('assessments')
+        .update({
+          clinical_note: clinicalNote,
+          prescription: prescription,
+          summary: summary,
+          structured_data: structuredData,
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', assessmentId);
+        
+      if (error) throw error;
+      
+      setCurrentStep('completed');
+      toast({
+        title: "Sucesso",
+        description: "Avaliação salva com sucesso",
+      });
+    } catch (error) {
+      console.error('Error saving assessment:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao salvar avaliação",
       });
     }
+  };
+  
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedFields({...copiedFields, [field]: true});
+    
+    setTimeout(() => {
+      setCopiedFields({...copiedFields, [field]: false});
+    }, 2000);
     
     toast({
-      title: "Documentos gerados com sucesso",
-      description: "Os documentos clínicos foram gerados e estão prontos para revisão."
+      title: "Copiado",
+      description: "Texto copiado para a área de transferência"
     });
   };
   
-  const handlePatientInfoSubmit = async (data: PatientInfo) => {
-    setPatientInfo(data);
-    
-    const newId = await createInitialAssessment(data);
-    
-    if (newId) {
-      setAssessmentId(newId);
-      setCurrentStep('recording');
-      console.log("Assessment created, moving to recording step");
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Erro ao iniciar avaliação",
-        description: "Não foi possível passar para a próxima etapa. Tente novamente."
-      });
-    }
-  };
-  
-  const generatePatientFriendlySummary = async () => {
-    if (!clinicalNote || !summary) {
-      toast({
-        variant: "destructive",
-        title: "Conteúdo insuficiente",
-        description: "A nota clínica e o resumo são necessários para gerar o sumário para o paciente."
-      });
-      return;
-    }
-    
-    try {
-      setIsGeneratingPatientSummary(true);
-      
-      const { data, error } = await supabase.functions.invoke('process-text', {
-        body: { 
-          text: `Nota Clínica: ${clinicalNote}\n\nResumo: ${summary}`,
-          mode: 'patient_friendly',
-          reviewRequired: true
-        }
-      });
-      
-      if (error) throw error;
-      
-      if (data?.text) {
-        setPatientFriendlySummary(data.text);
+  const renderPatientSelectionStep = () => {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <h3 className="text-lg font-medium">Selecionar Paciente</h3>
+          <p className="text-sm text-gray-400">Selecione um paciente existente ou cadastre um novo.</p>
+        </div>
         
-        if (assessmentId) {
-          const patientAssessments = fromPatientAssessments(supabase);
-          patientAssessments.update({
-            patient_friendly_summary: data.text
-          }, assessmentId).then(({ error }) => {
-            if (error) {
-              console.error("Error updating patient friendly summary:", error);
-            }
-          });
-        }
+        <div className="space-y-4">
+          <Select onValueChange={handlePatientChange}>
+            <SelectTrigger className="bg-darkblue-700 border-darkblue-600 w-full">
+              <SelectValue placeholder="Selecione um paciente" />
+            </SelectTrigger>
+            <SelectContent className="bg-darkblue-700 border-darkblue-600">
+              {patients.map(patient => (
+                <SelectItem key={patient.id} value={patient.id}>
+                  {patient.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Button 
+            variant="outline" 
+            className="w-full justify-start"
+            onClick={() => setIsNewPatientDialogOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Cadastrar Novo Paciente
+          </Button>
+        </div>
         
-        toast({
-          title: "Sumário para paciente gerado",
-          description: "Um sumário em linguagem acessível foi criado para o paciente."
-        });
-      }
-    } catch (error) {
-      console.error('Error generating patient summary:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao gerar sumário",
-        description: "Não foi possível criar o sumário para o paciente."
-      });
-    } finally {
-      setIsGeneratingPatientSummary(false);
-    }
-  };
-  
-  const submitAiInstruction = async () => {
-    if (!transcription || !aiInstruction) {
-      toast({
-        variant: "destructive",
-        title: "Instrução incompleta",
-        description: "A transcrição e a instrução para a IA são necessárias."
-      });
-      return;
-    }
-    
-    try {
-      setIsSubmittingInstruction(true);
-      
-      const { data, error } = await supabase.functions.invoke('process-text', {
-        body: { 
-          text: transcription,
-          mode: 'clinical_note',
-          reviewRequired: true,
-          additionalInstructions: aiInstruction,
-          patientInfo: patientInfo && hasPreviousAssessments ? {
-            prontuarioId: patientInfo.prontuarioId
-          } : null
-        }
-      });
-      
-      if (error) throw error;
-      
-      if (data?.text) {
-        setClinicalNote(data.text);
-        
-        if (assessmentId) {
-          const patientAssessments = fromPatientAssessments(supabase);
-          patientAssessments.update({
-            clinical_note: data.text
-          }, assessmentId).then(({ error }) => {
-            if (error) {
-              console.error("Error updating clinical note with AI instruction:", error);
-            }
-          });
-        }
-        
-        setAiInstruction('');
-        
-        toast({
-          title: "Documento refinado com sucesso",
-          description: "A nota clínica foi atualizada com suas instruções."
-        });
-      }
-    } catch (error) {
-      console.error('Error processing instruction:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao processar instrução",
-        description: "Não foi possível atualizar o documento com suas instruções."
-      });
-    } finally {
-      setIsSubmittingInstruction(false);
-    }
-  };
-  
-  return (
-    <Layout userType="medico">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Nova Avaliação</h1>
-        <p className="text-gray-400">
-          {currentStep === 'info' && "Preencha os dados do paciente para continuar"}
-          {currentStep === 'recording' && "Grave a consulta do paciente para gerar a documentação automaticamente"}
-          {currentStep === 'review' && "Revise e edite a documentação gerada pela IA antes de salvar"}
-        </p>
+        <Button 
+          className="bg-gold-500 hover:bg-gold-600 text-black w-full"
+          onClick={handleSelectPatient}
+          disabled={!selectedPatient}
+        >
+          Avançar
+          <ChevronsRight className="ml-2 h-4 w-4" />
+        </Button>
       </div>
-      
-      {currentStep === 'info' && (
-        <Card className="card-gradient p-6 max-w-2xl mb-6">
-          <h2 className="text-lg font-semibold mb-4">Informações do Paciente</h2>
-          <PatientInfoForm 
-            onSubmit={handlePatientInfoSubmit}
-            isLoading={creatingAssessment}
-          />
-        </Card>
-      )}
-      
-      {currentStep === 'recording' && patientInfo && (
-        <Card className="card-gradient p-6 max-w-2xl mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Gravação da Consulta</h2>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setCurrentStep('info')}
-              className="text-xs"
-            >
-              Voltar
-            </Button>
+    );
+  };
+  
+  const renderRecordingStep = () => {
+    return (
+      <div className="space-y-6">
+        <div className="bg-darkblue-800 p-4 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <UserRound className="h-5 w-5 text-gold-500" />
+            <h3 className="text-lg font-medium">Informações do Paciente</h3>
           </div>
-          
-          <div className="bg-darkblue-800/50 p-4 rounded-md border border-darkblue-700 mb-4">
-            <p className="text-sm font-medium text-gray-300">Paciente: {patientInfo.name}</p>
-            <p className="text-sm font-medium text-gray-300">Prontuário: {patientInfo.prontuarioId}</p>
-            {assessmentId && (
-              <p className="text-sm font-medium text-gray-300">ID da Avaliação: {assessmentId}</p>
-            )}
-            {hasPreviousAssessments && (
-              <div className="mt-2 flex items-center text-gold-500">
-                <History className="h-4 w-4 mr-1" />
-                <p className="text-sm font-medium">{previousAssessments.length} avaliações anteriores encontradas</p>
+          {selectedPatient && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-400">Nome</p>
+                <p>{selectedPatient.full_name}</p>
               </div>
-            )}
-          </div>
-          
+              <div>
+                <p className="text-sm text-gray-400">Email</p>
+                <p>{selectedPatient.email}</p>
+              </div>
+              {selectedPatient.phone && (
+                <div>
+                  <p className="text-sm text-gray-400">Telefone</p>
+                  <p>{selectedPatient.phone}</p>
+                </div>
+              )}
+              {selectedPatient.date_of_birth && (
+                <div>
+                  <p className="text-sm text-gray-400">Data de Nascimento</p>
+                  <p>{new Date(selectedPatient.date_of_birth).toLocaleDateString('pt-BR')}</p>
+                </div>
+              )}
+              {selectedPatient.sex && (
+                <div>
+                  <p className="text-sm text-gray-400">Sexo</p>
+                  <p>{selectedPatient.sex === 'male' ? 'Masculino' : 'Feminino'}</p>
+                </div>
+              )}
+              {selectedPatient.prontuario_id && (
+                <div>
+                  <p className="text-sm text-gray-400">ID do Prontuário</p>
+                  <p>{selectedPatient.prontuario_id}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        
+        <div className="bg-darkblue-800 p-4 rounded-lg">
           <AudioRecorder 
             onTranscriptionComplete={handleTranscriptionComplete}
             onProcessingStart={handleProcessingStart}
             onProcessingComplete={handleProcessingComplete}
-            patientInfo={hasPreviousAssessments ? {
-              prontuarioId: patientInfo.prontuarioId
-            } : undefined}
+            patientInfo={{
+              prontuarioId: selectedPatient?.prontuario_id || undefined,
+              email: selectedPatient?.email
+            }}
           />
+        </div>
+        
+        <div className="flex justify-between mt-6">
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentStep('patient-selection')}
+          >
+            Voltar
+          </Button>
           
-          {transcription && (
-            <div className="mt-6">
-              <h3 className="text-md font-medium mb-2">Transcrição</h3>
-              <div className="bg-darkblue-900/50 p-4 rounded-md border border-darkblue-700 overflow-y-auto max-h-60">
-                <p className="text-sm whitespace-pre-wrap">{transcription}</p>
-              </div>
-            </div>
-          )}
-        </Card>
-      )}
-      
-      {currentStep === 'review' && docsGenerated && (
-        <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
-          <Card className="card-gradient p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Revisão de Documentação</h2>
+          <Button 
+            disabled={isProcessing || (!clinicalNote && !prescription && !summary)}
+            onClick={() => setCurrentStep('editing')}
+          >
+            {isProcessing ? (
+              <>Processando...</>
+            ) : (
+              <>
+                Avançar
+                <ChevronsRight className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderEditingStep = () => {
+    return (
+      <div className="space-y-6">
+        <Tabs defaultValue="clinical_note" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="clinical_note">Nota Clínica</TabsTrigger>
+            <TabsTrigger value="prescription">Prescrição</TabsTrigger>
+            <TabsTrigger value="summary">Resumo</TabsTrigger>
+            {structuredData && <TabsTrigger value="structured_data">Dados Estruturados</TabsTrigger>}
+          </TabsList>
+          
+          <TabsContent value="clinical_note" className="space-y-2">
+            <div className="flex justify-end">
               <Button 
-                variant="outline" 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => copyToClipboard(clinicalNote, 'clinical_note')}
+                disabled={copiedFields['clinical_note']}
+              >
+                {copiedFields['clinical_note'] ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copiar
+                  </>
+                )}
+              </Button>
+            </div>
+            <Textarea 
+              value={clinicalNote} 
+              onChange={(e) => setClinicalNote(e.target.value)} 
+              className="bg-darkblue-700 border-darkblue-600 min-h-[150px]"
+            />
+          </TabsContent>
+          
+          <TabsContent value="prescription" className="space-y-2">
+            <div className="flex justify-end">
+              <Button 
+                variant="ghost" 
                 size="sm"
-                onClick={() => setCurrentStep('recording')}
-                className="text-xs"
+                onClick={() => copyToClipboard(prescription, 'prescription')}
+                disabled={copiedFields['prescription']}
               >
-                Voltar para Gravação
+                {copiedFields['prescription'] ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copiar
+                  </>
+                )}
               </Button>
             </div>
-            
-            <div className="bg-darkblue-800/50 p-4 rounded-md border border-darkblue-700 mb-6">
-              <p className="text-sm font-medium text-gray-300">Paciente: {patientInfo?.name}</p>
-              <p className="text-sm font-medium text-gray-300">Prontuário: {patientInfo?.prontuarioId}</p>
-              {hasPreviousAssessments && (
-                <div className="mt-2 flex items-center text-gold-500">
-                  <History className="h-4 w-4 mr-1" />
-                  <p className="text-sm font-medium">{previousAssessments.length} avaliações anteriores integradas</p>
-                </div>
-              )}
-            </div>
-            
-            <Tabs defaultValue="medical" className="w-full mb-6">
-              <TabsList className="w-full grid grid-cols-2">
-                <TabsTrigger value="medical">Documentação Médica</TabsTrigger>
-                <TabsTrigger value="patient">Sumário para Paciente</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="medical" className="space-y-6 pt-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium leading-none">
-                      Resumo da Avaliação
-                    </label>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setIsEditingSummary(!isEditingSummary)}
-                      className="h-7 px-2"
-                    >
-                      {isEditingSummary ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={summary}
-                    onChange={(e) => setSummary(e.target.value)}
-                    className="h-24 bg-darkblue-800/50 border-darkblue-700"
-                    readOnly={!isEditingSummary}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium leading-none">
-                      Nota Clínica
-                    </label>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setIsEditingClinicalNote(!isEditingClinicalNote)}
-                      className="h-7 px-2"
-                    >
-                      {isEditingClinicalNote ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={clinicalNote}
-                    onChange={(e) => setClinicalNote(e.target.value)}
-                    className="h-32 bg-darkblue-800/50 border-darkblue-700"
-                    readOnly={!isEditingClinicalNote}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium leading-none">
-                      Prescrição
-                    </label>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setIsEditingPrescription(!isEditingPrescription)}
-                      className="h-7 px-2"
-                    >
-                      {isEditingPrescription ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={prescription}
-                    onChange={(e) => setPrescription(e.target.value)}
-                    className="h-32 bg-darkblue-800/50 border-darkblue-700"
-                    readOnly={!isEditingPrescription}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">
-                    Instruções para a IA (opcional)
-                  </label>
-                  <Textarea
-                    value={aiInstruction}
-                    onChange={(e) => setAiInstruction(e.target.value)}
-                    placeholder="Instrua a IA para melhorar a nota clínica, ex: 'Adicione mais detalhes sobre o tratamento' ou 'Foque mais nos sintomas respiratórios'"
-                    className="h-24 bg-darkblue-800/50 border-darkblue-700"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={submitAiInstruction}
-                    disabled={isSubmittingInstruction || !aiInstruction}
-                    className="w-full"
-                  >
-                    {isSubmittingInstruction ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Processando instruções...
-                      </>
-                    ) : (
-                      <>
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Atualizar documentação com instruções
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="patient" className="space-y-6 pt-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium leading-none">
-                      Sumário para o Paciente
-                    </label>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setIsEditingPatientSummary(!isEditingPatientSummary)}
-                      className="h-7 px-2"
-                      disabled={!patientFriendlySummary}
-                    >
-                      {isEditingPatientSummary ? <Check className="h-4 w-4" /> : <PencilLine className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={patientFriendlySummary}
-                    onChange={(e) => setPatientFriendlySummary(e.target.value)}
-                    className="h-64 bg-darkblue-800/50 border-darkblue-700"
-                    readOnly={!isEditingPatientSummary}
-                    placeholder={patientFriendlySummary ? "" : "Clique em 'Gerar sumário para paciente' para criar um resumo em linguagem acessível."}
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={generatePatientFriendlySummary}
-                    disabled={isGeneratingPatientSummary || !clinicalNote || !summary}
-                    className="w-full"
-                  >
-                    {isGeneratingPatientSummary ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Gerando sumário para paciente...
-                      </>
-                    ) : (
-                      <>
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        {patientFriendlySummary ? "Regenerar sumário para paciente" : "Gerar sumário para paciente"}
-                      </>
-                    )}
-                  </Button>
-                  <p className="text-xs text-gray-400 italic">
-                    Este sumário será apresentado ao paciente em linguagem não-técnica, similar ao estilo visual do Gamma.app
-                  </p>
-                </div>
-              </TabsContent>
-            </Tabs>
-            
-            <div className="flex gap-4">
+            <Textarea 
+              value={prescription} 
+              onChange={(e) => setPrescription(e.target.value)} 
+              className="bg-darkblue-700 border-darkblue-600 min-h-[150px]"
+            />
+          </TabsContent>
+          
+          <TabsContent value="summary" className="space-y-2">
+            <div className="flex justify-end">
               <Button 
-                type="submit" 
-                disabled={isSaving || isProcessing}
-                className="bg-gold-500 hover:bg-gold-600 text-black flex-1"
+                variant="ghost" 
+                size="sm"
+                onClick={() => copyToClipboard(summary, 'summary')}
+                disabled={copiedFields['summary']}
               >
-                {isSaving ? 'Salvando...' : 'Salvar Avaliação'}
-              </Button>
-              
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={resetForm}
-                disabled={isSaving || isProcessing}
-              >
-                Cancelar
+                {copiedFields['summary'] ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copiar
+                  </>
+                )}
               </Button>
             </div>
-          </Card>
-        </form>
-      )}
+            <Textarea 
+              value={summary} 
+              onChange={(e) => setSummary(e.target.value)} 
+              className="bg-darkblue-700 border-darkblue-600 min-h-[150px]"
+            />
+          </TabsContent>
+          
+          {structuredData && (
+            <TabsContent value="structured_data">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(structuredData).map(([key, value]: [string, any]) => (
+                  <div key={key} className="space-y-2">
+                    <p className="text-sm text-gray-400">{key}</p>
+                    {typeof value === 'string' || typeof value === 'number' ? (
+                      <p>{value}</p>
+                    ) : (
+                      <pre>{JSON.stringify(value, null, 2)}</pre>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+          )}
+        </Tabs>
+        
+        <div className="flex justify-between mt-6">
+          <Button variant="outline" onClick={() => setCurrentStep('recording')}>
+            Voltar
+          </Button>
+          
+          <Button 
+            className="bg-gold-500 hover:bg-gold-600 text-black"
+            onClick={handleSaveAssessment}
+          >
+            Salvar Avaliação
+          </Button>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderCompletedStep = () => {
+    return (
+      <div className="space-y-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold">Avaliação Concluída!</h2>
+          <p className="text-gray-400">A avaliação foi salva com sucesso.</p>
+        </div>
+        
+        <div className="flex justify-center">
+          <Button onClick={() => navigate('/doctor/assessments')}>
+            Voltar para Avaliações
+          </Button>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 'patient-selection':
+        return renderPatientSelectionStep();
+      case 'recording':
+        return renderRecordingStep();
+      case 'editing':
+        return renderEditingStep();
+      case 'completed':
+        return renderCompletedStep();
+      default:
+        return null;
+    }
+  };
+  
+  return (
+    <Layout>
+      <div className="container mx-auto py-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-white">
+            {id ? 'Editar Avaliação' : 'Nova Avaliação'}
+          </h1>
+          <p className="text-gray-400">
+            {currentStep === 'patient-selection' && 'Selecione um paciente para iniciar a avaliação'}
+            {currentStep === 'recording' && 'Grave o áudio da consulta para gerar a documentação'}
+            {currentStep === 'editing' && 'Revise e edite os documentos gerados pela IA'}
+            {currentStep === 'completed' && 'Avaliação concluída com sucesso'}
+          </p>
+        </div>
+        
+        <Card className="bg-darkblue-900 border-darkblue-700 text-white p-6">
+          {renderCurrentStep()}
+        </Card>
+      </div>
+      
+      <Dialog open={isNewPatientDialogOpen} onOpenChange={setIsNewPatientDialogOpen}>
+        <DialogContent className="bg-darkblue-800 text-white border-darkblue-700 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adicionar Novo Paciente</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Preencha os dados do paciente para cadastrá-lo no sistema.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="name" className="text-sm font-medium">Nome Completo</label>
+              <Input
+                id="name"
+                value={newPatient.full_name}
+                onChange={(e) => setNewPatient({...newPatient, full_name: e.target.value})}
+                className="bg-darkblue-700 border-darkblue-600"
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium">Email</label>
+              <Input
+                id="email"
+                type="email"
+                value={newPatient.email}
+                onChange={(e) => setNewPatient({...newPatient, email: e.target.value})}
+                className="bg-darkblue-700 border-darkblue-600"
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="phone" className="text-sm font-medium">Telefone</label>
+              <Input
+                id="phone"
+                value={newPatient.phone}
+                onChange={(e) => setNewPatient({...newPatient, phone: e.target.value})}
+                className="bg-darkblue-700 border-darkblue-600"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="dob" className="text-sm font-medium">Data de Nascimento</label>
+              <Input
+                id="dob"
+                type="date"
+                value={newPatient.date_of_birth}
+                onChange={(e) => setNewPatient({...newPatient, date_of_birth: e.target.value})}
+                className="bg-darkblue-700 border-darkblue-600"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="sex" className="text-sm font-medium">Sexo</label>
+              <Select 
+                value={newPatient.sex} 
+                onValueChange={(value) => setNewPatient({...newPatient, sex: value})}
+              >
+                <SelectTrigger className="bg-darkblue-700 border-darkblue-600">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent className="bg-darkblue-700 border-darkblue-600">
+                  <SelectItem value="male">Masculino</SelectItem>
+                  <SelectItem value="female">Feminino</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="prontuario_id" className="text-sm font-medium">ID do Prontuário</label>
+              <Input
+                id="prontuario_id"
+                value={newPatient.prontuario_id}
+                onChange={(e) => setNewPatient({...newPatient, prontuario_id: e.target.value})}
+                className="bg-darkblue-700 border-darkblue-600"
+              />
+            </div>
+          </div>
+          
+          <div className="flex justify-end">
+            <Button 
+              onClick={handleCreatePatient}
+              className="bg-gold-500 hover:bg-gold-600 text-black"
+              disabled={!newPatient.full_name || !newPatient.email}
+            >
+              Cadastrar Paciente
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

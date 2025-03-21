@@ -26,6 +26,8 @@ serve(async (req) => {
 
     // Request an ephemeral token from OpenAI for transcription
     console.log("Sending request to OpenAI...");
+    
+    // Update to the correct endpoint for transcription sessions
     const response = await fetch("https://api.openai.com/v1/audio/realtime/transcription_sessions", {
       method: "POST",
       headers: {
@@ -43,7 +45,8 @@ serve(async (req) => {
           "type": "server_vad",
           "threshold": 0.5,
           "prefix_padding_ms": 300,
-          "silence_duration_ms": 500
+          "silence_duration_ms": 500,
+          "create_response": false
         },
         "input_audio_noise_reduction": {
           "type": "near_field"
