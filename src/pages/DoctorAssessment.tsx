@@ -8,7 +8,7 @@ import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
-import AudioRecorder from '@/components/AudioRecorder';
+import AudioRecorder from '@/components/AudioRecording/AudioRecorder';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, PencilLine, Check, RotateCcw, History } from 'lucide-react';
 import PatientInfoForm, { PatientInfo } from '@/components/PatientInfoForm';
@@ -687,3 +687,4 @@ const DoctorAssessment = () => {
 };
 
 export default DoctorAssessment;
+
