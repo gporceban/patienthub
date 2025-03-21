@@ -43,7 +43,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("Transcription session created successfully");
+    console.log("Transcription session created successfully, token_type:", data.client_secret?.type);
     
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

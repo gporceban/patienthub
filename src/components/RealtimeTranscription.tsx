@@ -25,8 +25,8 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   const audioData = useRef<Float32Array | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const maxRetryAttemptsRef = useRef<number>(5);
+  const processorRef = useRef<ScriptProcessorNode | AudioWorkletNode | null>(null);
+  const maxRetryAttemptsRef = useRef<number>(3); // Reduced retries for faster feedback
   const retryCountRef = useRef<number>(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const backoffTimeRef = useRef<number>(1000); // Start with 1 second
@@ -87,21 +87,56 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       });
       
       const source = audioContextRef.current.createMediaStreamSource(stream);
-      processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
       
-      processorRef.current.onaudioprocess = (e) => {
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-        
-        const inputData = e.inputBuffer.getChannelData(0);
-        audioData.current = new Float32Array(inputData.length);
-        audioData.current.set(inputData);
-        
-        const pcmData = convertToInt16(audioData.current);
-        wsRef.current.send(pcmData.buffer);
-      };
+      // Try to use AudioWorkletNode if supported
+      if ('audioWorklet' in audioContextRef.current) {
+        try {
+          await audioContextRef.current.audioWorklet.addModule('https://cdn.jsdelivr.net/npm/audio-worklet-polyfill@1.0.1/dist/worklet-processor.min.js');
+          processorRef.current = new AudioWorkletNode(audioContextRef.current, 'worklet-processor');
+          processorRef.current.port.onmessage = (e) => {
+            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+            
+            audioData.current = new Float32Array(e.data);
+            const pcmData = convertToInt16(audioData.current);
+            wsRef.current.send(pcmData.buffer);
+          };
+        } catch (workletError) {
+          console.warn('AudioWorklet not supported or failed to load, falling back to ScriptProcessor:', workletError);
+          // Fall back to ScriptProcessor
+          processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+          (processorRef.current as ScriptProcessorNode).onaudioprocess = (e) => {
+            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+            
+            const inputData = e.inputBuffer.getChannelData(0);
+            audioData.current = new Float32Array(inputData.length);
+            audioData.current.set(inputData);
+            
+            const pcmData = convertToInt16(audioData.current);
+            wsRef.current.send(pcmData.buffer);
+          };
+        }
+      } else {
+        // Fall back to ScriptProcessor for older browsers
+        console.warn('AudioWorklet not supported, using deprecated ScriptProcessor');
+        processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+        (processorRef.current as ScriptProcessorNode).onaudioprocess = (e) => {
+          if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+          
+          const inputData = e.inputBuffer.getChannelData(0);
+          audioData.current = new Float32Array(inputData.length);
+          audioData.current.set(inputData);
+          
+          const pcmData = convertToInt16(audioData.current);
+          wsRef.current.send(pcmData.buffer);
+        };
+      }
       
       source.connect(processorRef.current);
-      processorRef.current.connect(audioContextRef.current.destination);
+      
+      // If using ScriptProcessor, we need to connect to destination
+      if ('onaudioprocess' in processorRef.current) {
+        processorRef.current.connect(audioContextRef.current.destination);
+      }
       
       console.log('Audio processing setup complete');
       return true;
@@ -114,17 +149,29 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   
   const cleanupMicrophone = useCallback(() => {
     if (processorRef.current) {
-      processorRef.current.disconnect();
+      try {
+        processorRef.current.disconnect();
+      } catch (e) {
+        console.error('Error disconnecting processor:', e);
+      }
       processorRef.current = null;
     }
     
     if (audioContextRef.current) {
-      audioContextRef.current.close().catch(console.error);
+      try {
+        audioContextRef.current.close().catch(console.error);
+      } catch (e) {
+        console.error('Error closing audio context:', e);
+      }
       audioContextRef.current = null;
     }
     
     if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      try {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      } catch (e) {
+        console.error('Error stopping media tracks:', e);
+      }
       mediaStreamRef.current = null;
     }
     
@@ -149,7 +196,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       }, retryTime);
     } else {
       console.log('Max retry attempts reached, giving up...');
-      setError('Falha ao conectar ao serviço de transcrição após várias tentativas');
+      setError('Falha ao conectar ao serviço de transcrição após várias tentativas. Por favor, tente novamente mais tarde.');
       setIsConnecting(false);
     }
   }, []);
@@ -200,9 +247,14 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       console.log('Token received, connecting to WebSocket...');
       
       if (wsRef.current) {
-        wsRef.current.close();
+        try {
+          wsRef.current.close();
+        } catch (e) {
+          console.error('Error closing existing websocket:', e);
+        }
       }
       
+      // Create a new WebSocket connection
       wsRef.current = new WebSocket('wss://api.openai.com/v1/realtime/transcription');
       
       wsRef.current.onopen = () => {
@@ -267,10 +319,8 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       
       wsRef.current.onerror = (event) => {
         console.error('WebSocket error:', event);
-        setError('Erro na conexão de transcrição');
-        setIsConnected(false);
-        setIsConnecting(false);
-        retryConnection();
+        setError('Erro na conexão de transcrição. Tentando reconectar...');
+        // Don't set isConnecting to false here, let the onclose handler deal with it
       };
     } catch (error) {
       console.error('Error connecting to WebSocket:', error);
