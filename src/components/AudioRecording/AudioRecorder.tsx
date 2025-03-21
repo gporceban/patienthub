@@ -162,6 +162,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     } catch (error) {
       setHasError(true);
       setErrorMessage('Erro ao acessar o microfone. Verifique permissões de navegador e hardware.');
+      console.error('Error starting recording:', error);
     }
   };
 

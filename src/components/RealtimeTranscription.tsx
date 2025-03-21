@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +10,8 @@ interface RealtimeTranscriptionProps {
   onTranscriptionUpdate?: (text: string) => void;
 }
 
+// Define a more correct type for legacy audio context
+// We're using Omit to remove createScriptProcessor from AudioContext, then add it back as optional
 interface LegacyAudioContext extends Omit<AudioContext, 'createScriptProcessor'> {
   createScriptProcessor?: (
     bufferSize: number,
@@ -109,6 +112,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
           };
         } catch (workletError) {
           console.warn('AudioWorklet not supported or failed to load, falling back to ScriptProcessor:', workletError);
+          // Safely cast to LegacyAudioContext
           const legacyContext = audioContextRef.current as unknown as LegacyAudioContext;
           if (legacyContext.createScriptProcessor) {
             processorRef.current = legacyContext.createScriptProcessor(4096, 1, 1);
@@ -129,6 +133,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         }
       } else {
         console.warn('AudioWorklet not supported, using deprecated ScriptProcessor');
+        // Safely cast to LegacyAudioContext
         const legacyContext = audioContextRef.current as unknown as LegacyAudioContext;
         if (legacyContext.createScriptProcessor) {
           processorRef.current = legacyContext.createScriptProcessor(4096, 1, 1);

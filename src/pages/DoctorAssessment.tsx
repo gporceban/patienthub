@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card } from '@/components/ui/card';
@@ -284,7 +285,10 @@ const DoctorAssessment = () => {
     
     if (newId) {
       setAssessmentId(newId);
-      setCurrentStep('recording');
+      // This is the critical fix: Ensure we transition to the recording step after assessment creation
+      setTimeout(() => {
+        setCurrentStep('recording');
+      }, 100);
     } else {
       toast({
         variant: "destructive",
@@ -687,4 +691,3 @@ const DoctorAssessment = () => {
 };
 
 export default DoctorAssessment;
-
