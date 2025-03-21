@@ -9,7 +9,7 @@ interface RealtimeTranscriptionProps {
   onTranscriptionUpdate?: (text: string) => void;
 }
 
-interface LegacyAudioContext extends AudioContext {
+interface LegacyAudioContext extends Omit<AudioContext, 'createScriptProcessor'> {
   createScriptProcessor?: (
     bufferSize: number,
     numberOfInputChannels: number,
@@ -33,10 +33,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | AudioWorkletNode | null>(null);
-  const maxRetryAttemptsRef = useRef<number>(3); // Reduced retries for faster feedback
+  const maxRetryAttemptsRef = useRef<number>(3);
   const retryCountRef = useRef<number>(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const backoffTimeRef = useRef<number>(1000); // Start with 1 second
+  const backoffTimeRef = useRef<number>(1000);
 
   useEffect(() => {
     if (!isConnected) {
@@ -198,8 +198,8 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
     if (retryCountRef.current < maxRetryAttemptsRef.current) {
       retryCountRef.current += 1;
       const backoffTime = backoffTimeRef.current * Math.pow(1.5, retryCountRef.current - 1);
-      const jitter = backoffTime * 0.1 * Math.random(); // Add 0-10% jitter
-      const retryTime = Math.min(10000, backoffTime + jitter); // Cap at 10 seconds
+      const jitter = backoffTime * 0.1 * Math.random();
+      const retryTime = Math.min(10000, backoffTime + jitter);
       
       console.log(`Retrying connection (attempt ${retryCountRef.current} of ${maxRetryAttemptsRef.current}) in ${Math.round(retryTime)}ms...`);
       
@@ -274,8 +274,8 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       
       wsRef.current.onopen = () => {
         console.log('WebSocket connection opened for transcription');
-        retryCountRef.current = 0; // Reset retry count on successful connection
-        backoffTimeRef.current = 1000; // Reset backoff time
+        retryCountRef.current = 0;
+        backoffTimeRef.current = 1000;
         
         if (!wsRef.current) return;
         
