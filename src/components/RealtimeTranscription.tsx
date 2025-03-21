@@ -87,6 +87,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       const websocketUrl = `wss://api.openai.com/v1/realtime?intent=transcription?token=${sessionTokenRef.current}`;
       console.log("Connecting to WebSocket with URL:", websocketUrl);
       
+      const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
       const websocket = new WebSocket(websocketUrl, {
         headers: {
           "Authorization": `Bearer ${OPENAI_API_KEY}`,
