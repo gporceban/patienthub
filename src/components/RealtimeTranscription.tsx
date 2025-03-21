@@ -108,7 +108,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
             
             audioData.current = new Float32Array(e.data);
             const pcmData = convertToInt16(audioData.current);
-            wsRef.current.send(pcmData.buffer);
+            wsRef.current.send(JSON.stringify({
+              type: 'input_audio_buffer.append',
+              audio: btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(pcmData.buffer))))
+            }));
           };
         } catch (workletError) {
           console.warn('AudioWorklet not supported or failed to load, falling back to ScriptProcessor:', workletError);
@@ -124,7 +127,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
               audioData.current.set(inputData);
               
               const pcmData = convertToInt16(audioData.current);
-              wsRef.current.send(pcmData.buffer);
+              wsRef.current.send(JSON.stringify({
+                type: 'input_audio_buffer.append',
+                audio: btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(pcmData.buffer))))
+              }));
             };
           } else {
             console.error('Neither AudioWorklet nor ScriptProcessor is supported in this browser');
@@ -145,7 +151,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
             audioData.current.set(inputData);
             
             const pcmData = convertToInt16(audioData.current);
-            wsRef.current.send(pcmData.buffer);
+            wsRef.current.send(JSON.stringify({
+              type: 'input_audio_buffer.append',
+              audio: btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(pcmData.buffer))))
+            }));
           };
         } else {
           console.error('ScriptProcessor is not supported in this browser');
@@ -284,24 +293,19 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         
         if (!wsRef.current) return;
         
-        const messageData = {
-          bearer_token: token,
-          model: 'whisper-1',
-          encoding: 'linear16',
-          sample_rate: 16000,
-          language: 'pt',
-          compression: 'none'
-        };
+        // Send authentication message with the token
+        wsRef.current.send(JSON.stringify({
+          type: "auth",
+          client_secret: token
+        }));
         
-        wsRef.current.send(JSON.stringify(messageData));
-        console.log('Initialization message sent to WebSocket');
-        setIsConnected(true);
-        setIsConnecting(false);
+        console.log('Authentication message sent to WebSocket');
       };
       
       wsRef.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log('WebSocket message received:', data);
           
           if (data.error) {
             console.error('WebSocket error from server:', data.error);
@@ -309,15 +313,23 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
             return;
           }
           
-          if (data.status === 'ok' && data.type === 'parameters_ok') {
-            console.log('WebSocket parameters accepted');
-          } else if (data.type === 'transcription') {
-            if (data.text) {
-              setRealtimeText(data.text);
+          // Handle different message types from the new API
+          if (data.type === "auth_success") {
+            console.log('Authentication successful');
+            setIsConnected(true);
+            setIsConnecting(false);
+          } else if (data.type === "conversation.item.input_audio_transcription.completed") {
+            if (data.transcript) {
+              console.log('Transcription received:', data.transcript);
+              setRealtimeText(data.transcript);
             }
-          } else if (data.status === 'error') {
-            console.error('WebSocket transcription error:', data);
-            setError(`Erro na transcrição: ${data.error || 'Erro desconhecido'}`);
+          } else if (data.type === "input_audio_buffer.speech_started") {
+            console.log('Speech started detected');
+          } else if (data.type === "input_audio_buffer.speech_stopped") {
+            console.log('Speech stopped detected');
+          } else if (data.type === "error") {
+            console.error('WebSocket error event:', data);
+            setError(`Erro na transcrição: ${data.message || 'Erro desconhecido'}`);
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error, event.data);

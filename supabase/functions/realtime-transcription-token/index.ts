@@ -31,7 +31,24 @@ serve(async (req) => {
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
-      }
+      },
+      body: JSON.stringify({
+        "input_audio_format": "pcm16",
+        "input_audio_transcription": {
+          "model": "whisper-1",
+          "language": "pt",
+          "prompt": "Vocabulário médico, terminologia ortopédica"
+        },
+        "turn_detection": {
+          "type": "server_vad",
+          "threshold": 0.5,
+          "prefix_padding_ms": 300,
+          "silence_duration_ms": 500
+        },
+        "input_audio_noise_reduction": {
+          "type": "near_field"
+        }
+      })
     });
 
     console.log("OpenAI API response status:", response.status);
