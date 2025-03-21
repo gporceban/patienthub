@@ -25,6 +25,7 @@ serve(async (req) => {
     }
 
     // Request an ephemeral session token from OpenAI for transcription only
+    // Make sure to follow the latest API format from the documentation
     console.log("Sending request to OpenAI Realtime API...");
     const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
@@ -33,10 +34,10 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        session_type: "transcription",
+        session_type: "transcription", // Explicitly set to transcription-only mode
         input_audio_format: "pcm16",
         input_audio_transcription: {
-          model: "gpt-4o-transcribe",
+          model: "gpt-4o-transcribe", // Using the latest transcription model
           prompt: "Vocabulário médico, terminologia ortopédica",
           language: "pt"
         },
@@ -52,16 +53,26 @@ serve(async (req) => {
       })
     });
 
+    // Add detailed logging for troubleshooting
     console.log("OpenAI API response status:", response.status);
     
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error("OpenAI API error:", errorData);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
+      const errorText = await response.text();
+      console.error("OpenAI API error response:", errorText);
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        console.error("OpenAI API error details:", errorData);
+        throw new Error(`OpenAI API error: ${response.status} - ${JSON.stringify(errorData)}`);
+      } catch (e) {
+        // If JSON parsing fails, just use the text
+        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      }
     }
 
     const data = await response.json();
     console.log("Transcription session created successfully");
+    console.log("Session data structure:", Object.keys(data));
     
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -70,13 +81,18 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in realtime-transcription-token function:", error.message);
     console.error("Error stack:", error.stack);
+    
+    // Return a more detailed error response
     return new Response(
       JSON.stringify({ 
         error: error.message,
         stack: error.stack,
         timestamp: new Date().toISOString()
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+        status: 500 
+      }
     );
   }
 });

@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { processAudioLevel } from '@/utils/audioUtils';
+import { processAudioLevel, encodeAudioForAPI } from '@/utils/audioUtils';
 
 interface RealtimeTranscriptionProps {
   isRecording: boolean;
@@ -22,6 +22,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   const [realtimeText, setRealtimeText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [lastTranscriptId, setLastTranscriptId] = useState<string | null>(null);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -74,6 +75,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       console.log("Session data received:", sessionData);
       
       if (!sessionData || !sessionData.client_secret?.value) {
+        console.error("Invalid session data:", sessionData);
         throw new Error("Token de transcrição inválido ou ausente");
       }
       
@@ -129,6 +131,8 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
             setIsConnected(true);
             setIsConnecting(false);
             setError(null);
+            // Reset connection attempts on success
+            setConnectionAttempts(0);
           }
           else if (data.type === "session.updated") {
             console.log("Session settings updated successfully");
@@ -158,10 +162,13 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         setError("Erro na conexão WebSocket. Tente novamente.");
         setIsConnected(false);
         setIsConnecting(false);
+        
+        // Increment connection attempts
+        setConnectionAttempts(prev => prev + 1);
       };
       
-      websocket.onclose = () => {
-        console.log("WebSocket connection closed");
+      websocket.onclose = (event) => {
+        console.log(`WebSocket connection closed: ${event.code} - ${event.reason}`);
         setIsConnected(false);
         setIsConnecting(false);
       };
@@ -169,6 +176,9 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       console.error('Error setting up real-time transcription:', error);
       setError(`Erro ao configurar transcrição em tempo real: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       setIsConnecting(false);
+      
+      // Increment connection attempts
+      setConnectionAttempts(prev => prev + 1);
     }
   };
 
@@ -238,28 +248,6 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
     }
   };
   
-  // Função para codificar áudio para a API
-  const encodeAudioForAPI = (float32Array: Float32Array): string => {
-    // Converter de Float32Array para Int16Array (PCM16)
-    const int16Array = new Int16Array(float32Array.length);
-    for (let i = 0; i < float32Array.length; i++) {
-      const s = Math.max(-1, Math.min(1, float32Array[i]));
-      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-    }
-    
-    // Converter para string binária e codificar em base64
-    const uint8Array = new Uint8Array(int16Array.buffer);
-    let binary = '';
-    const chunkSize = 0x8000;
-    
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    
-    return btoa(binary);
-  };
-  
   const cleanupRealtimeTranscription = () => {
     cleanupWebSocket();
     
@@ -326,8 +314,17 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
       )}
       
       {error && (
-        <div className="text-red-500 mb-2">
-          {error}
+        <div className="text-red-500 mb-2 flex items-start">
+          <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-medium">Erro:</p>
+            <p className="text-sm">{error}</p>
+            {connectionAttempts > 2 && (
+              <p className="text-xs mt-1">
+                Problema persistente. Considere usar transcrição normal em vez de tempo real.
+              </p>
+            )}
+          </div>
         </div>
       )}
       
