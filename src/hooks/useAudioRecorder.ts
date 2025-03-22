@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { processAudioLevel } from '@/utils/audioUtils';
+import { processAudioLevel, checkMicrophoneAvailability } from '@/utils/audioUtils';
 import { useToast } from '@/components/ui/use-toast';
 
 interface UseAudioRecorderProps {
@@ -34,6 +34,7 @@ export const useAudioRecorder = ({
   const analyserNodeRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const audioLevelRef = useRef<number>(0);
+  const startRecordingInProgressRef = useRef<boolean>(false);
   
   const { toast } = useToast();
 
@@ -67,9 +68,19 @@ export const useAudioRecorder = ({
     }
 
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        if (track.readyState === 'live') {
+          track.stop();
+        }
+      });
       streamRef.current = null;
     }
+    
+    audioContextRef.current = null;
+    analyserNodeRef.current = null;
+    mediaRecorderRef.current = null;
+    
+    console.log("Audio recorder resources cleaned up");
   };
 
   const startPeriodicTranscription = () => {
@@ -96,9 +107,21 @@ export const useAudioRecorder = ({
   };
 
   const startRecording = async () => {
+    if (startRecordingInProgressRef.current) {
+      console.log("Start recording already in progress");
+      return;
+    }
+    
+    startRecordingInProgressRef.current = true;
     audioChunksRef.current = [];
     
     try {
+      // First, check if the microphone is available
+      const micAvailable = await checkMicrophoneAvailability();
+      if (!micAvailable) {
+        throw new Error('Microfone não disponível ou permissão negada');
+      }
+      
       console.log("Requesting microphone access...");
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -182,11 +205,15 @@ export const useAudioRecorder = ({
         stream.getTracks().forEach(track => track.stop());
       };
       
+      // Start the audio level visualization
       checkAudioLevel();
       
+      // Set the recording state before starting MediaRecorder to ensure UI is updated
+      setIsRecording(true);
+      
+      // Start MediaRecorder with 500ms timeslice to get data frequently
       mediaRecorder.start(500);
       console.log("MediaRecorder started");
-      setIsRecording(true);
       
       if (!useRealtimeTranscription) {
         startPeriodicTranscription();
@@ -205,7 +232,12 @@ export const useAudioRecorder = ({
         title: "Erro ao acessar o microfone",
         description: "Verifique se o microfone está conectado e se você concedeu permissão para usá-lo."
       });
+      
+      setIsRecording(false);
+      cleanupResources();
       throw error;
+    } finally {
+      startRecordingInProgressRef.current = false;
     }
   };
 

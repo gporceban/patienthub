@@ -41,6 +41,7 @@ export const useRealtimeTranscription = ({
   const isReconnectingRef = useRef(false);
   const setupInProgressRef = useRef(false);
   const activeStreamIdRef = useRef<string | null>(null);
+  const setupMicrophoneInProgressRef = useRef(false);
 
   // Cleanup WebSocket connection
   const cleanupWebSocket = useCallback(() => {
@@ -57,8 +58,7 @@ export const useRealtimeTranscription = ({
   
   // Cleanup function for all resources
   const cleanupResources = useCallback(() => {
-    console.log("Transcription resources cleaned up");
-    isCleanedUpRef.current = true;
+    console.log("Transcription resources cleanup initiated");
     
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -67,15 +67,22 @@ export const useRealtimeTranscription = ({
     
     cleanupWebSocket();
     
-    if (processorRef.current && sourceRef.current) {
+    if (processorRef.current && audioContextRef.current) {
       try {
-        sourceRef.current.disconnect();
         processorRef.current.disconnect();
       } catch (e) {
-        console.error('Error disconnecting audio nodes:', e);
+        console.error('Error disconnecting processor:', e);
+      }
+      processorRef.current = null;
+    }
+    
+    if (sourceRef.current && audioContextRef.current) {
+      try {
+        sourceRef.current.disconnect();
+      } catch (e) {
+        console.error('Error disconnecting source:', e);
       }
       sourceRef.current = null;
-      processorRef.current = null;
     }
     
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
@@ -89,7 +96,11 @@ export const useRealtimeTranscription = ({
     
     if (mediaStreamRef.current) {
       try {
-        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current.getTracks().forEach(track => {
+          if (track.readyState === 'live') {
+            track.stop();
+          }
+        });
       } catch (e) {
         console.error('Error stopping media tracks:', e);
       }
@@ -101,13 +112,28 @@ export const useRealtimeTranscription = ({
       isConnected: false,
       isConnecting: false
     }));
+    
+    isCleanedUpRef.current = true;
+    console.log("Transcription resources cleaned up");
   }, [cleanupWebSocket]);
   
   // Setup microphone capture
   const setupMicrophone = useCallback(async () => {
+    if (setupMicrophoneInProgressRef.current) {
+      console.log("Microphone setup already in progress");
+      return false;
+    }
+    
     try {
+      setupMicrophoneInProgressRef.current = true;
+      
       if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current.getTracks().forEach(track => {
+          if (track.readyState === 'live') {
+            track.stop();
+          }
+        });
+        mediaStreamRef.current = null;
       }
       
       console.log('Requesting microphone permission...');
@@ -122,7 +148,12 @@ export const useRealtimeTranscription = ({
       });
       console.log('Microphone access granted');
       
-      if (isCleanedUpRef.current) return false;
+      if (isCleanedUpRef.current) {
+        console.log('Resources cleaned up during microphone setup, aborting');
+        stream.getTracks().forEach(track => track.stop());
+        setupMicrophoneInProgressRef.current = false;
+        return false;
+      }
       
       const streamId = stream.id || Math.random().toString();
       activeStreamIdRef.current = streamId;
@@ -166,12 +197,18 @@ export const useRealtimeTranscription = ({
         }
       };
       
-      if (isCleanedUpRef.current || activeStreamIdRef.current !== streamId) return false;
+      if (isCleanedUpRef.current || activeStreamIdRef.current !== streamId) {
+        console.log('Resources cleaned up or stream changed during microphone setup, aborting');
+        stream.getTracks().forEach(track => track.stop());
+        setupMicrophoneInProgressRef.current = false;
+        return false;
+      }
       
       sourceRef.current.connect(processorRef.current);
       processorRef.current.connect(audioContextRef.current.destination);
       
       console.log('Audio processing setup complete');
+      setupMicrophoneInProgressRef.current = false;
       return true;
     } catch (error) {
       console.error('Error accessing microphone:', error);
@@ -181,6 +218,7 @@ export const useRealtimeTranscription = ({
           error: 'Erro ao acessar o microfone. Verifique se as permissões estão concedidas.'
         }));
       }
+      setupMicrophoneInProgressRef.current = false;
       return false;
     }
   }, [state.isConnected]);

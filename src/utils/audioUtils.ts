@@ -82,3 +82,35 @@ export const decodeAudioFromAPI = (base64Audio: string): Float32Array => {
   
   return float32Array;
 };
+
+/**
+ * Check if a microphone is available and accessible
+ */
+export const checkMicrophoneAvailability = async (): Promise<boolean> => {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const hasMicrophone = devices.some(device => device.kind === 'audioinput');
+    
+    if (!hasMicrophone) {
+      console.warn('No microphone devices found');
+      return false;
+    }
+    
+    // Try to access the microphone
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+    
+    // Clean up immediately to not leave the mic open
+    stream.getTracks().forEach(track => track.stop());
+    
+    return true;
+  } catch (err) {
+    console.error('Error checking microphone:', err);
+    return false;
+  }
+};
