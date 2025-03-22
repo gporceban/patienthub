@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useRealtimeTranscription } from '@/hooks/useRealtimeTranscription';
 import TranscriptionDisplay from './TranscriptionDisplay';
 
@@ -16,6 +16,13 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   isTranscribing,
   onTranscriptionUpdate
 }) => {
+  // Prevent callback changes causing re-renders
+  const stableCallback = useCallback((text: string) => {
+    if (onTranscriptionUpdate) {
+      onTranscriptionUpdate(text);
+    }
+  }, [onTranscriptionUpdate]);
+  
   const {
     isConnecting,
     isConnected,
@@ -24,7 +31,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
     connectionAttempts
   } = useRealtimeTranscription({
     isRecording,
-    onTranscriptionUpdate
+    onTranscriptionUpdate: stableCallback
   });
   
   return (
@@ -41,4 +48,4 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   );
 };
 
-export default RealtimeTranscription;
+export default React.memo(RealtimeTranscription);

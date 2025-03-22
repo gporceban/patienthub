@@ -73,20 +73,20 @@ serve(async (req) => {
     console.log("Transcription session created successfully");
     
     // Check for valid token and expiration
-    if (!data.client_secret?.value || !data.expires_at) {
-      console.error("Invalid token data received:", data);
+    if (!data.client_secret?.value) {
+      console.error("Invalid token data received: missing client_secret.value");
       throw new Error('Invalid token data received from OpenAI API');
     }
     
-    // If expires_at is 0 or invalid, set a default expiration (10 minutes)
-    if (data.expires_at === 0 || !data.expires_at) {
+    // If expires_at is 0, invalid, or missing, set a default expiration (10 minutes)
+    if (!data.expires_at || data.expires_at === 0) {
       console.log("Setting default expiration time for token");
       data.expires_at = Math.floor(Date.now() / 1000) + 600; // 10 minutes from now
     }
     
     // Log the structure of the response for debugging
     console.log("Session data structure:", JSON.stringify(Object.keys(data)));
-    console.log("Session data received:", data);
+    console.log("Token will expire at:", new Date(data.expires_at * 1000).toISOString());
     
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { encodeAudioForAPI } from '@/utils/audioUtils';
 
@@ -39,18 +39,19 @@ export const useRealtimeTranscription = ({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isCleanedUpRef = useRef(false);
   const isReconnectingRef = useRef(false);
+  const setupInProgressRef = useRef(false);
 
   // Cleanup WebSocket connection
-  const cleanupWebSocket = () => {
+  const cleanupWebSocket = useCallback(() => {
     if (websocketRef.current) {
       console.log("Closing WebSocket connection");
       websocketRef.current.close();
       websocketRef.current = null;
     }
-  };
+  }, []);
   
   // Cleanup function for all resources
-  const cleanupResources = () => {
+  const cleanupResources = useCallback(() => {
     isCleanedUpRef.current = true;
     
     if (reconnectTimeoutRef.current) {
@@ -95,17 +96,10 @@ export const useRealtimeTranscription = ({
       isConnecting: false
     }));
     console.log('Transcription resources cleaned up');
-  };
-  
-  // Effect to handle text updates
-  useEffect(() => {
-    if (onTranscriptionUpdate && state.text) {
-      onTranscriptionUpdate(state.text);
-    }
-  }, [state.text, onTranscriptionUpdate]);
+  }, [cleanupWebSocket]);
   
   // Setup microphone capture
-  const setupMicrophone = async () => {
+  const setupMicrophone = useCallback(async () => {
     try {
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
@@ -178,9 +172,9 @@ export const useRealtimeTranscription = ({
       }
       return false;
     }
-  };
+  }, [state.isConnected]);
   
-  const setupWebSocketConnection = (token: string) => {
+  const setupWebSocketConnection = useCallback((token: string) => {
     if (isCleanedUpRef.current || !token) return;
     
     cleanupWebSocket();
@@ -285,26 +279,32 @@ export const useRealtimeTranscription = ({
         isReconnectingRef.current = true;
         console.log("Token may be expired. Requesting a new token...");
         
+        // Invalidate the current token
+        sessionTokenRef.current = null;
+        tokenExpiryRef.current = null;
+        
         // Wait a moment before reconnecting to avoid rapid reconnection attempts
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
         }
         
         reconnectTimeoutRef.current = setTimeout(() => {
-          if (!isCleanedUpRef.current && isRecording) {
+          if (!isCleanedUpRef.current && isRecording && !setupInProgressRef.current) {
             console.log("Attempting to reconnect with a new token...");
             setupRealtimeTranscription();
           }
         }, 1000);
       }
     };
-  };
+  }, [cleanupWebSocket, isRecording, lastTranscriptId, setupMicrophone]);
   
-  const setupRealtimeTranscription = async () => {
+  const setupRealtimeTranscription = useCallback(async () => {
+    if (isCleanedUpRef.current || setupInProgressRef.current) return;
+    
     try {
-      if (isCleanedUpRef.current) return;
-      
+      setupInProgressRef.current = true;
       isCleanedUpRef.current = false;
+      
       setState(prev => ({
         ...prev,
         isConnecting: true
@@ -314,10 +314,10 @@ export const useRealtimeTranscription = ({
       const currentTime = Math.floor(Date.now() / 1000);
       const tokenValid = sessionTokenRef.current && 
                          tokenExpiryRef.current && 
-                         tokenExpiryRef.current > currentTime;
+                         tokenExpiryRef.current > currentTime + 30; // Add a 30-second buffer
       
       if (!tokenValid) {
-        // Obter token de sessão da função Edge
+        // Obtain session token from Edge Function
         console.log("Requesting new transcription token...");
         const { data: sessionData, error: tokenError } = await supabase.functions.invoke("realtime-transcription-token");
         
@@ -333,21 +333,19 @@ export const useRealtimeTranscription = ({
           throw new Error("Token de transcrição inválido ou ausente");
         }
         
-        if (isCleanedUpRef.current) return;
-        
-        sessionTokenRef.current = sessionData.client_secret.value;
-        
-        // Use the expires_at value from the token, or default to 10 minutes if it's 0 or invalid
-        if (sessionData.expires_at && sessionData.expires_at > 0) {
-          tokenExpiryRef.current = sessionData.expires_at;
-        } else {
-          tokenExpiryRef.current = Math.floor(Date.now() / 1000) + 600; // 10 minutes from now
+        if (isCleanedUpRef.current) {
+          setupInProgressRef.current = false;
+          return;
         }
         
-        console.log("Received transcription session token, expires at:", 
-                    tokenExpiryRef.current ? new Date(tokenExpiryRef.current * 1000).toISOString() : 'unknown');
+        sessionTokenRef.current = sessionData.client_secret.value;
+        tokenExpiryRef.current = sessionData.expires_at;
+        
+        console.log(`Received transcription session token, expires at: ${
+          tokenExpiryRef.current ? new Date(tokenExpiryRef.current * 1000).toISOString() : 'unknown'
+        }`);
       } else {
-        console.log("Using existing valid token");
+        console.log("Using existing valid token, expiring at:", new Date(tokenExpiryRef.current * 1000).toISOString());
       }
       
       // Connect using the WebSocket API with the token
@@ -356,7 +354,10 @@ export const useRealtimeTranscription = ({
     } catch (error) {
       console.error('Error setting up real-time transcription:', error);
       
-      if (isCleanedUpRef.current) return;
+      if (isCleanedUpRef.current) {
+        setupInProgressRef.current = false;
+        return;
+      }
       
       setState(prev => ({
         ...prev,
@@ -366,28 +367,42 @@ export const useRealtimeTranscription = ({
       
       // Increment connection attempts
       setConnectionAttempts(prev => prev + 1);
+    } finally {
+      setupInProgressRef.current = false;
     }
-  };
+  }, [setupWebSocketConnection]);
+  
+  // Effect for handling text updates
+  useEffect(() => {
+    if (onTranscriptionUpdate && state.text) {
+      onTranscriptionUpdate(state.text);
+    }
+  }, [state.text, onTranscriptionUpdate]);
   
   // Effect to handle connection and cleanup
   useEffect(() => {
-    if (isRecording && onTranscriptionUpdate && !state.isConnected && !state.isConnecting) {
-      setState(prev => ({
-        ...prev,
-        isConnecting: true
-      }));
-      
+    // Only start the connection if we're recording and have a callback
+    if (isRecording && onTranscriptionUpdate && !state.isConnected && !state.isConnecting && !setupInProgressRef.current) {
       setupRealtimeTranscription();
     }
     
+    // Clean up when not recording
     if (!isRecording && (state.isConnected || state.isConnecting)) {
       cleanupResources();
     }
     
+    // Cleanup on unmount
     return () => {
       cleanupResources();
     };
-  }, [isRecording, onTranscriptionUpdate, state.isConnected, state.isConnecting]);
+  }, [
+    isRecording, 
+    onTranscriptionUpdate, 
+    state.isConnected, 
+    state.isConnecting, 
+    setupRealtimeTranscription, 
+    cleanupResources
+  ]);
   
   return {
     isConnecting: state.isConnecting,
