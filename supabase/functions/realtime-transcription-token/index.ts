@@ -9,6 +9,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log("realtime-transcription-token function called");
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     console.log("Handling OPTIONS request with CORS headers");
@@ -16,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Requesting transcription session token from OpenAI");
+    // Get OpenAI API Key
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
@@ -24,83 +26,51 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not set');
     }
 
-    // Request a transcription session token from OpenAI
-    console.log("Sending request to OpenAI Realtime Transcription API...");
-    const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
+    console.log("Requesting OpenAI Realtime transcription token...");
+    
+    // Get token from OpenAI
+    const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
-        "OpenAI-Beta": "realtime=v1",
       },
       body: JSON.stringify({
-        input_audio_format: "pcm16",
-        input_audio_transcription: {
-          model: "gpt-4o-transcribe",
-          language: "pt",
-          prompt: "Vocabulário médico, terminologia ortopédica"
-        },
-        turn_detection: {
-          type: "server_vad",
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 1000,
-        },
-        input_audio_noise_reduction: {
-          type: "near_field"
-        }
-      })
+        model: "gpt-4o-transcribe",
+        intent: "transcription",
+        language: "pt"
+      }),
     });
 
-    // Add detailed logging for troubleshooting
-    console.log("OpenAI API response status:", response.status);
-    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("OpenAI API error response:", errorText);
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        console.error("OpenAI API error details:", errorData);
-        throw new Error(`OpenAI API error: ${response.status} - ${JSON.stringify(errorData)}`);
-      } catch (e) {
-        // If JSON parsing fails, just use the text
-        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-      }
+      console.error(`OpenAI API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log("Transcription session created successfully");
+    console.log("Token response:", JSON.stringify(data, null, 2));
     
-    // Check for valid token and expiration
     if (!data.client_secret?.value) {
-      console.error("Invalid token data received: missing client_secret.value");
-      throw new Error('Invalid token data received from OpenAI API');
+      throw new Error("No client_secret value in response");
     }
-    
-    // If expires_at is 0, invalid, or missing, set a default expiration (10 minutes)
-    if (!data.expires_at || data.expires_at === 0) {
-      console.log("Setting default expiration time for token");
-      data.expires_at = Math.floor(Date.now() / 1000) + 600; // 10 minutes from now
-    }
-    
-    // Log the structure of the response for debugging
-    console.log("Session data structure:", JSON.stringify(Object.keys(data)));
-    console.log("Token will expire at:", new Date(data.expires_at * 1000).toISOString());
-    
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200
-    });
+
+    // Return the token
+    return new Response(
+      JSON.stringify({ 
+        token: data.client_secret.value,
+        expires_at: data.expires_at
+      }),
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+        status: 200 
+      }
+    );
   } catch (error) {
     console.error("Error in realtime-transcription-token function:", error.message);
-    console.error("Error stack:", error.stack);
-    
-    // Return a more detailed error response
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        stack: error.stack,
         timestamp: new Date().toISOString()
       }),
       { 
