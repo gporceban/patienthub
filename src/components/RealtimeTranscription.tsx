@@ -1,5 +1,5 @@
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRealtimeTranscription } from '@/hooks/useRealtimeTranscription';
 import TranscriptionDisplay from './TranscriptionDisplay';
 
@@ -16,6 +16,9 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   isTranscribing,
   onTranscriptionUpdate
 }) => {
+  const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const prevIsRecordingRef = useRef(isRecording);
+  
   // Use a stable callback that only changes when onTranscriptionUpdate changes
   const stableCallback = useCallback((text: string) => {
     if (onTranscriptionUpdate) {
@@ -33,11 +36,34 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
     isConnected,
     error,
     text,
-    connectionAttempts
+    connectionAttempts,
+    cleanupResources
   } = useRealtimeTranscription({
     isRecording: shouldUseRealtime,
     onTranscriptionUpdate: stableCallback
   });
+  
+  // Properly handle recording state changes with a delay to prevent premature cleanup
+  useEffect(() => {
+    if (prevIsRecordingRef.current && !isRecording) {
+      if (cleanupTimeoutRef.current) {
+        clearTimeout(cleanupTimeoutRef.current);
+      }
+      
+      // Delay cleanup by 500ms to ensure all processing is complete
+      cleanupTimeoutRef.current = setTimeout(() => {
+        cleanupResources();
+      }, 500);
+    }
+    
+    prevIsRecordingRef.current = isRecording;
+    
+    return () => {
+      if (cleanupTimeoutRef.current) {
+        clearTimeout(cleanupTimeoutRef.current);
+      }
+    };
+  }, [isRecording, cleanupResources]);
   
   return (
     <TranscriptionDisplay

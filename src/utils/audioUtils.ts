@@ -1,128 +1,85 @@
 
 /**
- * Utility functions for audio processing
- */
-
-/**
- * Process and analyze audio levels from audio data
+ * Processes an Uint8Array of audio frequencies to calculate audio level
  */
 export const processAudioLevel = (dataArray: Uint8Array): number => {
+  if (!dataArray || dataArray.length === 0) return 0;
+  
   let sum = 0;
   for (let i = 0; i < dataArray.length; i++) {
     sum += dataArray[i];
   }
   
   const avg = sum / dataArray.length;
-  const level = Math.min(1, avg / 128);
-  
-  return level;
+  return Math.min(1, avg / 128);
 };
 
 /**
- * Convert Blob to base64 string
- */
-export const blobToBase64 = (blob: Blob): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result?.toString().split(',')[1];
-      if (base64String) {
-        resolve(base64String);
-      } else {
-        reject(new Error('Falha ao converter áudio para base64'));
-      }
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-};
-
-/**
- * Check if microphone is available and permissions are granted
- * @returns Promise resolving to true if microphone is available, false otherwise
+ * Checks if microphone is available and permissions are granted
  */
 export const checkMicrophoneAvailability = async (): Promise<boolean> => {
+  console.log("Checking microphone availability...");
+  
   try {
-    console.log("Checking microphone availability...");
     const devices = await navigator.mediaDevices.enumerateDevices();
-    const audioInputs = devices.filter(device => device.kind === 'audioinput');
+    const hasMicrophone = devices.some(device => device.kind === 'audioinput');
     
-    if (audioInputs.length === 0) {
-      console.log("No audio input devices found");
+    if (!hasMicrophone) {
+      console.log("No microphone devices found");
       return false;
     }
     
-    // Try to get actual access to verify permissions
+    // Try to get permission
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     
-    // Immediately stop the tracks since we just needed to check access
+    // Stop tracks immediately
     stream.getTracks().forEach(track => track.stop());
     
     console.log("Microphone is available and permissions granted");
     return true;
   } catch (error) {
-    console.error("Microphone availability check failed:", error);
+    console.error("Error checking microphone availability:", error);
     return false;
   }
 };
 
 /**
- * Convert Float32Array audio data to base64 encoded PCM16 format for the OpenAI API
- * @param float32Array The Float32Array from the audio buffer
- * @returns base64 encoded PCM16 audio data
+ * Convert a Blob to base64 string
  */
-export const encodeAudioForAPI = (float32Array: Float32Array): string => {
-  // Convert Float32Array (-1.0 to 1.0) to Int16Array (-32768 to 32767)
-  const int16Array = new Int16Array(float32Array.length);
-  for (let i = 0; i < float32Array.length; i++) {
-    // Ensure the value is within -1.0 to 1.0 range
-    const s = Math.max(-1, Math.min(1, float32Array[i]));
-    // Scale to 16-bit range and convert
-    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+export const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(blob);
+    reader.onloadend = () => {
+      const base64 = reader.result?.toString().split(',')[1];
+      if (base64) {
+        resolve(base64);
+      } else {
+        reject(new Error('Failed to convert blob to base64'));
+      }
+    };
+    reader.onerror = reject;
+  });
+};
+
+/**
+ * Encode audio data for the OpenAI API
+ * Converts Float32Array to Int16Array base64 string
+ */
+export const encodeAudioForAPI = (audioData: Float32Array): string => {
+  // Convert Float32Array (-1 to 1) to Int16Array (-32768 to 32767)
+  const pcm16 = new Int16Array(audioData.length);
+  for (let i = 0; i < audioData.length; i++) {
+    // Map the Float32 sample to Int16 range
+    pcm16[i] = Math.max(-32768, Math.min(32767, Math.floor(audioData[i] * 32767)));
   }
   
-  // Convert Int16Array to Uint8Array for base64 encoding
-  const uint8Array = new Uint8Array(int16Array.buffer);
-  
-  // Convert to binary string
+  // Convert Int16Array to Base64
   let binary = '';
-  const chunkSize = 0x8000; // Split into chunks to avoid call stack overflow
-  
-  for (let i = 0; i < uint8Array.length; i += chunkSize) {
-    const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-    // Apply directly to avoid creating an array
-    binary += String.fromCharCode.apply(null, Array.from(chunk));
+  const len = pcm16.length;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(pcm16[i] & 0xff, (pcm16[i] >> 8) & 0xff);
   }
   
-  // Convert binary string to base64
   return btoa(binary);
-};
-
-/**
- * Decode base64 PCM16 audio into a Float32Array for Web Audio API
- */
-export const decodeAudioFromAPI = (base64Audio: string): Float32Array => {
-  const binaryString = atob(base64Audio);
-  const bytes = new Uint8Array(binaryString.length);
-  
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  
-  const int16Array = new Int16Array(bytes.buffer);
-  const float32Array = new Float32Array(int16Array.length);
-  
-  for (let i = 0; i < int16Array.length; i++) {
-    float32Array[i] = int16Array[i] / 0x8000;
-  }
-  
-  return float32Array;
-};
-
-/**
- * Wait for a specified amount of time
- * @param ms Time to wait in milliseconds
- */
-export const sleep = (ms: number): Promise<void> => {
-  return new Promise(resolve => setTimeout(resolve, ms));
 };

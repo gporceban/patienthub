@@ -1,111 +1,72 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+// Follow this setup guide to integrate the Deno language server with your editor:
+// https://deno.land/manual/getting_started/setup_your_environment
+// This enables autocomplete, go to definition, etc.
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-app-name",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    console.log("Handling OPTIONS request with CORS headers");
-    return new Response(null, { headers: corsHeaders, status: 204 });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
-
+  
   try {
-    console.log("Requesting transcription session token from OpenAI");
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    // Get OpenAI API key from environment variables
+    const apiKey = Deno.env.get('OPENAI_API_KEY')
     
-    if (!OPENAI_API_KEY) {
-      console.error("OPENAI_API_KEY is not set");
-      throw new Error('OPENAI_API_KEY is not set');
+    if (!apiKey) {
+      throw new Error('OpenAI API key not found in environment variables')
     }
-
-    // Request a transcription session token from OpenAI
-    console.log("Sending request to OpenAI Realtime Transcription API...");
-    const response = await fetch("https://api.openai.com/v1/realtime/transcription_sessions", {
-      method: "POST",
+    
+    // Get a speech-to-text token from OpenAI API
+    const response = await fetch('https://api.openai.com/v1/audio/speech-recognition/realtime/tokens', {
+      method: 'POST',
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        input_audio_format: "pcm16",
-        input_audio_transcription: {
-          model: "gpt-4o-transcribe",
-          language: "pt",
-          prompt: "Vocabulário médico, terminologia ortopédica"
-        },
-        turn_detection: {
-          type: "server_vad",
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 1000,
-        },
-        input_audio_noise_reduction: {
-          type: "near_field"
-        }
+        model: 'whisper-1',
+        language: 'pt'
       })
-    });
-
-    // Add detailed logging for troubleshooting
-    console.log("OpenAI API response status:", response.status);
+    })
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenAI API error response:", errorText);
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        console.error("OpenAI API error details:", errorData);
-        throw new Error(`OpenAI API error: ${response.status} - ${JSON.stringify(errorData)}`);
-      } catch (e) {
-        // If JSON parsing fails, just use the text
-        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-      }
-    }
-
-    const data = await response.json();
-    console.log("Transcription session created successfully");
-    
-    // Check for valid token and expiration
-    if (!data.client_secret?.value || !data.expires_at) {
-      console.error("Invalid token data received:", data);
-      throw new Error('Invalid token data received from OpenAI API');
+      const errorData = await response.text()
+      console.error('OpenAI token request failed:', errorData)
+      throw new Error(`Failed to get token: ${response.status} ${response.statusText}`)
     }
     
-    // If expires_at is 0 or invalid, set a default expiration (10 minutes)
-    if (data.expires_at === 0 || !data.expires_at) {
-      console.log("Setting default expiration time for token");
-      data.expires_at = Math.floor(Date.now() / 1000) + 600; // 10 minutes from now
-    }
+    const data = await response.json()
     
-    // Log the structure of the response for debugging
-    console.log("Session data structure:", JSON.stringify(Object.keys(data)));
-    console.log("Session data received:", data);
+    console.log(`Token will expire at: ${new Date(data.expires_at * 1000).toISOString()}`)
     
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200
-    });
-  } catch (error) {
-    console.error("Error in realtime-transcription-token function:", error.message);
-    console.error("Error stack:", error.stack);
-    
-    // Return a more detailed error response
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        stack: error.stack,
-        timestamp: new Date().toISOString()
+      JSON.stringify({
+        token: data.token,
+        expires_at: data.expires_at
       }),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-        status: 500 
-      }
-    );
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
+  } catch (error) {
+    console.error('Error getting transcription token:', error)
+    
+    return new Response(
+      JSON.stringify({
+        error: error.message
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
   }
-});
+})
