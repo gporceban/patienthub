@@ -1,5 +1,5 @@
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useRealtimeTranscription } from '@/hooks/useRealtimeTranscription';
 import TranscriptionDisplay from './TranscriptionDisplay';
 
@@ -16,12 +16,17 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
   isTranscribing,
   onTranscriptionUpdate
 }) => {
-  // Prevent callback changes causing re-renders
+  // Use a stable callback that only changes when onTranscriptionUpdate changes
   const stableCallback = useCallback((text: string) => {
     if (onTranscriptionUpdate) {
       onTranscriptionUpdate(text);
     }
   }, [onTranscriptionUpdate]);
+  
+  // Only use the realtime transcription if we're recording and have a callback
+  const shouldUseRealtime = useMemo(() => {
+    return isRecording && !!onTranscriptionUpdate;
+  }, [isRecording, onTranscriptionUpdate]);
   
   const {
     isConnecting,
@@ -30,7 +35,7 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
     text,
     connectionAttempts
   } = useRealtimeTranscription({
-    isRecording,
+    isRecording: shouldUseRealtime,
     onTranscriptionUpdate: stableCallback
   });
   

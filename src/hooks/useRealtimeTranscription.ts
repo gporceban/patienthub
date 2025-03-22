@@ -40,18 +40,24 @@ export const useRealtimeTranscription = ({
   const isCleanedUpRef = useRef(false);
   const isReconnectingRef = useRef(false);
   const setupInProgressRef = useRef(false);
+  const activeStreamIdRef = useRef<string | null>(null);
 
   // Cleanup WebSocket connection
   const cleanupWebSocket = useCallback(() => {
     if (websocketRef.current) {
       console.log("Closing WebSocket connection");
-      websocketRef.current.close();
+      try {
+        websocketRef.current.close();
+      } catch (err) {
+        console.error("Error closing WebSocket:", err);
+      }
       websocketRef.current = null;
     }
   }, []);
   
   // Cleanup function for all resources
   const cleanupResources = useCallback(() => {
+    console.log("Transcription resources cleaned up");
     isCleanedUpRef.current = true;
     
     if (reconnectTimeoutRef.current) {
@@ -72,7 +78,7 @@ export const useRealtimeTranscription = ({
       processorRef.current = null;
     }
     
-    if (audioContextRef.current) {
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       try {
         audioContextRef.current.close().catch(console.error);
       } catch (e) {
@@ -95,7 +101,6 @@ export const useRealtimeTranscription = ({
       isConnected: false,
       isConnecting: false
     }));
-    console.log('Transcription resources cleaned up');
   }, [cleanupWebSocket]);
   
   // Setup microphone capture
@@ -119,10 +124,16 @@ export const useRealtimeTranscription = ({
       
       if (isCleanedUpRef.current) return false;
       
+      const streamId = stream.id || Math.random().toString();
+      activeStreamIdRef.current = streamId;
       mediaStreamRef.current = stream;
       
       if (audioContextRef.current) {
-        await audioContextRef.current.close();
+        try {
+          await audioContextRef.current.close();
+        } catch (e) {
+          console.error('Error closing previous audio context:', e);
+        }
       }
       
       const newAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
@@ -155,7 +166,7 @@ export const useRealtimeTranscription = ({
         }
       };
       
-      if (isCleanedUpRef.current) return false;
+      if (isCleanedUpRef.current || activeStreamIdRef.current !== streamId) return false;
       
       sourceRef.current.connect(processorRef.current);
       processorRef.current.connect(audioContextRef.current.destination);
@@ -217,19 +228,42 @@ export const useRealtimeTranscription = ({
         
         if (data.type === "transcription.delta") {
           const newText = data.delta || "";
-          setState(prev => ({
-            ...prev,
-            text: prev.text + newText
-          }));
+          if (onTranscriptionUpdate) {
+            setState(prev => {
+              const updatedText = prev.text + newText;
+              
+              // Update state after ensuring the component is still mounted
+              if (!isCleanedUpRef.current) {
+                if (onTranscriptionUpdate) {
+                  onTranscriptionUpdate(updatedText);
+                }
+              }
+              
+              return {
+                ...prev,
+                text: updatedText
+              };
+            });
+          }
         } 
         else if (data.type === "transcription.completed") {
           const completeText = data.transcript || "";
           if (data.item_id !== lastTranscriptId) {
             setLastTranscriptId(data.item_id);
-            setState(prev => ({
-              ...prev,
-              text: completeText
-            }));
+            
+            setState(prev => {
+              // Update state after ensuring the component is still mounted
+              if (!isCleanedUpRef.current) {
+                if (onTranscriptionUpdate) {
+                  onTranscriptionUpdate(completeText);
+                }
+              }
+              
+              return {
+                ...prev,
+                text: completeText
+              };
+            });
           }
         }
         else if (data.type === "error") {
@@ -296,7 +330,7 @@ export const useRealtimeTranscription = ({
         }, 1000);
       }
     };
-  }, [cleanupWebSocket, isRecording, lastTranscriptId, setupMicrophone]);
+  }, [cleanupWebSocket, isRecording, lastTranscriptId, onTranscriptionUpdate, setupMicrophone]);
   
   const setupRealtimeTranscription = useCallback(async () => {
     if (isCleanedUpRef.current || setupInProgressRef.current) return;
@@ -371,13 +405,6 @@ export const useRealtimeTranscription = ({
       setupInProgressRef.current = false;
     }
   }, [setupWebSocketConnection]);
-  
-  // Effect for handling text updates
-  useEffect(() => {
-    if (onTranscriptionUpdate && state.text) {
-      onTranscriptionUpdate(state.text);
-    }
-  }, [state.text, onTranscriptionUpdate]);
   
   // Effect to handle connection and cleanup
   useEffect(() => {
