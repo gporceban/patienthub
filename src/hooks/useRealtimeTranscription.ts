@@ -42,6 +42,7 @@ export const useRealtimeTranscription = ({
   const setupInProgressRef = useRef(false);
   const activeStreamIdRef = useRef<string | null>(null);
   const setupMicrophoneInProgressRef = useRef(false);
+  const sessionInitializedRef = useRef(false);
 
   // Cleanup WebSocket connection
   const cleanupWebSocket = useCallback(() => {
@@ -114,6 +115,7 @@ export const useRealtimeTranscription = ({
     }));
     
     isCleanedUpRef.current = true;
+    sessionInitializedRef.current = false;
     console.log("Transcription resources cleaned up");
   }, [cleanupWebSocket]);
   
@@ -183,7 +185,7 @@ export const useRealtimeTranscription = ({
         
         const inputData = e.inputBuffer.getChannelData(0);
         
-        // Convert Float32Array to Int16Array (PCM16)
+        // Convert Float32Array to base64 for sending
         const pcmData = encodeAudioForAPI(inputData);
         
         // Send to the API Realtime
@@ -250,6 +252,28 @@ export const useRealtimeTranscription = ({
         error: null
       }));
       
+      // Send configuration update
+      console.log("Sending transcription session configuration");
+      websocket.send(JSON.stringify({
+        type: "transcription_session.update",
+        input_audio_format: "pcm16",
+        input_audio_transcription: {
+          model: "gpt-4o-transcribe",
+          language: "pt",
+          prompt: "Vocabulário médico, terminologia ortopédica"
+        },
+        turn_detection: {
+          type: "server_vad",
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 1000,
+        },
+        input_audio_noise_reduction: {
+          type: "near_field"
+        }
+      }));
+      
+      sessionInitializedRef.current = true;
       setConnectionAttempts(0);
       isReconnectingRef.current = false;
       
@@ -266,23 +290,21 @@ export const useRealtimeTranscription = ({
         
         if (data.type === "transcription.delta") {
           const newText = data.delta || "";
-          if (onTranscriptionUpdate) {
-            setState(prev => {
-              const updatedText = prev.text + newText;
-              
-              // Update state after ensuring the component is still mounted
-              if (!isCleanedUpRef.current) {
-                if (onTranscriptionUpdate) {
-                  onTranscriptionUpdate(updatedText);
-                }
+          setState(prev => {
+            const updatedText = prev.text + newText;
+            
+            // Update state after ensuring the component is still mounted
+            if (!isCleanedUpRef.current) {
+              if (onTranscriptionUpdate) {
+                onTranscriptionUpdate(updatedText);
               }
-              
-              return {
-                ...prev,
-                text: updatedText
-              };
-            });
-          }
+            }
+            
+            return {
+              ...prev,
+              text: updatedText
+            };
+          });
         } 
         else if (data.type === "transcription.completed") {
           const completeText = data.transcript || "";
@@ -347,7 +369,7 @@ export const useRealtimeTranscription = ({
       
       // If the token is expired or invalid (code 3000 is often used by OpenAI for invalid tokens)
       // Request a new token and reconnect
-      if (event.code === 3000 && !isReconnectingRef.current && isRecording) {
+      if ((event.code === 3000 || event.code === 1000) && !isReconnectingRef.current && isRecording) {
         isReconnectingRef.current = true;
         console.log("Token may be expired. Requesting a new token...");
         
@@ -448,6 +470,8 @@ export const useRealtimeTranscription = ({
   useEffect(() => {
     // Only start the connection if we're recording and have a callback
     if (isRecording && onTranscriptionUpdate && !state.isConnected && !state.isConnecting && !setupInProgressRef.current) {
+      // Reset the cleanup flag when starting new connection
+      isCleanedUpRef.current = false;
       setupRealtimeTranscription();
     }
     

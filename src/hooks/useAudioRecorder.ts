@@ -1,5 +1,5 @@
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { processAudioLevel, checkMicrophoneAvailability } from '@/utils/audioUtils';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -38,13 +38,10 @@ export const useAudioRecorder = ({
   
   const { toast } = useToast();
 
-  useEffect(() => {
-    return () => {
-      cleanupResources();
-    };
-  }, []);
-
-  const cleanupResources = () => {
+  // Explicitly create a cleanup function that we can call from anywhere
+  const cleanupResources = useCallback(() => {
+    console.log("Audio recorder resources cleanup initiated");
+    
     if (mediaRecorderRef.current && isRecording) {
       try {
         mediaRecorderRef.current.stop();
@@ -81,9 +78,15 @@ export const useAudioRecorder = ({
     mediaRecorderRef.current = null;
     
     console.log("Audio recorder resources cleaned up");
-  };
+  }, [isRecording]);
 
-  const startPeriodicTranscription = () => {
+  useEffect(() => {
+    return () => {
+      cleanupResources();
+    };
+  }, [cleanupResources]);
+
+  const startPeriodicTranscription = useCallback(() => {
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
     }
@@ -104,7 +107,7 @@ export const useAudioRecorder = ({
         }
       }, 5000);
     }
-  };
+  }, [isRecording, onDataAvailable, useRealtimeTranscription]);
 
   const startRecording = async () => {
     if (startRecordingInProgressRef.current) {
@@ -143,7 +146,7 @@ export const useAudioRecorder = ({
       const dataArray = new Uint8Array(analyserNodeRef.current.frequencyBinCount);
       
       const checkAudioLevel = () => {
-        if (!isRecording || !analyserNodeRef.current) return;
+        if (!analyserNodeRef.current) return;
         
         analyserNodeRef.current.getByteFrequencyData(dataArray);
         
