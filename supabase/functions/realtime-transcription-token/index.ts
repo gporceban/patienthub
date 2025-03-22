@@ -7,13 +7,18 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-app-name',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 }
 
 serve(async (req) => {
+  console.log("Realtime transcription token function called");
+  console.log("Request method:", req.method);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    console.log("Handling OPTIONS request with CORS headers");
+    return new Response('ok', { headers: corsHeaders, status: 204 })
   }
   
   try {
@@ -21,8 +26,11 @@ serve(async (req) => {
     const apiKey = Deno.env.get('OPENAI_API_KEY')
     
     if (!apiKey) {
+      console.error('OpenAI API key not found in environment variables');
       throw new Error('OpenAI API key not found in environment variables')
     }
+    
+    console.log("Sending request to OpenAI Realtime Transcription API...");
     
     // Get a speech-to-text token from OpenAI API
     const response = await fetch('https://api.openai.com/v1/audio/speech-recognition/realtime/tokens', {
@@ -39,13 +47,13 @@ serve(async (req) => {
     
     if (!response.ok) {
       const errorData = await response.text()
-      console.error('OpenAI token request failed:', errorData)
-      throw new Error(`Failed to get token: ${response.status} ${response.statusText}`)
+      console.error('OpenAI token request failed:', errorData);
+      throw new Error(`Failed to get token: ${response.status} ${response.statusText} - ${errorData}`)
     }
     
     const data = await response.json()
     
-    console.log(`Token will expire at: ${new Date(data.expires_at * 1000).toISOString()}`)
+    console.log(`Token received successfully. Will expire at: ${new Date(data.expires_at * 1000).toISOString()}`);
     
     return new Response(
       JSON.stringify({
@@ -54,10 +62,11 @@ serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
       },
     )
   } catch (error) {
-    console.error('Error getting transcription token:', error)
+    console.error('Error getting transcription token:', error);
     
     return new Response(
       JSON.stringify({

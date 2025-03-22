@@ -50,10 +50,10 @@ const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
         clearTimeout(cleanupTimeoutRef.current);
       }
       
-      // Delay cleanup by 500ms to ensure all processing is complete
+      // Delay cleanup by 2 seconds to ensure all processing is complete
       cleanupTimeoutRef.current = setTimeout(() => {
         cleanupResources();
-      }, 500);
+      }, 2000);
     }
     
     prevIsRecordingRef.current = isRecording;

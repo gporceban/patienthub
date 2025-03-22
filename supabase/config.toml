@@ -4,6 +4,7 @@ project_id = "tokybrabdqqahhbxxpzj"
 
 [functions.realtime-transcription-token]
 verify_jwt = false
+max_retries = 0
 
 [functions.process-text]
 verify_jwt = false
