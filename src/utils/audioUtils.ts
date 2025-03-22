@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for audio processing
  */
@@ -38,27 +37,63 @@ export const blobToBase64 = (blob: Blob): Promise<string> => {
 };
 
 /**
- * Encode audio data for the OpenAI Realtime API
- * Converts Float32Array to base64-encoded PCM16 format
+ * Check if microphone is available and permissions are granted
+ * @returns Promise resolving to true if microphone is available, false otherwise
+ */
+export const checkMicrophoneAvailability = async (): Promise<boolean> => {
+  try {
+    console.log("Checking microphone availability...");
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const audioInputs = devices.filter(device => device.kind === 'audioinput');
+    
+    if (audioInputs.length === 0) {
+      console.log("No audio input devices found");
+      return false;
+    }
+    
+    // Try to get actual access to verify permissions
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    // Immediately stop the tracks since we just needed to check access
+    stream.getTracks().forEach(track => track.stop());
+    
+    console.log("Microphone is available and permissions granted");
+    return true;
+  } catch (error) {
+    console.error("Microphone availability check failed:", error);
+    return false;
+  }
+};
+
+/**
+ * Convert Float32Array audio data to base64 encoded PCM16 format for the OpenAI API
+ * @param float32Array The Float32Array from the audio buffer
+ * @returns base64 encoded PCM16 audio data
  */
 export const encodeAudioForAPI = (float32Array: Float32Array): string => {
-  // Converter de Float32Array para Int16Array (PCM16)
+  // Convert Float32Array (-1.0 to 1.0) to Int16Array (-32768 to 32767)
   const int16Array = new Int16Array(float32Array.length);
   for (let i = 0; i < float32Array.length; i++) {
+    // Ensure the value is within -1.0 to 1.0 range
     const s = Math.max(-1, Math.min(1, float32Array[i]));
+    // Scale to 16-bit range and convert
     int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
   }
   
-  // Converter para string binária e codificar em base64
+  // Convert Int16Array to Uint8Array for base64 encoding
   const uint8Array = new Uint8Array(int16Array.buffer);
+  
+  // Convert to binary string
   let binary = '';
-  const chunkSize = 0x8000;
+  const chunkSize = 0x8000; // Split into chunks to avoid call stack overflow
   
   for (let i = 0; i < uint8Array.length; i += chunkSize) {
     const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+    // Apply directly to avoid creating an array
     binary += String.fromCharCode.apply(null, Array.from(chunk));
   }
   
+  // Convert binary string to base64
   return btoa(binary);
 };
 
@@ -81,36 +116,4 @@ export const decodeAudioFromAPI = (base64Audio: string): Float32Array => {
   }
   
   return float32Array;
-};
-
-/**
- * Check if a microphone is available and accessible
- */
-export const checkMicrophoneAvailability = async (): Promise<boolean> => {
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const hasMicrophone = devices.some(device => device.kind === 'audioinput');
-    
-    if (!hasMicrophone) {
-      console.warn('No microphone devices found');
-      return false;
-    }
-    
-    // Try to access the microphone
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
-    });
-    
-    // Clean up immediately to not leave the mic open
-    stream.getTracks().forEach(track => track.stop());
-    
-    return true;
-  } catch (err) {
-    console.error('Error checking microphone:', err);
-    return false;
-  }
 };

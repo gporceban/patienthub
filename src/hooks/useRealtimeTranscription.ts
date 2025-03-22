@@ -230,6 +230,7 @@ export const useRealtimeTranscription = ({
     
     cleanupWebSocket();
     
+    // FIXED: The URL now includes "intent=transcription", and token is passed correctly
     const websocketUrl = `wss://api.openai.com/v1/realtime?intent=transcription&token=${token}`;
     console.log("Connecting to WebSocket with URL:", websocketUrl);
     
@@ -369,25 +370,27 @@ export const useRealtimeTranscription = ({
       
       // If the token is expired or invalid (code 3000 is often used by OpenAI for invalid tokens)
       // Request a new token and reconnect
-      if ((event.code === 3000 || event.code === 1000) && !isReconnectingRef.current && isRecording) {
-        isReconnectingRef.current = true;
-        console.log("Token may be expired. Requesting a new token...");
-        
-        // Invalidate the current token
-        sessionTokenRef.current = null;
-        tokenExpiryRef.current = null;
-        
-        // Wait a moment before reconnecting to avoid rapid reconnection attempts
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current);
-        }
-        
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (!isCleanedUpRef.current && isRecording && !setupInProgressRef.current) {
-            console.log("Attempting to reconnect with a new token...");
-            setupRealtimeTranscription();
+      if (event.code === 3000 || event.code === 1000 || event.code === 3001) {
+        if (!isReconnectingRef.current && isRecording) {
+          isReconnectingRef.current = true;
+          console.log("Token may be expired or invalid. Code:", event.code, "Requesting a new token...");
+          
+          // Invalidate the current token
+          sessionTokenRef.current = null;
+          tokenExpiryRef.current = null;
+          
+          // Wait a moment before reconnecting to avoid rapid reconnection attempts
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
           }
-        }, 1000);
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (!isCleanedUpRef.current && isRecording && !setupInProgressRef.current) {
+              console.log("Attempting to reconnect with a new token...");
+              setupRealtimeTranscription();
+            }
+          }, 1000);
+        }
       }
     };
   }, [cleanupWebSocket, isRecording, lastTranscriptId, onTranscriptionUpdate, setupMicrophone]);
