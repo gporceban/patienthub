@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { encodeAudioForAPI } from '@/utils/audioUtils';
+import { encodeAudioForAPI, sleep } from '@/utils/audioUtils';
 
 interface UseRealtimeTranscriptionProps {
   isRecording: boolean;
@@ -43,6 +43,7 @@ export const useRealtimeTranscription = ({
   const activeStreamIdRef = useRef<string | null>(null);
   const setupMicrophoneInProgressRef = useRef(false);
   const sessionInitializedRef = useRef(false);
+  const lastIsRecordingRef = useRef(false);
 
   // Cleanup WebSocket connection
   const cleanupWebSocket = useCallback(() => {
@@ -59,6 +60,12 @@ export const useRealtimeTranscription = ({
   
   // Cleanup function for all resources
   const cleanupResources = useCallback(() => {
+    // Don't cleanup resources if recording should continue
+    if (isRecording && lastIsRecordingRef.current && !isCleanedUpRef.current) {
+      console.log("Recording still in progress, skipping cleanup");
+      return;
+    }
+    
     console.log("Transcription resources cleanup initiated");
     
     if (reconnectTimeoutRef.current) {
@@ -117,12 +124,17 @@ export const useRealtimeTranscription = ({
     isCleanedUpRef.current = true;
     sessionInitializedRef.current = false;
     console.log("Transcription resources cleaned up");
-  }, [cleanupWebSocket]);
+  }, [cleanupWebSocket, isRecording]);
   
   // Setup microphone capture
   const setupMicrophone = useCallback(async () => {
     if (setupMicrophoneInProgressRef.current) {
       console.log("Microphone setup already in progress");
+      return false;
+    }
+    
+    if (!isRecording) {
+      console.log("Not recording anymore, aborting microphone setup");
       return false;
     }
     
@@ -150,8 +162,8 @@ export const useRealtimeTranscription = ({
       });
       console.log('Microphone access granted');
       
-      if (isCleanedUpRef.current) {
-        console.log('Resources cleaned up during microphone setup, aborting');
+      if (isCleanedUpRef.current || !isRecording) {
+        console.log('Resources cleaned up or recording stopped during microphone setup, aborting');
         stream.getTracks().forEach(track => track.stop());
         setupMicrophoneInProgressRef.current = false;
         return false;
@@ -199,8 +211,8 @@ export const useRealtimeTranscription = ({
         }
       };
       
-      if (isCleanedUpRef.current || activeStreamIdRef.current !== streamId) {
-        console.log('Resources cleaned up or stream changed during microphone setup, aborting');
+      if (isCleanedUpRef.current || !isRecording || activeStreamIdRef.current !== streamId) {
+        console.log('Resources cleaned up, recording stopped, or stream changed during microphone setup, aborting');
         stream.getTracks().forEach(track => track.stop());
         setupMicrophoneInProgressRef.current = false;
         return false;
@@ -214,7 +226,7 @@ export const useRealtimeTranscription = ({
       return true;
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      if (!isCleanedUpRef.current) {
+      if (!isCleanedUpRef.current && isRecording) {
         setState(prev => ({
           ...prev,
           error: 'Erro ao acessar o microfone. Verifique se as permissões estão concedidas.'
@@ -223,14 +235,20 @@ export const useRealtimeTranscription = ({
       setupMicrophoneInProgressRef.current = false;
       return false;
     }
-  }, [state.isConnected]);
+  }, [state.isConnected, isRecording]);
   
-  const setupWebSocketConnection = useCallback((token: string) => {
-    if (isCleanedUpRef.current || !token) return;
+  const setupWebSocketConnection = useCallback(async (token: string) => {
+    if (isCleanedUpRef.current || !token || !isRecording) {
+      console.log("Skipping WebSocket setup because:", 
+        isCleanedUpRef.current ? "resources cleaned up" : 
+        !token ? "no token" : 
+        !isRecording ? "not recording" : "unknown reason");
+      return;
+    }
     
     cleanupWebSocket();
     
-    // FIXED: The URL now includes "intent=transcription", and token is passed correctly
+    // FIXED: Using the correct WebSocket URL format
     const websocketUrl = `wss://api.openai.com/v1/realtime?intent=transcription&token=${token}`;
     console.log("Connecting to WebSocket with URL:", websocketUrl);
     
@@ -240,10 +258,14 @@ export const useRealtimeTranscription = ({
     websocket.onopen = async () => {
       console.log("WebSocket connection established successfully");
       
-      if (isCleanedUpRef.current) {
+      if (isCleanedUpRef.current || !isRecording) {
+        console.log("Resources cleaned up or recording stopped during WebSocket setup, closing connection");
         websocket.close();
         return;
       }
+      
+      // Wait a moment before sending configuration to ensure connection is stable
+      await sleep(100);
       
       // Successfully connected
       setState(prev => ({
@@ -287,7 +309,7 @@ export const useRealtimeTranscription = ({
         const data = JSON.parse(event.data);
         console.log("WebSocket message received:", data.type);
         
-        if (isCleanedUpRef.current) return;
+        if (isCleanedUpRef.current || !isRecording) return;
         
         if (data.type === "transcription.delta") {
           const newText = data.delta || "";
@@ -295,7 +317,7 @@ export const useRealtimeTranscription = ({
             const updatedText = prev.text + newText;
             
             // Update state after ensuring the component is still mounted
-            if (!isCleanedUpRef.current) {
+            if (!isCleanedUpRef.current && isRecording) {
               if (onTranscriptionUpdate) {
                 onTranscriptionUpdate(updatedText);
               }
@@ -314,7 +336,7 @@ export const useRealtimeTranscription = ({
             
             setState(prev => {
               // Update state after ensuring the component is still mounted
-              if (!isCleanedUpRef.current) {
+              if (!isCleanedUpRef.current && isRecording) {
                 if (onTranscriptionUpdate) {
                   onTranscriptionUpdate(completeText);
                 }
@@ -329,7 +351,7 @@ export const useRealtimeTranscription = ({
         }
         else if (data.type === "error") {
           console.error("WebSocket error event:", data);
-          if (!isCleanedUpRef.current) {
+          if (!isCleanedUpRef.current && isRecording) {
             setState(prev => ({
               ...prev,
               error: `Erro na transcrição: ${data.error?.message || data.message || "Erro desconhecido"}`
@@ -344,7 +366,7 @@ export const useRealtimeTranscription = ({
     websocket.onerror = (error) => {
       console.error("WebSocket connection error:", error);
       
-      if (isCleanedUpRef.current) return;
+      if (isCleanedUpRef.current || !isRecording) return;
       
       setState(prev => ({
         ...prev,
@@ -360,7 +382,7 @@ export const useRealtimeTranscription = ({
     websocket.onclose = (event) => {
       console.log(`WebSocket connection closed: ${event.code} - ${event.reason}`);
       
-      if (isCleanedUpRef.current) return;
+      if (isCleanedUpRef.current || !isRecording) return;
       
       setState(prev => ({
         ...prev,
@@ -368,8 +390,9 @@ export const useRealtimeTranscription = ({
         isConnecting: false
       }));
       
-      // If the token is expired or invalid (code 3000 is often used by OpenAI for invalid tokens)
-      // Request a new token and reconnect
+      // If the token is expired or invalid
+      // 3000 is often used by OpenAI for invalid tokens
+      // 3001 is "authentication required"
       if (event.code === 3000 || event.code === 1000 || event.code === 3001) {
         if (!isReconnectingRef.current && isRecording) {
           isReconnectingRef.current = true;
@@ -396,7 +419,13 @@ export const useRealtimeTranscription = ({
   }, [cleanupWebSocket, isRecording, lastTranscriptId, onTranscriptionUpdate, setupMicrophone]);
   
   const setupRealtimeTranscription = useCallback(async () => {
-    if (isCleanedUpRef.current || setupInProgressRef.current) return;
+    if (isCleanedUpRef.current || setupInProgressRef.current || !isRecording) {
+      console.log("Skipping setup because:", 
+        isCleanedUpRef.current ? "resources cleaned up" : 
+        setupInProgressRef.current ? "setup in progress" : 
+        !isRecording ? "not recording" : "unknown reason");
+      return;
+    }
     
     try {
       setupInProgressRef.current = true;
@@ -430,7 +459,8 @@ export const useRealtimeTranscription = ({
           throw new Error("Token de transcrição inválido ou ausente");
         }
         
-        if (isCleanedUpRef.current) {
+        if (isCleanedUpRef.current || !isRecording) {
+          console.log("Resources cleaned up or recording stopped during token request, aborting setup");
           setupInProgressRef.current = false;
           return;
         }
@@ -446,12 +476,12 @@ export const useRealtimeTranscription = ({
       }
       
       // Connect using the WebSocket API with the token
-      setupWebSocketConnection(sessionTokenRef.current!);
+      await setupWebSocketConnection(sessionTokenRef.current!);
       
     } catch (error) {
       console.error('Error setting up real-time transcription:', error);
       
-      if (isCleanedUpRef.current) {
+      if (isCleanedUpRef.current || !isRecording) {
         setupInProgressRef.current = false;
         return;
       }
@@ -467,24 +497,31 @@ export const useRealtimeTranscription = ({
     } finally {
       setupInProgressRef.current = false;
     }
-  }, [setupWebSocketConnection]);
+  }, [setupWebSocketConnection, isRecording]);
   
   // Effect to handle connection and cleanup
   useEffect(() => {
+    // Update the ref to track the previous isRecording value
+    const wasRecording = lastIsRecordingRef.current;
+    lastIsRecordingRef.current = isRecording;
+    
     // Only start the connection if we're recording and have a callback
     if (isRecording && onTranscriptionUpdate && !state.isConnected && !state.isConnecting && !setupInProgressRef.current) {
       // Reset the cleanup flag when starting new connection
+      console.log("Starting real-time transcription");
       isCleanedUpRef.current = false;
       setupRealtimeTranscription();
     }
     
-    // Clean up when not recording
-    if (!isRecording && (state.isConnected || state.isConnecting)) {
+    // Clean up when not recording, but was recording previously
+    if (!isRecording && wasRecording) {
+      console.log("Recording stopped, cleaning up resources");
       cleanupResources();
     }
     
     // Cleanup on unmount
     return () => {
+      console.log("Component unmounting, cleaning up resources");
       cleanupResources();
     };
   }, [
