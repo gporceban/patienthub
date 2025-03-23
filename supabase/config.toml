@@ -4,10 +4,26 @@ project_id = "tokybrabdqqahhbxxpzj"
 
 [functions.realtime-transcription-token]
 verify_jwt = false
-max_retries = 0
+max_retries = 3
+timeout_ms = 15000
+import_map = "./import_map.json"
 
 [functions.process-text]
 verify_jwt = false
 
 [functions.transcribe-audio]
 verify_jwt = false
+
+[api]
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[global.hooks.auth]
+custom_claims = "async (_, next) => {\n  return await next()\n}"
+
+[db]
+shadow = false
+major_version = 15
+port = 54322

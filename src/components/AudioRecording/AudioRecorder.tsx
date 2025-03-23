@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -9,6 +8,7 @@ import RealtimeTranscription from '../RealtimeTranscription';
 import RecorderControls from './RecorderControls';
 import AudioVisualizer from './AudioVisualizer';
 import AgentProgressIndicator from './AgentProgressIndicator';
+import { useToast } from '@/components/ui/use-toast';
 
 interface AudioRecorderProps {
   onTranscriptionComplete: (transcription: string) => void;
@@ -36,6 +36,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const { toast } = useToast();
   
   const [agentProgress, setAgentProgress] = useState({
     patientInfo: false,
@@ -86,6 +87,23 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       setAudioBlob(blob);
     }
   });
+  
+  // Listen for events to disable realtime transcription
+  useEffect(() => {
+    const handleDisableRealtime = () => {
+      setUseRealtimeTranscription(false);
+      toast({
+        title: "Transcrição em tempo real desativada",
+        description: "Usando transcrição normal para melhor compatibilidade.",
+      });
+    };
+    
+    document.addEventListener('disable-realtime-transcription', handleDisableRealtime);
+    
+    return () => {
+      document.removeEventListener('disable-realtime-transcription', handleDisableRealtime);
+    };
+  }, [toast]);
   
   // Update transcription from hook
   useEffect(() => {

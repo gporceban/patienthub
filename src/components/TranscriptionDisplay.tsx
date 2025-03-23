@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Mic } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface TranscriptionDisplayProps {
   isConnecting: boolean;
@@ -23,6 +24,14 @@ const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
   transcription,
   connectionAttempts
 }) => {
+  const handleDisableRealtime = () => {
+    // This would be handled by the parent component
+    const event = new CustomEvent('disable-realtime-transcription', {
+      bubbles: true
+    });
+    document.dispatchEvent(event);
+  };
+
   if (isTranscribing && !isRecording) {
     return (
       <div className="p-4 border border-darkblue-700 bg-darkblue-900 rounded-lg h-32 overflow-auto relative">
@@ -57,9 +66,17 @@ const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
             <p className="font-medium">Erro:</p>
             <p className="text-sm">{error}</p>
             {connectionAttempts > 2 && (
-              <p className="text-xs mt-1">
-                Problema persistente. Considere usar transcrição normal em vez de tempo real.
-              </p>
+              <div className="text-xs mt-1">
+                <p>Problema persistente. Considere usar transcrição normal em vez de tempo real.</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-1 text-xs h-6 px-2 bg-darkblue-800 hover:bg-darkblue-700 text-gold-400"
+                  onClick={handleDisableRealtime}
+                >
+                  <Mic className="h-3 w-3 mr-1" /> Usar transcrição normal
+                </Button>
+              </div>
             )}
           </div>
         </div>
