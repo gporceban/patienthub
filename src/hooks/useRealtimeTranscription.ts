@@ -297,6 +297,10 @@ export const useRealtimeTranscription = ({
           },
           input_audio_noise_reduction: {
             type: "near_field"
+          },
+          {
+          "type": "input_audio_buffer.append",
+          "audio": "Base64EncodedAudioData"
           }
         }));
       } catch (error) {
