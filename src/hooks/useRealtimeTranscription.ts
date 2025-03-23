@@ -281,7 +281,7 @@ export const useRealtimeTranscription = ({
             format: "encodings=PCM16",
             channels: 1,
             sample_rate: 16000,
-            model: "whisper-1",
+            model: "gpt-4o-transcribe",
             language: "pt"
           }
         }));
