@@ -71,8 +71,7 @@ export const encodeAudioForAPI = (audioData: Float32Array): string => {
   const pcm16 = new Int16Array(audioData.length);
   for (let i = 0; i < audioData.length; i++) {
     // Map the Float32 sample to Int16 range
-    const sample = Math.max(-1, Math.min(1, audioData[i])); // Clamp between -1 and 1
-    pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    pcm16[i] = Math.max(-32768, Math.min(32767, Math.floor(audioData[i] * 32767)));
   }
   
   // Convert Int16Array to Base64
@@ -82,11 +81,5 @@ export const encodeAudioForAPI = (audioData: Float32Array): string => {
     binary += String.fromCharCode(pcm16[i] & 0xff, (pcm16[i] >> 8) & 0xff);
   }
   
-  try {
-    return btoa(binary);
-  } catch (error) {
-    console.error("Error encoding audio data:", error);
-    // Return an empty string if encoding fails
-    return '';
-  }
+  return btoa(binary);
 };
