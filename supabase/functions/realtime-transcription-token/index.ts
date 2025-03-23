@@ -33,7 +33,8 @@ serve(async (req) => {
     console.log('Requesting token from OpenAI...')
     
     // Get a speech-to-text token from OpenAI API
-    const response = await fetch('https://api.openai.com/v1/audio/speech-recognition/realtime/tokens', {
+    // Updated to use the correct endpoint based on OpenAI's latest API
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions/realtime/tokens', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
