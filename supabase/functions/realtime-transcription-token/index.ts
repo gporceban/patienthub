@@ -15,6 +15,7 @@ const corsHeaders = {
 serve(async (req) => {
   console.log("Realtime transcription token function called");
   console.log("Request method:", req.method);
+  console.log("Request headers:", Object.fromEntries(req.headers.entries()));
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -49,6 +50,8 @@ serve(async (req) => {
     if (!response.ok) {
       const errorData = await response.text()
       console.error('OpenAI token request failed:', errorData);
+      console.error('Response status:', response.status);
+      console.error('Response headers:', Object.fromEntries(response.headers.entries()));
       throw new Error(`Failed to get token: ${response.status} ${response.statusText} - ${errorData}`)
     }
     
