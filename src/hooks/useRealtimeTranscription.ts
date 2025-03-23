@@ -256,7 +256,7 @@ export const useRealtimeTranscription = ({
     
     cleanupWebSocket();
     
-    const websocketUrl = `wss://api.openai.com/v1/audio/speech-recognition/realtime?token=${token}`;
+    const websocketUrl = `wss://api.openai.com/v1/realtime?intent=transcription&token=${token}`;
     console.log("Connecting to WebSocket with URL:", websocketUrl);
     
     const websocket = new WebSocket(websocketUrl);
