@@ -32,15 +32,16 @@ serve(async (req) => {
     
     console.log('Requesting ephemeral token from OpenAI...')
     
-    // According to OpenAI docs, the correct endpoint for ephemeral tokens is:
+    // According to OpenAI docs, the correct endpoint and parameters for transcription sessions
     const response = await fetch('https://api.openai.com/v1/realtime/transcription_sessions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
+      // The API doesn't accept 'model' as a parameter for this endpoint
+      // Only sending the language parameter which is supported
       body: JSON.stringify({
-        model: 'gpt-4o-transcribe',
         language: 'pt'
       })
     })
