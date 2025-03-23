@@ -12,6 +12,7 @@ interface TranscriptionDisplayProps {
   isTranscribing: boolean;
   transcription: string;
   connectionAttempts: number;
+  onDisableRealtime?: () => void;
 }
 
 const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
@@ -22,14 +23,19 @@ const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
   isRecording,
   isTranscribing,
   transcription,
-  connectionAttempts
+  connectionAttempts,
+  onDisableRealtime
 }) => {
   const handleDisableRealtime = () => {
-    // This would be handled by the parent component
-    const event = new CustomEvent('disable-realtime-transcription', {
-      bubbles: true
-    });
-    document.dispatchEvent(event);
+    if (onDisableRealtime) {
+      onDisableRealtime();
+    } else {
+      // Fallback to event dispatch if no prop handler provided
+      const event = new CustomEvent('disable-realtime-transcription', {
+        bubbles: true
+      });
+      document.dispatchEvent(event);
+    }
   };
 
   if (isTranscribing && !isRecording) {

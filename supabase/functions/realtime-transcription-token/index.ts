@@ -12,15 +12,61 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 }
 
+// Track requests to implement rate limiting
+const requestTracker = new Map<string, { count: number, timestamp: number }>();
+
 serve(async (req) => {
+  // Get client IP or a unique identifier from the request
+  const clientId = req.headers.get('x-forwarded-for') || 
+                   req.headers.get('x-real-ip') || 
+                   'unknown-client';
+  
   console.log("Realtime transcription token function called");
   console.log("Request method:", req.method);
-  console.log("Request headers:", Object.fromEntries(req.headers.entries()));
+  console.log("Client identifier:", clientId);
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log("Handling OPTIONS request with CORS headers");
     return new Response('ok', { headers: corsHeaders, status: 204 })
+  }
+  
+  // Implement basic rate limiting
+  const now = Date.now();
+  const windowMs = 60000; // 1 minute window
+  const maxRequests = 5; // Maximum requests per window
+  
+  // Clean up old entries
+  for (const [id, data] of requestTracker.entries()) {
+    if (now - data.timestamp > windowMs) {
+      requestTracker.delete(id);
+    }
+  }
+  
+  // Check if client is rate limited
+  const clientData = requestTracker.get(clientId) || { count: 0, timestamp: now };
+  if (now - clientData.timestamp > windowMs) {
+    // Reset if window has passed
+    clientData.count = 1;
+    clientData.timestamp = now;
+  } else {
+    // Increment count
+    clientData.count++;
+  }
+  requestTracker.set(clientId, clientData);
+  
+  // If rate limit exceeded, return 429
+  if (clientData.count > maxRequests) {
+    console.error(`Rate limit exceeded for client ${clientId}: ${clientData.count} requests in the last minute`);
+    return new Response(
+      JSON.stringify({
+        error: 'Rate limit exceeded. Please try again later.'
+      }),
+      {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' },
+      },
+    )
   }
   
   try {

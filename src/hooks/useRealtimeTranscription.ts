@@ -48,6 +48,8 @@ export const useRealtimeTranscription = ({
   const isUnmountedRef = useRef(false);
   const recordingStartTimeRef = useRef<number | null>(null);
   const tokenRequestAttemptRef = useRef(0);
+  const tokenRequestInProgressRef = useRef(false);
+  const lastTokenRequestTimeRef = useRef<number>(0);
   
   // Track if we're permanently stopped vs temporarily disconnected
   const isPermanentlyStoppedRef = useRef(false);
@@ -462,9 +464,38 @@ export const useRealtimeTranscription = ({
       return;
     }
     
+    // Prevent concurrent token requests and implement rate limiting
+    const now = Date.now();
+    const minInterval = 5000; // 5 seconds minimum between requests
+    
+    if (tokenRequestInProgressRef.current) {
+      console.log("Token request already in progress, skipping");
+      return;
+    }
+    
+    if (now - lastTokenRequestTimeRef.current < minInterval) {
+      console.log(`Too many requests, waiting to respect rate limit. Last request was ${(now - lastTokenRequestTimeRef.current) / 1000}s ago`);
+      const waitTime = minInterval - (now - lastTokenRequestTimeRef.current);
+      
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      
+      reconnectTimeoutRef.current = setTimeout(() => {
+        if (!isCleanedUpRef.current && isRecording && !setupInProgressRef.current && !isPermanentlyStoppedRef.current) {
+          console.log("Retrying after rate limit timeout...");
+          setupRealtimeTranscription();
+        }
+      }, waitTime);
+      
+      return;
+    }
+    
     try {
       setupInProgressRef.current = true;
       isCleanedUpRef.current = false;
+      tokenRequestInProgressRef.current = true;
+      lastTokenRequestTimeRef.current = now;
       
       setState(prev => ({
         ...prev,
@@ -493,7 +524,6 @@ export const useRealtimeTranscription = ({
         
         // Obtain session token from Edge Function
         console.log("Requesting new transcription token...");
-        tokenRequestAttemptRef.current
         const { data: sessionData, error: tokenError } = await supabase.functions.invoke(
           "realtime-transcription-token",
           {
@@ -515,6 +545,7 @@ export const useRealtimeTranscription = ({
         
         if (isCleanedUpRef.current || isPermanentlyStoppedRef.current) {
           setupInProgressRef.current = false;
+          tokenRequestInProgressRef.current = false;
           return;
         }
         
@@ -536,6 +567,7 @@ export const useRealtimeTranscription = ({
       
       if (isCleanedUpRef.current || isPermanentlyStoppedRef.current) {
         setupInProgressRef.current = false;
+        tokenRequestInProgressRef.current = false;
         return;
       }
       
@@ -555,6 +587,7 @@ export const useRealtimeTranscription = ({
       setConnectionAttempts(prev => prev + 1);
     } finally {
       setupInProgressRef.current = false;
+      tokenRequestInProgressRef.current = false;
     }
   }, [setupWebSocketConnection, toast]);
   
