@@ -34,7 +34,7 @@ export const useRealtimeTranscription = ({
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const sessionTokenRef = useRef<string | null>(null);
-  const tokenExpiryRef = useRef<number | null>(null);
+  const tokenExpiryRef = useRef<number | null>(null);\
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isCleanedUpRef = useRef(false);
   const isReconnectingRef = useRef(false);
@@ -297,12 +297,17 @@ export const useRealtimeTranscription = ({
           },
           input_audio_noise_reduction: {
             type: "near_field"
-          },
-          {
-          "type": "input_audio_buffer.append",
-          "audio": "Base64EncodedAudioData"
           }
         }));
+        
+        // Now send the audio buffer in a separate message if needed
+        // Instead of including it in the configuration object
+        /*
+        websocket.send(JSON.stringify({
+          type: "input_audio_buffer.append",
+          audio: base64Audio // We'll send real audio data in processor.onaudioprocess
+        }));
+        */
       } catch (error) {
         console.error("Error sending start configuration:", error);
       }
