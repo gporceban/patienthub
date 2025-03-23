@@ -7,22 +7,30 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-app-name',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 }
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS preflight request')
     return new Response('ok', { headers: corsHeaders })
   }
   
   try {
+    console.log('Processing transcription token request')
+    
     // Get OpenAI API key from environment variables
     const apiKey = Deno.env.get('OPENAI_API_KEY')
     
     if (!apiKey) {
+      console.error('OpenAI API key not found in environment variables')
       throw new Error('OpenAI API key not found in environment variables')
     }
+    
+    console.log('Requesting token from OpenAI...')
     
     // Get a speech-to-text token from OpenAI API
     const response = await fetch('https://api.openai.com/v1/audio/speech-recognition/realtime/tokens', {
@@ -36,6 +44,8 @@ serve(async (req) => {
         language: 'pt'
       })
     })
+    
+    console.log('OpenAI response status:', response.status)
     
     if (!response.ok) {
       const errorData = await response.text()
