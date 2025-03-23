@@ -4,13 +4,15 @@ project_id = "tokybrabdqqahhbxxpzj"
 
 [functions.realtime-transcription-token]
 verify_jwt = false
-import_map = "./import_map.json"
+import_map = "../import_map.json"
 
 [functions.process-text]
 verify_jwt = false
+import_map = "../import_map.json"
 
 [functions.transcribe-audio]
 verify_jwt = false
+import_map = "../import_map.json"
 
 [api]
 port = 54321
