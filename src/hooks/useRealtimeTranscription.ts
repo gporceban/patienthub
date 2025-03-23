@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { encodeAudioForAPI, encodeToBase64 } from '@/utils/audioUtils';
@@ -44,6 +45,7 @@ export const useRealtimeTranscription = ({
   const externallyTriggeredCleanupRef = useRef(false);
   const isUnmountedRef = useRef(false);
   const recordingStartTimeRef = useRef<number | null>(null);
+  const sessionInitializedRef = useRef(false);
   
   // Track if we're permanently stopped vs temporarily disconnected
   const isPermanentlyStoppedRef = useRef(false);
@@ -252,6 +254,7 @@ export const useRealtimeTranscription = ({
     if (isCleanedUpRef.current || !token || isPermanentlyStoppedRef.current) return;
     
     cleanupWebSocket();
+    sessionInitializedRef.current = false;
     
     // Use the WebSocket protocol array for authentication
     const websocket = new WebSocket(
@@ -281,7 +284,7 @@ export const useRealtimeTranscription = ({
       
       // Send initial configuration according to the documentation
       try {
-        websocket.send(JSON.stringify({
+        const sessionConfig = {
           type: "transcription_session.update",
           input_audio_format: "pcm16",
           input_audio_transcription: {
@@ -298,39 +301,39 @@ export const useRealtimeTranscription = ({
           input_audio_noise_reduction: {
             type: "near_field"
           }
+        };
+        
+        console.log("Sending session configuration:", JSON.stringify(sessionConfig, null, 2));
+        websocket.send(JSON.stringify(sessionConfig));
+        
+        sessionInitializedRef.current = true;
+        
+        // Successfully connected
+        setState(prev => ({
+          ...prev,
+          isConnected: true,
+          isConnecting: false,
+          error: null
         }));
         
-        // Now send the audio buffer in a separate message if needed
-        // Instead of including it in the configuration object
-        /*
-        websocket.send(JSON.stringify({
-          type: "input_audio_buffer.append",
-          audio: base64Audio // We'll send real audio data in processor.onaudioprocess
-        }));
-        */
+        setConnectionAttempts(0);
+        isReconnectingRef.current = false;
+        
+        // Setup microphone capture
+        await setupMicrophone();
       } catch (error) {
         console.error("Error sending start configuration:", error);
+        setState(prev => ({
+          ...prev,
+          error: `Erro ao configurar sessão: ${error instanceof Error ? error.message : "Erro desconhecido"}`
+        }));
       }
-      
-      // Successfully connected
-      setState(prev => ({
-        ...prev,
-        isConnected: true,
-        isConnecting: false,
-        error: null
-      }));
-      
-      setConnectionAttempts(0);
-      isReconnectingRef.current = false;
-      
-      // Setup microphone capture
-      await setupMicrophone();
     };
     
     websocket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("WebSocket message received:", data.type);
+        console.log("WebSocket message received:", data.type, data);
         
         if (isCleanedUpRef.current || isPermanentlyStoppedRef.current) return;
         
