@@ -30,17 +30,16 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found in environment variables')
     }
     
-    console.log('Requesting ephemeral token from OpenAI...')
+    console.log('Requesting ephemeral token from OpenAI for transcription...')
     
-    // According to OpenAI docs, the correct endpoint and parameters for transcription sessions
+    // According to OpenAI docs, the correct endpoint for transcription sessions
     const response = await fetch('https://api.openai.com/v1/realtime/transcription_sessions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      // The API doesn't accept 'model' as a parameter for this endpoint
-      // Only sending the language parameter which is supported
+      // Using the parameters from the provided documentation
       body: JSON.stringify({
         language: 'pt'
       })
@@ -49,8 +48,8 @@ serve(async (req) => {
     console.log('OpenAI response status:', response.status)
     
     if (!response.ok) {
-      const errorData = await response.text()
-      console.error('OpenAI token request failed:', errorData)
+      const errorText = await response.text()
+      console.error('OpenAI token request failed:', errorText)
       throw new Error(`Failed to get token: ${response.status} ${response.statusText}`)
     }
     
