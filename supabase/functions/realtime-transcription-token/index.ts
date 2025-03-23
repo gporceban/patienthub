@@ -39,10 +39,8 @@ serve(async (req) => {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      // Using the parameters from the provided documentation
-      body: JSON.stringify({
-        language: 'pt'
-      })
+      // Send an empty body as per the documentation
+      body: JSON.stringify({})
     })
     
     console.log('OpenAI response status:', response.status)
