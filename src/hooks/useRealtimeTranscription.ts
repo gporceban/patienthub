@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { encodeAudioForAPI } from '@/utils/audioUtils';
+import { encodeAudioForAPI, encodeToBase64 } from '@/utils/audioUtils';
 
 interface UseRealtimeTranscriptionProps {
   isRecording: boolean;
@@ -206,17 +206,15 @@ export const useRealtimeTranscription = ({
         // Convert Float32Array to Int16Array for PCM16 (OpenAI format)
         const pcmData = encodeAudioForAPI(inputData);
         
+        // Convert to base64 for sending to API
+        const base64Audio = encodeToBase64(pcmData);
+        
         // Send to the API Realtime
         try {
           if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
             websocketRef.current.send(JSON.stringify({
-              type: 'audio',
-              data: {
-                format: "encodings=PCM16",
-                channels: 1,
-                sample_rate: 16000,
-                data: pcmData
-              }
+              type: "input_audio_buffer.append",
+              audio: base64Audio
             }));
           }
         } catch (err) {
@@ -255,11 +253,20 @@ export const useRealtimeTranscription = ({
     
     cleanupWebSocket();
     
-    const websocketUrl = `wss://api.openai.com/v1/realtime?intent=transcription&token=${token}`;
-    console.log("Connecting to WebSocket with URL:", websocketUrl);
+    // Use the WebSocket protocol array for authentication
+    const websocket = new WebSocket(
+      "wss://api.openai.com/v1/realtime?intent=transcription",
+      [
+        "realtime",
+        // For client tokens
+        "openai-ephemeral-client-token." + token,
+        // Beta protocol, required
+        "openai-beta.realtime-v1"
+      ]
+    );
     
-    const websocket = new WebSocket(websocketUrl);
     websocketRef.current = websocket;
+    console.log("Connecting to WebSocket with token authentication");
     
     websocket.onopen = async () => {
       console.log("WebSocket connection established successfully");
@@ -272,16 +279,24 @@ export const useRealtimeTranscription = ({
       // Record when we established connection
       recordingStartTimeRef.current = Date.now();
       
-      // Send initial configuration
+      // Send initial configuration according to the documentation
       try {
         websocket.send(JSON.stringify({
-          type: "start",
-          data: {
-            format: "encodings=PCM16",
-            channels: 1,
-            sample_rate: 16000,
+          type: "transcription_session.update",
+          input_audio_format: "pcm16",
+          input_audio_transcription: {
             model: "gpt-4o-transcribe",
+            prompt: "",
             language: "pt"
+          },
+          turn_detection: {
+            type: "server_vad",
+            threshold: 0.5,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 500,
+          },
+          input_audio_noise_reduction: {
+            type: "near_field"
           }
         }));
       } catch (error) {
@@ -310,31 +325,32 @@ export const useRealtimeTranscription = ({
         
         if (isCleanedUpRef.current || isPermanentlyStoppedRef.current) return;
         
-        if (data.type === "result") {
-          if (data.data?.alternatives && data.data.alternatives.length > 0) {
-            const newText = data.data.alternatives[0].text || "";
+        // Handle the response based on updated message format
+        if (data.type === "transcription.result") {
+          // Handle interim results
+          if (data.alternatives && data.alternatives.length > 0) {
+            const newText = data.alternatives[0].text || "";
             
             setState(prev => {
-              const updatedText = newText; // Use new text directly from result
-              
               // Update state after ensuring the component is still mounted
               if (!isCleanedUpRef.current && !isPermanentlyStoppedRef.current) {
                 if (onTranscriptionUpdate) {
-                  onTranscriptionUpdate(updatedText);
+                  onTranscriptionUpdate(newText);
                 }
               }
               
               return {
                 ...prev,
-                text: updatedText
+                text: newText
               };
             });
           }
         } 
-        else if (data.type === "final") {
-          const completeText = data.data?.text || "";
-          if (data.data?.id !== lastTranscriptId) {
-            setLastTranscriptId(data.data?.id);
+        else if (data.type === "transcription.final") {
+          // Handle final results
+          const completeText = data.text || "";
+          if (data.id !== lastTranscriptId) {
+            setLastTranscriptId(data.id);
             
             setState(prev => {
               // Update state after ensuring the component is still mounted
