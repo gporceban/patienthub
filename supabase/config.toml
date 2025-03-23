@@ -21,6 +21,3 @@ max_rows = 1000
 [db]
 port = 54322
 major_version = 15
-
-[auth.hooks]
-custom_claims = "async (_, next) => {\n  return await next()\n}"
