@@ -1,6 +1,7 @@
+
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 
 interface TranscriptionDisplayProps {
@@ -58,7 +59,7 @@ function TranscriptionDisplay({
 
   return (
     <div className="absolute inset-0 flex items-center justify-center">
-      <p className="text-gray-300 text-sm">Gravando áudio... Começe a falar.</p>
+      <p className="text-gray-300 text-sm">Gravando áudio... Comece a falar.</p>
       <span className="ml-2 h-2 w-2 bg-red-500 rounded-full animate-pulse"></span>
     </div>
   )
@@ -69,6 +70,7 @@ interface RealtimeTranscriptionProps {
   transcription: string
   isTranscribing: boolean
   error?: string | null
+  onTranscriptionUpdate?: (text: string) => void
 }
 
 function RealtimeTranscription({
@@ -76,8 +78,20 @@ function RealtimeTranscription({
   transcription,
   isTranscribing,
   error,
+  onTranscriptionUpdate,
 }: RealtimeTranscriptionProps) {
   const isEmpty = !isRecording && !transcription && !isTranscribing && !error
+  const [displayText, setDisplayText] = useState(transcription)
+  
+  // Update the displayed text when transcription changes
+  useEffect(() => {
+    setDisplayText(transcription)
+    
+    // If there's an external update handler, call it
+    if (onTranscriptionUpdate && transcription) {
+      onTranscriptionUpdate(transcription)
+    }
+  }, [transcription, onTranscriptionUpdate])
 
   return (
     <div
@@ -86,7 +100,7 @@ function RealtimeTranscription({
       } relative border border-darkblue-700`}
     >
       <TranscriptionDisplay
-        transcription={transcription}
+        transcription={displayText}
         isRecording={isRecording}
         isLoading={isTranscribing}
         error={error}
