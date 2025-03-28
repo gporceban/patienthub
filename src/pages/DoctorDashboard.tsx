@@ -1,3 +1,4 @@
+
 import React, { useContext, useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { AuthContext } from '@/contexts/AuthContext';
@@ -10,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import CalendarWidget from '@/components/CalendarWidget';
 import { createCalComManagedUser, hasCalComManagedUser } from '@/services/calComV2Service';
-import { seedTestNotifications } from '@/types/notifications';
+
 interface DashboardStat {
   title: string;
   value: string | number;
@@ -19,6 +20,7 @@ interface DashboardStat {
   link: string;
   linkText: string;
 }
+
 const DoctorDashboard = () => {
   const {
     profile
@@ -34,11 +36,14 @@ const DoctorDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasCalComUser, setHasCalComUser] = useState(false);
   const [isCreatingCalComUser, setIsCreatingCalComUser] = useState(false);
+
   useEffect(() => {
     const fetchDoctorStats = async () => {
       if (!profile?.id) return;
       try {
         setIsLoading(true);
+
+        // Get patient count - fixed the is() method call by using eq()
         const {
           count: patientCount,
           error: patientError
@@ -47,6 +52,8 @@ const DoctorDashboard = () => {
           head: true
         }).eq('doctor_id', profile.id).eq('status', 'completed');
         if (patientError) throw patientError;
+
+        // Get appointment count
         const {
           count: appointmentCount,
           error: appointmentError
@@ -55,6 +62,8 @@ const DoctorDashboard = () => {
           head: true
         }).eq('doctor_id', profile.id);
         if (appointmentError) throw appointmentError;
+
+        // Get assessment count
         const {
           count: assessmentCount,
           error: assessmentError
@@ -63,6 +72,7 @@ const DoctorDashboard = () => {
           head: true
         }).eq('doctor_id', profile.id);
         if (assessmentError) throw assessmentError;
+        
         setStats({
           patients: patientCount || 0,
           appointments: appointmentCount || 0,
@@ -79,11 +89,14 @@ const DoctorDashboard = () => {
         setIsLoading(false);
       }
     };
+    
     fetchDoctorStats();
   }, [profile, toast]);
+  
   useEffect(() => {
     const checkCalComUser = async () => {
       if (!profile?.id) return;
+      
       try {
         const hasUser = await hasCalComManagedUser(profile.id);
         setHasCalComUser(hasUser);
@@ -91,24 +104,17 @@ const DoctorDashboard = () => {
         console.error('Error checking Cal.com user:', error);
       }
     };
+    
     checkCalComUser();
   }, [profile]);
-  useEffect(() => {
-    const seedNotifications = async () => {
-      if (!profile?.id) return;
-      try {
-        await seedTestNotifications(supabase, 'medico', profile.id);
-      } catch (error) {
-        console.error('Error seeding notifications:', error);
-      }
-    };
-    seedNotifications();
-  }, [profile]);
+
   const handleCreateCalComUser = async () => {
     if (!profile?.id) return;
+    
     setIsCreatingCalComUser(true);
     try {
       const response = await createCalComManagedUser(profile.id);
+      
       if (response.success) {
         setHasCalComUser(true);
         toast({
@@ -129,6 +135,7 @@ const DoctorDashboard = () => {
       setIsCreatingCalComUser(false);
     }
   };
+
   const dashboardStats: DashboardStat[] = [{
     title: "Pacientes",
     value: stats.patients,
@@ -151,6 +158,7 @@ const DoctorDashboard = () => {
     link: "/medico/avaliacao",
     linkText: "Ver avaliações"
   }];
+  
   return <Layout userType="medico">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">Bem-vindo, Dr. {profile?.full_name?.split(' ')[0] || ''}</h1>
@@ -184,12 +192,18 @@ const DoctorDashboard = () => {
           </div>
           
           {/* Calendar widget - only show if the user has a Cal.com account */}
-          {profile?.id && hasCalComUser && <div className="mb-8">
-              <CalendarWidget userId={profile.id} limit={5} />
-            </div>}
+          {profile?.id && hasCalComUser && (
+            <div className="mb-8">
+              <CalendarWidget 
+                userId={profile.id} 
+                limit={5}
+              />
+            </div>
+          )}
           
           {/* Cal.com connection prompt - only show if the user doesn't have a Cal.com account */}
-          {profile?.id && !hasCalComUser && <Card className="card-gradient p-5 mb-8">
+          {profile?.id && !hasCalComUser && (
+            <Card className="card-gradient p-5 mb-8">
               <div className="flex items-center gap-3 mb-3">
                 <div className="bg-darkblue-800 p-2 rounded-full">
                   <CalendarDays className="h-6 w-6 text-gold-400" />
@@ -199,13 +213,47 @@ const DoctorDashboard = () => {
               <p className="text-sm text-gray-400 mb-4">
                 Crie uma conta no Cal.com para gerenciar sua agenda e consultas de forma integrada.
               </p>
-              <Button variant="default" size="sm" onClick={handleCreateCalComUser} disabled={isCreatingCalComUser} className="bg-gold-500 hover:bg-gold-600 text-black">
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={handleCreateCalComUser} 
+                disabled={isCreatingCalComUser}
+                className="bg-gold-500 hover:bg-gold-600 text-black"
+              >
                 {isCreatingCalComUser ? 'Criando...' : 'Criar Conta Cal.com'}
               </Button>
-            </Card>}
+            </Card>
+          )}
           
           {/* Recent activity */}
-          
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Atividade Recente</h2>
+              <Button asChild variant="link" className="text-gold-400">
+                <Link to="/medico/agenda">
+                  Ver tudo <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+            
+            <Card className="card-gradient p-6">
+              <div className="flex justify-center items-center flex-col py-8">
+                <Activity className="h-16 w-16 text-gray-500 mb-4" />
+                <h3 className="text-lg font-medium mb-2">Nenhuma atividade recente</h3>
+                <p className="text-gray-400 text-center max-w-md mb-4">
+                  Suas atividades recentes aparecerão aqui. Comece agendando consultas ou registrando avaliações.
+                </p>
+                <div className="flex gap-3 mt-2">
+                  <Button asChild variant="default" size="sm">
+                    <Link to="/medico/agenda">Agendar Consulta</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/medico/avaliacao">Nova Avaliação</Link>
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
         
         <div>
@@ -236,9 +284,15 @@ const DoctorDashboard = () => {
           
           {/* Upcoming appointments - Show Cal.com appointments if the user has a Cal.com account */}
           <h2 className="text-xl font-semibold mb-4">Próximas Consultas</h2>
-          {profile?.id && hasCalComUser ? <Card className="card-gradient p-5">
-              <CalendarWidget userId={profile.id} limit={3} />
-            </Card> : <Card className="card-gradient p-5">
+          {profile?.id && hasCalComUser ? (
+            <Card className="card-gradient p-5">
+              <CalendarWidget 
+                userId={profile.id} 
+                limit={3}
+              />
+            </Card>
+          ) : (
+            <Card className="card-gradient p-5">
               <div className="text-center py-8">
                 <CalendarDays className="h-12 w-12 mx-auto text-gray-500 mb-3" />
                 <h3 className="text-lg font-medium mb-2">Nenhuma consulta agendada</h3>
@@ -249,9 +303,11 @@ const DoctorDashboard = () => {
                   <Link to="/medico/agenda">Ver Agenda Completa</Link>
                 </Button>
               </div>
-            </Card>}
+            </Card>
+          )}
         </div>
       </div>
     </Layout>;
 };
+
 export default DoctorDashboard;
