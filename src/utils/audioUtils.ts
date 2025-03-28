@@ -63,47 +63,31 @@ export const blobToBase64 = (blob: Blob): Promise<string> => {
 };
 
 /**
- * Convert Float32Array to Int16Array for PCM encoding
+ * Encode audio data for the OpenAI API
+ * Converts Float32Array to Int16Array base64 string
  */
+// Modify this function to return Int16Array instead of string
 export const encodeAudioForAPI = (audioData: Float32Array): Int16Array => {
   // Convert Float32Array (-1 to 1) to Int16Array (-32768 to 32767)
   const pcm16 = new Int16Array(audioData.length);
   for (let i = 0; i < audioData.length; i++) {
-    // Map the Float32 sample to Int16 range with correct scaling and clipping
-    const sample = Math.max(-1, Math.min(1, audioData[i])); // Ensure range -1 to 1
-    pcm16[i] = sample < 0 ? Math.floor(sample * 32768) : Math.floor(sample * 32767);
+    // Map the Float32 sample to Int16 range
+    pcm16[i] = Math.max(-32768, Math.min(32767, Math.floor(audioData[i] * 32767)));
   }
   
   return pcm16;
 };
 
-/**
- * Convert Int16Array to Base64 string for WebSocket transmission
- */
+// Add this new function
 export const encodeToBase64 = (data: Int16Array): string => {
-  // Convert to Uint8Array for reliable base64 encoding
+  // Convert Int16Array to Uint8Array
   const uint8Array = new Uint8Array(data.buffer);
   
-  // Use a chunked approach to handle large arrays
-  let binary = '';
-  const chunkSize = 0x8000; // 32K chunks to avoid call stack limits
+  // Convert to base64
+  let binaryString = '';
+  uint8Array.forEach(byte => {
+    binaryString += String.fromCharCode(byte);
+  });
   
-  for (let i = 0; i < uint8Array.length; i += chunkSize) {
-    const chunk = uint8Array.slice(i, Math.min(i + chunkSize, uint8Array.length));
-    const binaryChunk = Array.from(chunk).map(byte => String.fromCharCode(byte)).join('');
-    binary += binaryChunk;
-  }
-  
-  return btoa(binary);
-};
-
-/**
- * Debug utility to check if audio data contains non-zero values
- */
-export const hasAudioContent = (data: Float32Array | Int16Array): boolean => {
-  // Check if audio contains non-zero values (useful for debugging)
-  for (let i = 0; i < data.length; i++) {
-    if (Math.abs(data[i]) > 0.01) return true;
-  }
-  return false;
+  return btoa(binaryString);
 };
