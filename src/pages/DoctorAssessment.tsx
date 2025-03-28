@@ -8,20 +8,20 @@ import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
-import AudioRecorder from '@/components/AudioRecording/AudioRecorder';
+import RealtimeAudioRecorder from '@/components/RealtimeAudioRecorder';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, PencilLine, Check, RotateCcw, History } from 'lucide-react';
 import PatientInfoForm, { PatientInfo } from '@/components/PatientInfoForm';
-import { PatientAssessment, fromPatientAssessments, AssessmentStatus } from '@/types/patientAssessments';
+import { PatientAssessment } from '@/types/patientAssessments';
 
 const DoctorAssessment = () => {
   const { user } = useContext(AuthContext);
   const { toast } = useToast();
   
+  // Patient info state
   const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
-  const [assessmentId, setAssessmentId] = useState<string | null>(null);
-  const [creatingAssessment, setCreatingAssessment] = useState(false);
   
+  // Generated content state
   const [summary, setSummary] = useState('');
   const [clinicalNote, setClinicalNote] = useState('');
   const [prescription, setPrescription] = useState('');
@@ -29,23 +29,28 @@ const DoctorAssessment = () => {
   const [patientFriendlySummary, setPatientFriendlySummary] = useState('');
   const [structuredData, setStructuredData] = useState<any>(null);
   
+  // Previous assessments state
   const [previousAssessments, setPreviousAssessments] = useState<PatientAssessment[]>([]);
   const [hasPreviousAssessments, setHasPreviousAssessments] = useState(false);
   
+  // Editing state for human-in-the-loop
   const [isEditingSummary, setIsEditingSummary] = useState(false);
   const [isEditingClinicalNote, setIsEditingClinicalNote] = useState(false);
   const [isEditingPrescription, setIsEditingPrescription] = useState(false);
   const [isEditingPatientSummary, setIsEditingPatientSummary] = useState(false);
   
+  // AI instruction state for refinement
   const [aiInstruction, setAiInstruction] = useState('');
   const [isSubmittingInstruction, setIsSubmittingInstruction] = useState(false);
   
+  // Workflow state management
   const [currentStep, setCurrentStep] = useState<'info' | 'recording' | 'review'>('info');
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [docsGenerated, setDocsGenerated] = useState(false);
   const [isGeneratingPatientSummary, setIsGeneratingPatientSummary] = useState(false);
   
+  // Fetch previous assessments when patient info changes
   useEffect(() => {
     const fetchPreviousAssessments = async () => {
       if (patientInfo && patientInfo.prontuarioId) {
@@ -85,103 +90,7 @@ const DoctorAssessment = () => {
     fetchPreviousAssessments();
   }, [patientInfo, toast]);
   
-  const createInitialAssessment = async (patientData: PatientInfo) => {
-    if (!user) {
-      toast({
-        variant: "destructive",
-        title: "Não autenticado",
-        description: "Você precisa estar logado para criar uma avaliação."
-      });
-      return null;
-    }
-    
-    setCreatingAssessment(true);
-    
-    try {
-      const newId = uuidv4();
-      console.log("Creating initial assessment with ID:", newId);
-      
-      const assessmentData = {
-        id: newId,
-        doctor_id: user.id,
-        patient_name: patientData.name,
-        patient_email: patientData.email,
-        prontuario_id: patientData.prontuarioId,
-        status: 'in_progress' as AssessmentStatus
-      };
-      
-      const patientAssessments = fromPatientAssessments(supabase);
-      const { data, error } = await patientAssessments.insert(assessmentData);
-      
-      if (error) {
-        console.error("Error creating initial assessment:", error);
-        throw error;
-      }
-      
-      console.log("Initial assessment created:", data);
-      toast({
-        title: "Avaliação iniciada",
-        description: "Prossiga com a gravação da consulta."
-      });
-      
-      return newId;
-    } catch (error) {
-      console.error('Error creating initial assessment:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao iniciar avaliação",
-        description: "Não foi possível criar o registro inicial. Tente novamente."
-      });
-      return null;
-    } finally {
-      setCreatingAssessment(false);
-    }
-  };
-  
-  const updateAssessment = async () => {
-    if (!assessmentId) {
-      console.error("No assessment ID to update");
-      return false;
-    }
-    
-    try {
-      setIsSaving(true);
-      
-      const patientAssessments = fromPatientAssessments(supabase);
-      const { error } = await patientAssessments.update({
-        summary,
-        clinical_note: clinicalNote,
-        prescription,
-        patient_friendly_summary: patientFriendlySummary,
-        transcription,
-        structured_data: structuredData,
-        status: 'completed' as AssessmentStatus
-      }, assessmentId);
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Avaliação salva com sucesso",
-        description: "A avaliação do paciente foi atualizada e finalizada."
-      });
-      
-      return true;
-    } catch (error) {
-      console.error('Error updating assessment:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao salvar avaliação",
-        description: "Não foi possível atualizar a avaliação do paciente."
-      });
-      
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  
+  // Save completed assessment
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -194,16 +103,55 @@ const DoctorAssessment = () => {
       return;
     }
     
-    const success = await updateAssessment();
-    
-    if (success) {
+    try {
+      setIsSaving(true);
+      
+      const { data, error } = await supabase
+        .from('patient_assessments')
+        .insert([
+          {
+            id: uuidv4(),
+            doctor_id: user.id,
+            patient_name: patientInfo.name,
+            patient_email: patientInfo.email,
+            prontuario_id: patientInfo.prontuarioId,
+            summary: summary,
+            clinical_note: clinicalNote,
+            prescription: prescription,
+            patient_friendly_summary: patientFriendlySummary,
+            transcription: transcription,
+            structured_data: structuredData,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Avaliação salva com sucesso",
+        description: "A avaliação do paciente foi salva com sucesso."
+      });
+      
+      // Reset all state
       resetForm();
+      
+    } catch (error) {
+      console.error('Error saving assessment:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao salvar avaliação",
+        description: "Não foi possível salvar a avaliação do paciente. Tente novamente mais tarde."
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
   
+  // Reset the form completely
   const resetForm = () => {
     setPatientInfo(null);
-    setAssessmentId(null);
     setSummary('');
     setClinicalNote('');
     setPrescription('');
@@ -217,28 +165,18 @@ const DoctorAssessment = () => {
     setHasPreviousAssessments(false);
   };
   
+  // Transcription completion handler
   const handleTranscriptionComplete = (text: string) => {
     setTranscription(text);
-    
-    if (assessmentId) {
-      const patientAssessments = fromPatientAssessments(supabase);
-      patientAssessments.update({
-        transcription: text
-      }, assessmentId).then(({ error }) => {
-        if (error) {
-          console.error("Error updating transcription:", error);
-        } else {
-          console.log("Transcription updated in assessment record");
-        }
-      });
-    }
   };
   
+  // Processing start handler
   const handleProcessingStart = () => {
     setIsProcessing(true);
     setDocsGenerated(false);
   };
   
+  // Processing completion handler
   const handleProcessingComplete = (data: {
     clinical_note?: string;
     prescription?: string;
@@ -253,23 +191,8 @@ const DoctorAssessment = () => {
     setIsProcessing(false);
     setDocsGenerated(true);
     
+    // Set to review step when processing is complete
     setCurrentStep('review');
-    
-    if (assessmentId) {
-      const patientAssessments = fromPatientAssessments(supabase);
-      patientAssessments.update({
-        clinical_note: data.clinical_note,
-        prescription: data.prescription,
-        summary: data.summary,
-        structured_data: data.structured_data
-      }, assessmentId).then(({ error }) => {
-        if (error) {
-          console.error("Error updating processed data:", error);
-        } else {
-          console.log("Processed data updated in assessment record");
-        }
-      });
-    }
     
     toast({
       title: "Documentos gerados com sucesso",
@@ -277,24 +200,18 @@ const DoctorAssessment = () => {
     });
   };
   
-  const handlePatientInfoSubmit = async (data: PatientInfo) => {
+  // Handle patient info submission
+  const handlePatientInfoSubmit = (data: PatientInfo) => {
     setPatientInfo(data);
+    setCurrentStep('recording');
     
-    const newId = await createInitialAssessment(data);
-    
-    if (newId) {
-      setAssessmentId(newId);
-      setCurrentStep('recording');
-      console.log("Assessment created, moving to recording step");
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Erro ao iniciar avaliação",
-        description: "Não foi possível passar para a próxima etapa. Tente novamente."
-      });
-    }
+    toast({
+      title: "Informações do paciente salvas",
+      description: "Continue com a gravação da consulta."
+    });
   };
   
+  // Generate patient-friendly summary
   const generatePatientFriendlySummary = async () => {
     if (!clinicalNote || !summary) {
       toast({
@@ -321,17 +238,6 @@ const DoctorAssessment = () => {
       if (data?.text) {
         setPatientFriendlySummary(data.text);
         
-        if (assessmentId) {
-          const patientAssessments = fromPatientAssessments(supabase);
-          patientAssessments.update({
-            patient_friendly_summary: data.text
-          }, assessmentId).then(({ error }) => {
-            if (error) {
-              console.error("Error updating patient friendly summary:", error);
-            }
-          });
-        }
-        
         toast({
           title: "Sumário para paciente gerado",
           description: "Um sumário em linguagem acessível foi criado para o paciente."
@@ -349,6 +255,7 @@ const DoctorAssessment = () => {
     }
   };
   
+  // Regenerate AI content with human instruction
   const submitAiInstruction = async () => {
     if (!transcription || !aiInstruction) {
       toast({
@@ -362,6 +269,7 @@ const DoctorAssessment = () => {
     try {
       setIsSubmittingInstruction(true);
       
+      // Process the transcription with additional instructions
       const { data, error } = await supabase.functions.invoke('process-text', {
         body: { 
           text: transcription,
@@ -379,17 +287,7 @@ const DoctorAssessment = () => {
       if (data?.text) {
         setClinicalNote(data.text);
         
-        if (assessmentId) {
-          const patientAssessments = fromPatientAssessments(supabase);
-          patientAssessments.update({
-            clinical_note: data.text
-          }, assessmentId).then(({ error }) => {
-            if (error) {
-              console.error("Error updating clinical note with AI instruction:", error);
-            }
-          });
-        }
-        
+        // Clear the instruction after processing
         setAiInstruction('');
         
         toast({
@@ -420,16 +318,17 @@ const DoctorAssessment = () => {
         </p>
       </div>
       
+      {/* Step 1: Patient Information */}
       {currentStep === 'info' && (
         <Card className="card-gradient p-6 max-w-2xl mb-6">
           <h2 className="text-lg font-semibold mb-4">Informações do Paciente</h2>
           <PatientInfoForm 
             onSubmit={handlePatientInfoSubmit}
-            isLoading={creatingAssessment}
           />
         </Card>
       )}
       
+      {/* Step 2: Recording */}
       {currentStep === 'recording' && patientInfo && (
         <Card className="card-gradient p-6 max-w-2xl mb-6">
           <div className="flex justify-between items-center mb-4">
@@ -447,9 +346,6 @@ const DoctorAssessment = () => {
           <div className="bg-darkblue-800/50 p-4 rounded-md border border-darkblue-700 mb-4">
             <p className="text-sm font-medium text-gray-300">Paciente: {patientInfo.name}</p>
             <p className="text-sm font-medium text-gray-300">Prontuário: {patientInfo.prontuarioId}</p>
-            {assessmentId && (
-              <p className="text-sm font-medium text-gray-300">ID da Avaliação: {assessmentId}</p>
-            )}
             {hasPreviousAssessments && (
               <div className="mt-2 flex items-center text-gold-500">
                 <History className="h-4 w-4 mr-1" />
@@ -458,13 +354,8 @@ const DoctorAssessment = () => {
             )}
           </div>
           
-          <AudioRecorder 
+          <RealtimeAudioRecorder 
             onTranscriptionComplete={handleTranscriptionComplete}
-            onProcessingStart={handleProcessingStart}
-            onProcessingComplete={handleProcessingComplete}
-            patientInfo={hasPreviousAssessments ? {
-              prontuarioId: patientInfo.prontuarioId
-            } : undefined}
           />
           
           {transcription && (
@@ -478,6 +369,7 @@ const DoctorAssessment = () => {
         </Card>
       )}
       
+      {/* Step 3: Review and Edit */}
       {currentStep === 'review' && docsGenerated && (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
           <Card className="card-gradient p-6">
@@ -511,6 +403,7 @@ const DoctorAssessment = () => {
               </TabsList>
               
               <TabsContent value="medical" className="space-y-6 pt-4">
+                {/* Summary field with edit capability */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium leading-none">
@@ -534,6 +427,7 @@ const DoctorAssessment = () => {
                   />
                 </div>
                 
+                {/* Clinical Note field with edit capability */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium leading-none">
@@ -557,6 +451,7 @@ const DoctorAssessment = () => {
                   />
                 </div>
                 
+                {/* Prescription field with edit capability */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium leading-none">
@@ -580,6 +475,7 @@ const DoctorAssessment = () => {
                   />
                 </div>
                 
+                {/* AI Instruction for feedback to improve content */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">
                     Instruções para a IA (opcional)
@@ -613,6 +509,7 @@ const DoctorAssessment = () => {
               </TabsContent>
               
               <TabsContent value="patient" className="space-y-6 pt-4">
+                {/* Patient-friendly summary */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium leading-none">
