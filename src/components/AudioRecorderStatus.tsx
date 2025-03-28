@@ -9,7 +9,6 @@ type StatusProps = {
   hasError: boolean;
   transcriptionComplete: boolean;
   processingComplete: boolean;
-  isUploading?: boolean;
   agentProgress?: {
     patientInfo?: boolean;
     symptoms?: boolean;
@@ -28,7 +27,6 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
   hasError,
   transcriptionComplete,
   processingComplete,
-  isUploading = false,
   agentProgress = {},
   errorMessage
 }) => {
@@ -38,15 +36,6 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
       <div className="flex items-center text-red-500 mt-4">
         <AlertCircle className="h-5 w-5 mr-2" />
         <span>{errorMessage || "Ocorreu um erro no processamento"}</span>
-      </div>
-    );
-  }
-  
-  if (isUploading) {
-    return (
-      <div className="flex items-center text-blue-400 mt-4">
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-        <span>Enviando arquivo de áudio para transcrição...</span>
       </div>
     );
   }
