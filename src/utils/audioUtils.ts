@@ -64,30 +64,34 @@ export const blobToBase64 = (blob: Blob): Promise<string> => {
 
 /**
  * Encode audio data for the OpenAI API
- * Converts Float32Array to Int16Array base64 string
+ * Converts Float32Array to Int16Array 
  */
-// Modify this function to return Int16Array instead of string
 export const encodeAudioForAPI = (audioData: Float32Array): Int16Array => {
   // Convert Float32Array (-1 to 1) to Int16Array (-32768 to 32767)
   const pcm16 = new Int16Array(audioData.length);
   for (let i = 0; i < audioData.length; i++) {
-    // Map the Float32 sample to Int16 range
+    // Map the Float32 sample to Int16 range with proper clamping
     pcm16[i] = Math.max(-32768, Math.min(32767, Math.floor(audioData[i] * 32767)));
   }
   
   return pcm16;
 };
 
-// Add this new function
+/**
+ * Convert Int16Array to base64 string for sending to API
+ */
 export const encodeToBase64 = (data: Int16Array): string => {
   // Convert Int16Array to Uint8Array
   const uint8Array = new Uint8Array(data.buffer);
   
   // Convert to base64
   let binaryString = '';
-  uint8Array.forEach(byte => {
-    binaryString += String.fromCharCode(byte);
-  });
+  const chunkSize = 0x8000; // Split into chunks to avoid call stack size exceeded
+  
+  for (let i = 0; i < uint8Array.length; i += chunkSize) {
+    const chunk = uint8Array.slice(i, Math.min(i + chunkSize, uint8Array.length));
+    binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+  }
   
   return btoa(binaryString);
 };

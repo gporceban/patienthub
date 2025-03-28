@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
@@ -31,10 +32,12 @@ function RealtimeAudioRecorder({
   const websocketRef = useRef<WebSocket | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const processorRef = useRef<ScriptProcessorNode | null>(null)
+  const sessionSetupCompletedRef = useRef<boolean>(false)
   
   // Call the Edge Function to get an ephemeral token
   const getEphemeralToken = async (): Promise<{ token: string, expires_at: number, session_id: string } | null> => {
     try {
+      setIsFetchingToken(true)
       // Use the supabase client to call the function - this handles authentication properly
       const { data, error } = await supabase.functions.invoke('realtime-transcription-token')
       
@@ -56,8 +59,8 @@ function RealtimeAudioRecorder({
       
       // Return the token data in the expected format
       return {
-        token: data.token || data.client_secret,
-        expires_at: data.expires_at,
+        token: data.token || data.client_secret?.value,
+        expires_at: data.expires_at || data.client_secret?.expires_at,
         session_id: data.session_id || data.id
       }
     } catch (error) {
@@ -65,6 +68,8 @@ function RealtimeAudioRecorder({
       setError(`Error fetching token: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setIsFetchingToken(false)
       return null
+    } finally {
+      setIsFetchingToken(false)
     }
   }
 
@@ -88,7 +93,7 @@ function RealtimeAudioRecorder({
 
       const ws = new WebSocket(wsUrl, [
         "realtime",
-        `openai-insecure-api-key.${tokenData.token}`,
+        `openai-ephemeral-client-token.${tokenData.token}`,
         "openai-beta.realtime-v1",
       ]);
             
@@ -106,18 +111,18 @@ function RealtimeAudioRecorder({
           "session": {
             "input_audio_format": "pcm16",
             "input_audio_transcription": {
-            "model": "gpt-4o-transcribe",
-            "prompt": "Esta é uma consulta médica em português do Brasil.",
-            "language": "pt"
+              "model": "gpt-4o-transcribe",
+              "prompt": "Esta é uma consulta médica em português do Brasil.",
+              "language": "pt"
             },
             "turn_detection": {
-            "type": "server_vad",
-            "threshold": 0.3,
-            "prefix_padding_ms": 300,
-            "silence_duration_ms": 500
+              "type": "server_vad",
+              "threshold": 0.3,
+              "prefix_padding_ms": 300,
+              "silence_duration_ms": 500
             },
             "input_audio_noise_reduction": {
-            "type": "far_field"
+              "type": "far_field"
             },
             "include": [
               "item.input_audio_transcription.logprobs"
@@ -127,11 +132,13 @@ function RealtimeAudioRecorder({
                 
         setIsTranscribing(true)
         setError(null)
+        sessionSetupCompletedRef.current = true
       }
       
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data)
+          console.log('WebSocket message received:', message.type)
           
           // Handle different event types according to the OpenAI Realtime API documentation
           switch (message.type) {
@@ -141,6 +148,7 @@ function RealtimeAudioRecorder({
               
             case 'transcription_session.updated':
               console.log('Transcription session updated')
+              sessionSetupCompletedRef.current = true
               break
               
             case 'input_audio_buffer.speech_started':
@@ -179,7 +187,7 @@ function RealtimeAudioRecorder({
               
             default:
               // Log other message types for debugging
-              console.log('Message received:', message.type)
+              console.log('Message received:', message.type, message)
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error)
@@ -198,6 +206,7 @@ function RealtimeAudioRecorder({
           setError(`Connection to transcription service closed: ${event.reason || 'Unknown reason'}`)
         }
         setIsTranscribing(false)
+        sessionSetupCompletedRef.current = false
       }
       
       setIsFetchingToken(false)
@@ -209,7 +218,7 @@ function RealtimeAudioRecorder({
       setIsTranscribing(false)
       return null
     }
-  }, [])
+  }, [onError, onTranscriptionComplete]);
   
   // Helper function to convert ArrayBuffer to Base64
   const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
@@ -230,11 +239,13 @@ function RealtimeAudioRecorder({
   
       // Initialize audio context
       if (!audioContextRef.current) {
+        // Use standard AudioContext (no need for webkitAudioContext)
         audioContextRef.current = new AudioContext({
           latencyHint: 'interactive',
           sampleRate: 16000,
         });
       }
+      
       if (audioContextRef.current.state === 'suspended') {
         await audioContextRef.current.resume();
         console.log('AudioContext resumed');
@@ -243,6 +254,7 @@ function RealtimeAudioRecorder({
       }
   
       // Get user media
+      console.log('Requesting microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -266,46 +278,60 @@ function RealtimeAudioRecorder({
       const processor = audioContext.createScriptProcessor(2048, 1, 1);
       processorRef.current = processor;
   
-      let accumulatedAudioData = new Float32Array(0);
+      // Create audio process handler with debug output
+      let accumulatedSampleCount = 0;
       let lastSendTime = Date.now();
       const MIN_BUFFER_SIZE = 1024; // ~64ms at 16kHz
       const MAX_BUFFER_DURATION_MS = 200; // Send every 200ms
-  
+
       processor.onaudioprocess = (e) => {
-        if (!websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN || !isRecording) return;
-  
+        if (!websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN || !isRecording) {
+          console.log("Cannot send audio: WebSocket not ready or not recording");
+          return;
+        }
+        
+        if (!sessionSetupCompletedRef.current) {
+          console.log("Session not fully setup yet, waiting...");
+          return;
+        }
+
         const inputBuffer = e.inputBuffer;
         const inputData = inputBuffer.getChannelData(0);
+        
+        // Log audio levels to debug
         const maxAmplitude = Math.max(...Array.from(inputData).map(Math.abs));
-        console.log('Processing audio chunk:', inputData.length, 'Max amplitude:', maxAmplitude);
-  
-        const newBuffer = new Float32Array(accumulatedAudioData.length + inputData.length);
-        newBuffer.set(accumulatedAudioData);
-        newBuffer.set(inputData, accumulatedAudioData.length);
-        accumulatedAudioData = newBuffer;
-  
-        const currentTime = Date.now();
-        const timeSinceLastSend = currentTime - lastSendTime;
-  
-        if (accumulatedAudioData.length >= MIN_BUFFER_SIZE || timeSinceLastSend >= MAX_BUFFER_DURATION_MS) {
-          if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
-            const pcmBuffer = new Int16Array(accumulatedAudioData.length);
-            for (let i = 0; i < accumulatedAudioData.length; i++) {
-              pcmBuffer[i] = Math.max(-32768, Math.min(32767, Math.floor(accumulatedAudioData[i] * 32768)));
-            }
-  
-            const base64Audio = arrayBufferToBase64(pcmBuffer.buffer);
-            console.log('Base64 audio length:', base64Audio.length);
-            const appendMessage = {
-              type: "input_audio_buffer.append",
-              audio: base64Audio,
-            };
-            websocketRef.current.send(JSON.stringify(appendMessage));
-            console.log(`Sent audio buffer: ${(accumulatedAudioData.length / audioContext.sampleRate * 1000).toFixed(2)}ms`);
-  
-            accumulatedAudioData = new Float32Array(0);
-            lastSendTime = currentTime;
-          }
+        if (accumulatedSampleCount % 10 === 0) { // Log every 10 chunks to avoid console spam
+          console.log(`Audio chunk ${accumulatedSampleCount}:`, 
+            `length=${inputData.length}, ` +
+            `max amplitude=${maxAmplitude.toFixed(4)}, ` + 
+            `time=${new Date().toISOString()}`);
+        }
+        
+        accumulatedSampleCount++;
+
+        // Convert Float32Array to PCM16 format (Int16Array)
+        const pcmBuffer = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          // Convert Float32 (-1 to 1) to Int16 (-32768 to 32767) range
+          pcmBuffer[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32768)));
+        }
+
+        // Encode audio data as base64
+        const base64Audio = arrayBufferToBase64(pcmBuffer.buffer);
+        
+        // Send audio data to the WebSocket with a unique event ID
+        const eventId = `audio_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        const appendMessage = {
+          type: "input_audio_buffer.append",
+          event_id: eventId,
+          audio: base64Audio,
+        };
+        
+        try {
+          websocketRef.current.send(JSON.stringify(appendMessage));
+          console.log(`Sent audio buffer ${accumulatedSampleCount}: ${base64Audio.length} bytes, event_id: ${eventId}`);
+        } catch (err) {
+          console.error("Error sending audio data:", err);
         }
       };
   
@@ -314,15 +340,17 @@ function RealtimeAudioRecorder({
   
       setIsRecording(true);
       setTranscription('');
+      console.log('Recording started successfully');
   
     } catch (err) {
       console.error('Error starting recording:', err);
       setError(`Could not start recording: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-  }, [initializeWebSocket]);
+  }, [initializeWebSocket, isRecording]);
 
   const stopRecording = useCallback(() => {
     try {
+      console.log("Stopping recording...");
       // Stop the media recorder and close streams
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop())
@@ -337,13 +365,15 @@ function RealtimeAudioRecorder({
       
       // Close the WebSocket connection
       if (websocketRef.current) {
-        if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+        if (websocketRef.current.readyState === WebSocket.OPEN) {
           websocketRef.current.close(1000, "Recording stopped by user");
           websocketRef.current = null;
         }
       }
       
       setIsRecording(false)
+      sessionSetupCompletedRef.current = false;
+      console.log("Recording stopped successfully");
     } catch (err) {
       console.error('Error stopping recording:', err)
       setError(`Error stopping recording: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -353,6 +383,7 @@ function RealtimeAudioRecorder({
   // Clean up resources when the component unmounts
   useEffect(() => {
     return () => {
+      console.log("Component unmounting, cleaning up resources...");
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop())
       }
@@ -364,6 +395,8 @@ function RealtimeAudioRecorder({
       if (websocketRef.current) {
         websocketRef.current.close()
       }
+      
+      sessionSetupCompletedRef.current = false;
     }
   }, [])
   
