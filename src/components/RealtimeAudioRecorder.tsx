@@ -15,7 +15,7 @@ interface RealtimeAudioRecorderProps {
 interface TokenResponse {
   token: string
   expires_at: number
-  session_id: string
+  id: string
 }
 
 function RealtimeAudioRecorder({
@@ -35,7 +35,7 @@ function RealtimeAudioRecorder({
   const sessionSetupCompletedRef = useRef<boolean>(false)
   
   // Call the Edge Function to get an ephemeral token
-  const getEphemeralToken = async (): Promise<{ token: string, expires_at: number, session_id: string } | null> => {
+  const getEphemeralToken = async (): Promise<TokenResponse | null> => {
     try {
       setIsFetchingToken(true)
       // Use the supabase client to call the function - this handles authentication properly
@@ -59,9 +59,9 @@ function RealtimeAudioRecorder({
       
       // Return the token data in the expected format
       return {
-        token: data.token || data.client_secret?.value,
-        expires_at: data.expires_at || data.client_secret?.expires_at,
-        session_id: data.session_id || data.id
+        token: data.token,
+        expires_at: data.expires_at,
+        id: data.id
       }
     } catch (error) {
       console.error('Error fetching token:', error)
@@ -87,25 +87,24 @@ function RealtimeAudioRecorder({
       
       console.log(`Token obtained, expires at: ${new Date(tokenData.expires_at * 1000).toISOString()}`)
       
-      // According to the latest documentation, the correct format is:
-      // wss://api.openai.com/v1/realtime?intent=transcription
+      // The correct WebSocket URL format
       const wsUrl = `wss://api.openai.com/v1/realtime?intent=transcription`;
-
+      
+      // Create WebSocket with the proper protocols array for authentication
       const ws = new WebSocket(wsUrl, [
         "realtime",
         `openai-ephemeral-client-token.${tokenData.token}`,
         "openai-beta.realtime-v1",
       ]);
             
-      console.log('Connecting to OpenAI Realtime API WebSocket with correct parameters')
+      console.log('Connecting to OpenAI Realtime API WebSocket with token authentication')
       
-      // Create WebSocket connection with the properly formatted URL
       websocketRef.current = ws
       
       ws.onopen = () => {
         console.log('WebSocket connection established with OpenAI')
         
-        // Configure the transcription session with the correct message format exactly as shown in the docs
+        // Configure the transcription session with the correct message format
         ws.send(JSON.stringify({
           "type": "transcription_session.update",
           "session": {
@@ -222,8 +221,6 @@ function RealtimeAudioRecorder({
   
   // Helper function to convert ArrayBuffer to Base64
   const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-    // Use a more reliable method to convert ArrayBuffer to Base64
-    // that works consistently across browsers
     const bytes = new Uint8Array(buffer)
     let binary = ''
     const len = bytes.byteLength
@@ -239,7 +236,6 @@ function RealtimeAudioRecorder({
   
       // Initialize audio context
       if (!audioContextRef.current) {
-        // Use standard AudioContext (no need for webkitAudioContext)
         audioContextRef.current = new AudioContext({
           latencyHint: 'interactive',
           sampleRate: 16000,
