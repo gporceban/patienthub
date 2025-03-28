@@ -230,7 +230,7 @@ function RealtimeAudioRecorder({
   
       // Initialize audio context
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+        audioContextRef.current = new AudioContext({
           latencyHint: 'interactive',
           sampleRate: 16000,
         });

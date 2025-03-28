@@ -6,6 +6,7 @@ type StatusProps = {
   isRecording: boolean;
   isTranscribing: boolean;
   isProcessing: boolean;
+  isUploading?: boolean;
   hasError: boolean;
   transcriptionComplete: boolean;
   processingComplete: boolean;
@@ -24,6 +25,7 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
   isRecording,
   isTranscribing,
   isProcessing,
+  isUploading = false,
   hasError,
   transcriptionComplete,
   processingComplete,
@@ -45,6 +47,15 @@ const AudioRecorderStatus: React.FC<StatusProps> = ({
       <div className="flex items-center text-red-500 mt-4 animate-pulse">
         <span className="h-3 w-3 rounded-full bg-red-500 mr-2"></span>
         <span>Gravando consulta...</span>
+      </div>
+    );
+  }
+  
+  if (isUploading) {
+    return (
+      <div className="flex items-center text-blue-400 mt-4">
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        <span>Enviando arquivo de áudio...</span>
       </div>
     );
   }
