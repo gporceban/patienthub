@@ -1,4 +1,3 @@
-
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
@@ -34,11 +33,9 @@ function RealtimeAudioRecorder({
   const processorRef = useRef<ScriptProcessorNode | null>(null)
   const sessionSetupCompletedRef = useRef<boolean>(false)
   
-  // Call the Edge Function to get an ephemeral token
   const getEphemeralToken = async (): Promise<TokenResponse | null> => {
     try {
       setIsFetchingToken(true)
-      // Use the supabase client to call the function - this handles authentication properly
       const { data, error } = await supabase.functions.invoke('realtime-transcription-token')
       
       if (error) {
@@ -57,7 +54,6 @@ function RealtimeAudioRecorder({
       
       console.log('Token response:', data)
       
-      // Return the token data in the expected format
       return {
         token: data.token,
         expires_at: data.expires_at,
@@ -73,12 +69,10 @@ function RealtimeAudioRecorder({
     }
   }
 
-  // Initialize WebSocket connection with the ephemeral token
   const initializeWebSocket = useCallback(async () => {
     try {
       setIsFetchingToken(true)
       
-      // Get ephemeral token from our Edge Function
       const tokenData = await getEphemeralToken()
       if (!tokenData) {
         setIsFetchingToken(false)
@@ -87,10 +81,8 @@ function RealtimeAudioRecorder({
       
       console.log(`Token obtained, expires at: ${new Date(tokenData.expires_at * 1000).toISOString()}`)
       
-      // The correct WebSocket URL format
       const wsUrl = `wss://api.openai.com/v1/realtime?intent=transcription`;
       
-      // Create WebSocket with the proper protocols array for authentication
       const ws = new WebSocket(wsUrl, [
         "realtime",
         `openai-ephemeral-client-token.${tokenData.token}`,
@@ -104,7 +96,6 @@ function RealtimeAudioRecorder({
       ws.onopen = () => {
         console.log('WebSocket connection established with OpenAI')
         
-        // Configure the transcription session with the correct message format
         ws.send(JSON.stringify({
           "type": "transcription_session.update",
           "session": {
@@ -139,7 +130,6 @@ function RealtimeAudioRecorder({
           const message = JSON.parse(event.data)
           console.log('WebSocket message received:', message.type)
           
-          // Handle different event types according to the OpenAI Realtime API documentation
           switch (message.type) {
             case 'transcription_session.created':
               console.log('Transcription session created')
@@ -159,7 +149,6 @@ function RealtimeAudioRecorder({
               break
               
             case 'response.audio_transcript.delta':
-              // Handle the incremental transcription updates
               if (message.delta) {
                 console.log('Transcription delta:', message.delta)
                 setTranscription(prev => prev + message.delta)
@@ -167,7 +156,6 @@ function RealtimeAudioRecorder({
               break
               
             case 'response.audio_transcript.done':
-              // Final transcription for a segment
               if (message.transcript) {
                 console.log('Final transcription:', message.transcript)
                 onTranscriptionComplete?.(message.transcript)
@@ -185,7 +173,6 @@ function RealtimeAudioRecorder({
               break
               
             default:
-              // Log other message types for debugging
               console.log('Message received:', message.type, message)
           }
         } catch (error) {
@@ -219,7 +206,6 @@ function RealtimeAudioRecorder({
     }
   }, [onError, onTranscriptionComplete]);
   
-  // Helper function to convert ArrayBuffer to Base64
   const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
     const bytes = new Uint8Array(buffer)
     let binary = ''
@@ -234,7 +220,6 @@ function RealtimeAudioRecorder({
     try {
       setError(null);
   
-      // Initialize audio context
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContext({
           latencyHint: 'interactive',
@@ -249,7 +234,6 @@ function RealtimeAudioRecorder({
         console.log('AudioContext state:', audioContextRef.current.state);
       }
   
-      // Get user media
       console.log('Requesting microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -264,7 +248,6 @@ function RealtimeAudioRecorder({
       console.log('Microphone stream active:', stream.active);
       console.log('Audio tracks:', stream.getAudioTracks());
   
-      // Initialize WebSocket
       const ws = await initializeWebSocket();
       if (!ws) throw new Error('Failed to initialize WebSocket connection');
       websocketRef.current = ws;
@@ -274,12 +257,11 @@ function RealtimeAudioRecorder({
       const processor = audioContext.createScriptProcessor(2048, 1, 1);
       processorRef.current = processor;
   
-      // Create audio process handler with debug output
       let accumulatedSampleCount = 0;
       let lastSendTime = Date.now();
-      const MIN_BUFFER_SIZE = 1024; // ~64ms at 16kHz
-      const MAX_BUFFER_DURATION_MS = 200; // Send every 200ms
-
+      const MIN_BUFFER_SIZE = 1024;
+      const MAX_BUFFER_DURATION_MS = 200;
+  
       processor.onaudioprocess = (e) => {
         if (!websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN || !isRecording) {
           console.log("Cannot send audio: WebSocket not ready or not recording");
@@ -294,9 +276,8 @@ function RealtimeAudioRecorder({
         const inputBuffer = e.inputBuffer;
         const inputData = inputBuffer.getChannelData(0);
         
-        // Log audio levels to debug
         const maxAmplitude = Math.max(...Array.from(inputData).map(Math.abs));
-        if (accumulatedSampleCount % 10 === 0) { // Log every 10 chunks to avoid console spam
+        if (accumulatedSampleCount % 10 === 0) {
           console.log(`Audio chunk ${accumulatedSampleCount}:`, 
             `length=${inputData.length}, ` +
             `max amplitude=${maxAmplitude.toFixed(4)}, ` + 
@@ -305,17 +286,13 @@ function RealtimeAudioRecorder({
         
         accumulatedSampleCount++;
 
-        // Convert Float32Array to PCM16 format (Int16Array)
         const pcmBuffer = new Int16Array(inputData.length);
         for (let i = 0; i < inputData.length; i++) {
-          // Convert Float32 (-1 to 1) to Int16 (-32768 to 32767) range
           pcmBuffer[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32768)));
         }
 
-        // Encode audio data as base64
         const base64Audio = arrayBufferToBase64(pcmBuffer.buffer);
         
-        // Send audio data to the WebSocket with a unique event ID
         const eventId = `audio_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
         const appendMessage = {
           type: "input_audio_buffer.append",
@@ -347,19 +324,16 @@ function RealtimeAudioRecorder({
   const stopRecording = useCallback(() => {
     try {
       console.log("Stopping recording...");
-      // Stop the media recorder and close streams
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop())
         streamRef.current = null
       }
       
-      // Disconnect the audio processor
       if (processorRef.current && audioContextRef.current) {
         processorRef.current.disconnect()
         processorRef.current = null
       }
       
-      // Close the WebSocket connection
       if (websocketRef.current) {
         if (websocketRef.current.readyState === WebSocket.OPEN) {
           websocketRef.current.close(1000, "Recording stopped by user");
@@ -376,7 +350,6 @@ function RealtimeAudioRecorder({
     }
   }, [])
   
-  // Clean up resources when the component unmounts
   useEffect(() => {
     return () => {
       console.log("Component unmounting, cleaning up resources...");
