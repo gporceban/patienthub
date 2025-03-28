@@ -1,82 +1,99 @@
+'use client'
 
-import React, { useCallback, useMemo, useEffect, useRef } from 'react';
-import { useRealtimeTranscription } from '@/hooks/useRealtimeTranscription';
-import TranscriptionDisplay from './TranscriptionDisplay';
+import React from 'react'
+import { Loader2 } from 'lucide-react'
 
-interface RealtimeTranscriptionProps {
-  isRecording: boolean;
-  transcription: string;
-  isTranscribing: boolean;
-  onTranscriptionUpdate?: (text: string) => void;
+interface TranscriptionDisplayProps {
+  transcription: string
+  isRecording: boolean
+  isLoading: boolean
+  error?: string | null
+  isEmpty: boolean
 }
 
-const RealtimeTranscription: React.FC<RealtimeTranscriptionProps> = ({
+function TranscriptionDisplay({
+  transcription,
+  isRecording,
+  isLoading,
+  error,
+  isEmpty,
+}: TranscriptionDisplayProps) {
+  if (isLoading) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center">
+        <Loader2 className="h-5 w-5 mr-2 text-gold-500 animate-spin" />
+        <p className="text-gray-300 text-sm">Transcrevendo áudio...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center">
+        <p className="text-red-400 text-sm">{error}</p>
+      </div>
+    )
+  }
+
+  if (isEmpty) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center">
+        <p className="text-gray-400 text-sm">A transcrição aparecerá aqui quando a gravação iniciar</p>
+      </div>
+    )
+  }
+
+  if (transcription) {
+    return (
+      <div className="absolute inset-0 p-3 overflow-y-auto">
+        <p className="text-white text-sm font-medium">
+          {transcription}
+          {isRecording && (
+            <span className="inline-block w-2 h-4 ml-1 bg-gold-500 animate-pulse"></span>
+          )}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <p className="text-gray-300 text-sm">Gravando áudio... Começe a falar.</p>
+      <span className="ml-2 h-2 w-2 bg-red-500 rounded-full animate-pulse"></span>
+    </div>
+  )
+}
+
+interface RealtimeTranscriptionProps {
+  isRecording: boolean
+  transcription: string
+  isTranscribing: boolean
+  error?: string | null
+}
+
+function RealtimeTranscription({
   isRecording,
   transcription,
   isTranscribing,
-  onTranscriptionUpdate
-}) => {
-  const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const prevIsRecordingRef = useRef(isRecording);
-  
-  // Use a stable callback that only changes when onTranscriptionUpdate changes
-  const stableCallback = useCallback((text: string) => {
-    if (onTranscriptionUpdate) {
-      onTranscriptionUpdate(text);
-    }
-  }, [onTranscriptionUpdate]);
-  
-  // Only use the realtime transcription if we're recording and have a callback
-  const shouldUseRealtime = useMemo(() => {
-    return isRecording && !!onTranscriptionUpdate;
-  }, [isRecording, onTranscriptionUpdate]);
-  
-  const {
-    isConnecting,
-    isConnected,
-    error,
-    text,
-    connectionAttempts,
-    cleanupResources
-  } = useRealtimeTranscription({
-    isRecording: shouldUseRealtime,
-    onTranscriptionUpdate: stableCallback
-  });
-  
-  // Properly handle recording state changes with a delay to prevent premature cleanup
-  useEffect(() => {
-    if (prevIsRecordingRef.current && !isRecording) {
-      if (cleanupTimeoutRef.current) {
-        clearTimeout(cleanupTimeoutRef.current);
-      }
-      
-      // Delay cleanup by 500ms to ensure all processing is complete
-      cleanupTimeoutRef.current = setTimeout(() => {
-        cleanupResources();
-      }, 500);
-    }
-    
-    prevIsRecordingRef.current = isRecording;
-    
-    return () => {
-      if (cleanupTimeoutRef.current) {
-        clearTimeout(cleanupTimeoutRef.current);
-      }
-    };
-  }, [isRecording, cleanupResources]);
-  
-  return (
-    <TranscriptionDisplay
-      isConnecting={isConnecting}
-      isConnected={isConnected}
-      error={error}
-      text={text}
-      isRecording={isRecording}
-      isTranscribing={isTranscribing}
-      transcription={transcription}
-      connectionAttempts={connectionAttempts}
-    />
-  );
-};
+  error,
+}: RealtimeTranscriptionProps) {
+  const isEmpty = !isRecording && !transcription && !isTranscribing && !error
 
-export default React.memo(RealtimeTranscription);
+  return (
+    <div
+      className={`w-full h-20 rounded-md overflow-hidden ${
+        isRecording ? 'bg-darkblue-800/80' : 'bg-darkblue-900/50'
+      } relative border border-darkblue-700`}
+    >
+      <TranscriptionDisplay
+        transcription={transcription}
+        isRecording={isRecording}
+        isLoading={isTranscribing}
+        error={error}
+        isEmpty={isEmpty}
+      />
+    </div>
+  )
+}
+
+export default RealtimeTranscription
