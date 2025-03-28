@@ -54,7 +54,7 @@ serve(async (req) => {
     const data = await response.json()
     console.log('Response data from OpenAI:', JSON.stringify(data, null, 2))
     
-    if (!data.client_secret?.value || !data.client_secret?.expires_at) {
+    if (!data.client_secret || !data.client_secret.value || !data.client_secret.expires_at) {
       throw new Error('Invalid response format from OpenAI API')
     }
     
@@ -63,8 +63,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         token: data.client_secret.value,
-        expires_at: data.client_secret.expires_at,
-        id: data.id
+        expires_at: data.client_secret.expires_at
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
