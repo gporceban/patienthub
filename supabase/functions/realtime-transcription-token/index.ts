@@ -32,7 +32,8 @@ serve(async (req) => {
     
     console.log('Requesting ephemeral token from OpenAI for transcription...')
     
-    // Send the request with the required session configuration
+    // Send the request with the correct format - the session parameters must be at the top level
+    // instead of nested inside a "session" object
     const response = await fetch('https://api.openai.com/v1/realtime/transcription_sessions', {
       method: 'POST',
       headers: {
@@ -40,24 +41,22 @@ serve(async (req) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        "session": {
-          "input_audio_format": "pcm16",
-          "input_audio_transcription": {
-            "model": "gpt-4o-transcribe",
-            "prompt": "Esta é uma consulta médica em português do Brasil.",
-            "language": "pt"
-          },
-          "turn_detection": {
-            "type": "server_vad",
-            "threshold": 0.3,
-            "prefix_padding_ms": 300,
-            "silence_duration_ms": 500
-          },
-          "input_audio_noise_reduction": {
-            "type": "far_field"
-          },
-          "include": ["item.input_audio_transcription.logprobs"]
-        }
+        "input_audio_format": "pcm16",
+        "input_audio_transcription": {
+          "model": "gpt-4o-transcribe",
+          "prompt": "Esta é uma consulta médica em português do Brasil.",
+          "language": "pt"
+        },
+        "turn_detection": {
+          "type": "server_vad",
+          "threshold": 0.3,
+          "prefix_padding_ms": 300,
+          "silence_duration_ms": 500
+        },
+        "input_audio_noise_reduction": {
+          "type": "far_field"
+        },
+        "include": ["item.input_audio_transcription.logprobs"]
       })
     })
     
