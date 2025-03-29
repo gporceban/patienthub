@@ -32,15 +32,33 @@ serve(async (req) => {
     
     console.log('Requesting ephemeral token from OpenAI for transcription...')
     
-    // According to OpenAI docs, the correct endpoint for transcription sessions
+    // Send the request with the required session configuration
     const response = await fetch('https://api.openai.com/v1/realtime/transcription_sessions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      // Send an empty body as per the documentation
-      body: JSON.stringify({})
+      body: JSON.stringify({
+        "session": {
+          "input_audio_format": "pcm16",
+          "input_audio_transcription": {
+            "model": "gpt-4o-transcribe",
+            "prompt": "Esta é uma consulta médica em português do Brasil.",
+            "language": "pt"
+          },
+          "turn_detection": {
+            "type": "server_vad",
+            "threshold": 0.3,
+            "prefix_padding_ms": 300,
+            "silence_duration_ms": 500
+          },
+          "input_audio_noise_reduction": {
+            "type": "far_field"
+          },
+          "include": ["item.input_audio_transcription.logprobs"]
+        }
+      })
     })
     
     console.log('OpenAI response status:', response.status)
@@ -54,6 +72,7 @@ serve(async (req) => {
     const data = await response.json()
     console.log('Response data from OpenAI:', JSON.stringify(data, null, 2))
     
+    // Properly extract all the necessary information
     if (!data.client_secret || !data.client_secret.value || !data.client_secret.expires_at) {
       throw new Error('Invalid response format from OpenAI API')
     }
@@ -64,7 +83,11 @@ serve(async (req) => {
       JSON.stringify({
         token: data.client_secret.value,
         expires_at: data.client_secret.expires_at,
-        session_id: data.id  // Include the session_id from the response
+        session_id: data.id,  // Include the session_id from the response
+        modalities: data.modalities,
+        turn_detection: data.turn_detection,
+        input_audio_format: data.input_audio_format,
+        input_audio_transcription: data.input_audio_transcription
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
