@@ -63,7 +63,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         token: data.client_secret.value,
-        expires_at: data.client_secret.expires_at
+        expires_at: data.client_secret.expires_at,
+        session_id: data.id  // Include the session_id from the response
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
